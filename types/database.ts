@@ -112,10 +112,96 @@ export type Database = {
         };
         Relationships: [];
       };
+      comparison_site_accounts: {
+        Row: {
+          id: string;
+          store_id: string | null;
+          site: "oikura" | "uridoki" | "hikakaku";
+          account_email: string | null;
+          notification_email: string | null;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          store_id?: string | null;
+          site: "oikura" | "uridoki" | "hikakaku";
+          account_email?: string | null;
+          notification_email?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          store_id?: string | null;
+          site?: "oikura" | "uridoki" | "hikakaku";
+          account_email?: string | null;
+          notification_email?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "comparison_site_accounts_store_id_fkey";
+            columns: ["store_id"];
+            isOneToOne: false;
+            referencedRelation: "stores";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      email_accounts: {
+        Row: {
+          id: string;
+          store_id: string | null;
+          email: string;
+          display_name: string | null;
+          provider: "gmail" | "other";
+          purpose: "inquiry" | "reply";
+          oauth_tokens: Json | null;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          store_id?: string | null;
+          email: string;
+          display_name?: string | null;
+          provider?: "gmail" | "other";
+          purpose?: "inquiry" | "reply";
+          oauth_tokens?: Json | null;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          store_id?: string | null;
+          email?: string;
+          display_name?: string | null;
+          provider?: "gmail" | "other";
+          purpose?: "inquiry" | "reply";
+          oauth_tokens?: Json | null;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "email_accounts_store_id_fkey";
+            columns: ["store_id"];
+            isOneToOne: false;
+            referencedRelation: "stores";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       inquiries: {
         Row: {
           id: string;
           lead_id: string | null;
+          store_id: string | null;
+          line_account_id: string | null;
+          email_account_id: string | null;
+          comparison_account_id: string | null;
           channel: Database["public"]["Enums"]["inquiry_channel"];
           status: Database["public"]["Enums"]["inquiry_status"];
           subject: string | null;
@@ -132,6 +218,10 @@ export type Database = {
         Insert: {
           id?: string;
           lead_id?: string | null;
+          store_id?: string | null;
+          line_account_id?: string | null;
+          email_account_id?: string | null;
+          comparison_account_id?: string | null;
           channel: Database["public"]["Enums"]["inquiry_channel"];
           status?: Database["public"]["Enums"]["inquiry_status"];
           subject?: string | null;
@@ -148,6 +238,10 @@ export type Database = {
         Update: {
           id?: string;
           lead_id?: string | null;
+          store_id?: string | null;
+          line_account_id?: string | null;
+          email_account_id?: string | null;
+          comparison_account_id?: string | null;
           channel?: Database["public"]["Enums"]["inquiry_channel"];
           status?: Database["public"]["Enums"]["inquiry_status"];
           subject?: string | null;
@@ -174,6 +268,34 @@ export type Database = {
             columns: ["assigned_to"];
             isOneToOne: false;
             referencedRelation: "staff";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "inquiries_store_id_fkey";
+            columns: ["store_id"];
+            isOneToOne: false;
+            referencedRelation: "stores";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "inquiries_line_account_id_fkey";
+            columns: ["line_account_id"];
+            isOneToOne: false;
+            referencedRelation: "line_accounts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "inquiries_email_account_id_fkey";
+            columns: ["email_account_id"];
+            isOneToOne: false;
+            referencedRelation: "email_accounts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "inquiries_comparison_account_id_fkey";
+            columns: ["comparison_account_id"];
+            isOneToOne: false;
+            referencedRelation: "comparison_site_accounts";
             referencedColumns: ["id"];
           },
         ];
@@ -240,6 +362,50 @@ export type Database = {
         };
         Relationships: [];
       };
+      line_accounts: {
+        Row: {
+          id: string;
+          store_id: string | null;
+          name: string;
+          channel_id: string;
+          channel_secret: string;
+          channel_access_token: string;
+          destination: string | null;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          store_id?: string | null;
+          name: string;
+          channel_id: string;
+          channel_secret: string;
+          channel_access_token: string;
+          destination?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          store_id?: string | null;
+          name?: string;
+          channel_id?: string;
+          channel_secret?: string;
+          channel_access_token?: string;
+          destination?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "line_accounts_store_id_fkey";
+            columns: ["store_id"];
+            isOneToOne: false;
+            referencedRelation: "stores";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       messages: {
         Row: {
           id: string;
@@ -291,13 +457,48 @@ export type Database = {
           },
         ];
       };
+      phone_numbers: {
+        Row: {
+          id: string;
+          store_id: string | null;
+          phone_number: string;
+          twilio_sid: string | null;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          store_id?: string | null;
+          phone_number: string;
+          twilio_sid?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          store_id?: string | null;
+          phone_number?: string;
+          twilio_sid?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "phone_numbers_store_id_fkey";
+            columns: ["store_id"];
+            isOneToOne: false;
+            referencedRelation: "stores";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       staff: {
         Row: {
           id: string;
           auth_id: string | null;
           name: string;
           email: string;
-          role: "admin" | "operator" | "viewer";
+          role: "super_admin" | "admin" | "operator" | "viewer";
           is_active: boolean;
           created_at: string;
         };
@@ -306,7 +507,7 @@ export type Database = {
           auth_id?: string | null;
           name: string;
           email: string;
-          role?: "admin" | "operator" | "viewer";
+          role?: "super_admin" | "admin" | "operator" | "viewer";
           is_active?: boolean;
           created_at?: string;
         };
@@ -315,7 +516,64 @@ export type Database = {
           auth_id?: string | null;
           name?: string;
           email?: string;
-          role?: "admin" | "operator" | "viewer";
+          role?: "super_admin" | "admin" | "operator" | "viewer";
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      staff_store_access: {
+        Row: {
+          staff_id: string;
+          store_id: string;
+        };
+        Insert: {
+          staff_id: string;
+          store_id: string;
+        };
+        Update: {
+          staff_id?: string;
+          store_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "staff_store_access_staff_id_fkey";
+            columns: ["staff_id"];
+            isOneToOne: false;
+            referencedRelation: "staff";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "staff_store_access_store_id_fkey";
+            columns: ["store_id"];
+            isOneToOne: false;
+            referencedRelation: "stores";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      stores: {
+        Row: {
+          id: string;
+          name: string;
+          store_code: string | null;
+          store_type: "direct" | "fc";
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          store_code?: string | null;
+          store_type?: "direct" | "fc";
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          store_code?: string | null;
+          store_type?: "direct" | "fc";
           is_active?: boolean;
           created_at?: string;
         };
@@ -358,6 +616,14 @@ export type Message = Database["public"]["Tables"]["messages"]["Row"];
 export type Appointment = Database["public"]["Tables"]["appointments"]["Row"];
 export type Staff = Database["public"]["Tables"]["staff"]["Row"];
 export type InquiryTag = Database["public"]["Tables"]["inquiry_tags"]["Row"];
+export type Store = Database["public"]["Tables"]["stores"]["Row"];
+export type LineAccount = Database["public"]["Tables"]["line_accounts"]["Row"];
+export type EmailAccount = Database["public"]["Tables"]["email_accounts"]["Row"];
+export type ComparisonSiteAccount =
+  Database["public"]["Tables"]["comparison_site_accounts"]["Row"];
+export type PhoneNumber = Database["public"]["Tables"]["phone_numbers"]["Row"];
+export type StaffStoreAccess =
+  Database["public"]["Tables"]["staff_store_access"]["Row"];
 export type InquiryChannel = Database["public"]["Enums"]["inquiry_channel"];
 export type InquiryStatus = Database["public"]["Enums"]["inquiry_status"];
 export type MessageDirection = Database["public"]["Enums"]["message_direction"];
@@ -365,5 +631,12 @@ export type MessageDirection = Database["public"]["Enums"]["message_direction"];
 export type InquiryWithLead = Inquiry & {
   leads: Lead | null;
   staff: Pick<Staff, "id" | "name" | "email"> | null;
+  stores?: Pick<Store, "id" | "name" | "store_code" | "store_type"> | null;
+  line_accounts?: Pick<LineAccount, "id" | "name" | "destination"> | null;
+  email_accounts?: Pick<EmailAccount, "id" | "email" | "display_name"> | null;
+  comparison_site_accounts?: Pick<
+    ComparisonSiteAccount,
+    "id" | "site" | "notification_email"
+  > | null;
   inquiry_tags?: InquiryTag[];
 };

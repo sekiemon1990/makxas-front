@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   // 反響とリード情報を取得
   const { data: inquiry } = await supabase
     .from("inquiries")
-    .select("*, leads(line_user_id)")
+    .select("*, leads(line_user_id), line_accounts(channel_access_token)")
     .eq("id", body.inquiry_id)
     .maybeSingle();
 
@@ -55,11 +55,23 @@ export async function POST(request: NextRequest) {
     .eq("id", body.inquiry_id);
 
   // LINEチャンネルの場合はpush送信
-  const lineUserId = (inquiry.leads as { line_user_id: string | null } | null)?.line_user_id;
+  const lineUserId = (
+    inquiry.leads as { line_user_id: string | null } | null
+  )?.line_user_id;
   if (inquiry.channel === "line" && lineUserId) {
+    const lineAccount = inquiry.line_accounts as {
+      channel_access_token: string | null;
+    } | null;
+    const channelAccessToken =
+      lineAccount?.channel_access_token ?? process.env.LINE_CHANNEL_ACCESS_TOKEN;
+
+    if (!channelAccessToken) {
+      return NextResponse.json({ message });
+    }
+
     try {
       const client = new line.messagingApi.MessagingApiClient({
-        channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN!,
+        channelAccessToken,
       });
       await client.pushMessage({
         to: lineUserId,

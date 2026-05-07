@@ -32,25 +32,33 @@ import type {
   InquiryWithLead,
   Message,
   Staff,
+  Store,
 } from "@/types/database";
 
 type StatusFilter = InquiryStatus | "all";
 type ChannelFilter = InquiryChannel | "all";
+type StoreFilter = string | "all";
 
 export function RealtimeInbox({
+  canUseAllStores,
   initialChannel,
   initialInquiries,
   initialMessages,
   initialSelectedId,
   initialStatus,
+  initialStore,
   staff,
+  stores,
 }: {
+  canUseAllStores: boolean;
   initialChannel: ChannelFilter;
   initialInquiries: InquiryWithLead[];
   initialMessages: Message[];
   initialSelectedId: string | null;
   initialStatus: StatusFilter;
+  initialStore: StoreFilter;
   staff: Staff[];
+  stores: Store[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -77,7 +85,8 @@ export function RealtimeInbox({
 
           if (
             (initialStatus !== "all" && row.status !== initialStatus) ||
-            (initialChannel !== "all" && row.channel !== initialChannel)
+            (initialChannel !== "all" && row.channel !== initialChannel) ||
+            (initialStore !== "all" && row.store_id !== initialStore)
           ) {
             return;
           }
@@ -105,7 +114,7 @@ export function RealtimeInbox({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [initialChannel, initialStatus]);
+  }, [initialChannel, initialStatus, initialStore]);
 
   const selectedInquiry = useMemo(() => {
     return items.find((item) => item.id === selectedId) ?? items[0] ?? null;
@@ -199,6 +208,25 @@ export function RealtimeInbox({
             </h1>
           </div>
           <div className="space-y-7 p-4">
+            <FilterSection title="店舗フィルター">
+              {canUseAllStores ? (
+                <FilterButton
+                  active={initialStore === "all"}
+                  onClick={() => updateQuery({ store: "all", id: null })}
+                >
+                  全店舗
+                </FilterButton>
+              ) : null}
+              {stores.map((store) => (
+                <FilterButton
+                  key={store.id}
+                  active={initialStore === store.id}
+                  onClick={() => updateQuery({ store: store.id, id: null })}
+                >
+                  {store.name}
+                </FilterButton>
+              ))}
+            </FilterSection>
             <FilterSection title="ステータスフィルター">
               {statusFilters.map((filter) => (
                 <FilterButton
@@ -281,7 +309,10 @@ export function RealtimeInbox({
                 </div>
                 <div className="mt-4 flex items-center justify-between text-xs text-zinc-500">
                   <span>{formatElapsed(item.created_at)}</span>
-                  <span>{item.staff?.name ?? "未アサイン"}</span>
+                  <span>
+                    {item.stores?.name ?? "店舗未設定"} /{" "}
+                    {item.staff?.name ?? "未アサイン"}
+                  </span>
                 </div>
               </button>
             ))}
@@ -311,6 +342,7 @@ export function RealtimeInbox({
                     </h2>
                     <p className="mt-1 text-sm text-zinc-500">
                       {getCustomerName(selectedInquiry)} /{" "}
+                      {selectedInquiry.stores?.name ?? "店舗未設定"} /{" "}
                       {formatDateTime(selectedInquiry.created_at)}
                     </p>
                   </div>
