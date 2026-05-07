@@ -1,6 +1,6 @@
 import { AppShell } from "@/components/app-shell";
 import { channelMeta, statusMeta } from "@/lib/inquiry-options";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import type {
   InquiryChannel,
   InquiryStatus,
@@ -26,7 +26,7 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
   const status = getStatusParam(firstValue(params.status));
   const channel = getChannelParam(firstValue(params.channel));
   const requestedId = firstValue(params.id);
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   let inquiryQuery = supabase
     .from("inquiries")
