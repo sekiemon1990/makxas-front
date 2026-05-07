@@ -1,7 +1,7 @@
+import * as line from "@line/bot-sdk";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { createClient } from "@/lib/supabase/server";
-import type { Message } from "@/types/database";
+import { createServiceClient } from "@/lib/supabase/service";
 
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => null)) as {
@@ -16,29 +16,27 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const supabase = createServiceClient();
+  const now = new Date().toISOString();
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { data: staff } = await supabase
-    .from("staff")
-    .select("id")
-    .eq("auth_id", user.id)
+  // 反響とリード情報を取得
+  const { data: inquiry } = await supabase
+    .from("inquiries")
+    .select("*, leads(line_user_id)")
+    .eq("id", body.inquiry_id)
     .maybeSingle();
 
-  const now = new Date().toISOString();
+  if (!inquiry) {
+    return NextResponse.json({ error: "Inquiry not found" }, { status: 404 });
+  }
+
+  // DBにメッセージ保存
   const { data: message, error } = await supabase
     .from("messages")
     .insert({
       inquiry_id: body.inquiry_id,
       direction: "outbound",
       body: body.body.trim(),
-      sent_by: staff?.id ?? null,
     })
     .select("*")
     .single();
@@ -47,19 +45,31 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const { data: inquiry } = await supabase
-    .from("inquiries")
-    .select("first_response_at")
-    .eq("id", body.inquiry_id)
-    .maybeSingle();
-
+  // first_response_at を更新
   await supabase
     .from("inquiries")
     .update({
       updated_at: now,
-      first_response_at: inquiry?.first_response_at ?? now,
+      first_response_at: inquiry.first_response_at ?? now,
     })
     .eq("id", body.inquiry_id);
 
-  return NextResponse.json({ message: message as Message });
+  // LINEチャンネルの場合はpush送信
+  const lineUserId = (inquiry.leads as { line_user_id: string | null } | null)?.line_user_id;
+  if (inquiry.channel === "line" && lineUserId) {
+    try {
+      const client = new line.messagingApi.MessagingApiClient({
+        channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN!,
+      });
+      await client.pushMessage({
+        to: lineUserId,
+        messages: [{ type: "text", text: body.body.trim() }],
+      });
+    } catch (lineError) {
+      // LINE送信失敗してもDB保存は成功として返す（ログのみ）
+      console.error("LINE push failed:", lineError);
+    }
+  }
+
+  return NextResponse.json({ message });
 }
