@@ -2,7 +2,7 @@ import { messagingApi, validateSignature } from "@line/bot-sdk";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { createServiceClient } from "@/lib/supabase/service";
-import type { Inquiry, Lead } from "@/types/database";
+import type { Inquiry, Lead, LineAccount } from "@/types/database";
 
 export const runtime = "nodejs";
 
@@ -19,6 +19,7 @@ type LineEvent = {
 };
 
 type LineCallback = {
+  destination?: string;
   events?: LineEvent[];
 };
 
@@ -33,7 +34,23 @@ const activeStatuses = [
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
   const signature = request.headers.get("x-line-signature") ?? "";
-  const channelSecret = process.env.LINE_CHANNEL_SECRET ?? "";
+  const payload = parseLinePayload(rawBody);
+
+  if (!payload) {
+    return NextResponse.json({ ok: false }, { status: 200 });
+  }
+
+  const supabase = createServiceClient();
+  const { data: lineAccount } = payload.destination
+    ? await supabase
+        .from("line_accounts")
+        .select("*")
+        .eq("destination", payload.destination)
+        .eq("is_active", true)
+        .maybeSingle()
+    : { data: null };
+  const account = lineAccount as LineAccount | null;
+  const channelSecret = account?.channel_secret ?? process.env.LINE_CHANNEL_SECRET;
 
   if (
     !channelSecret ||
@@ -43,10 +60,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false }, { status: 200 });
   }
 
-  const payload = JSON.parse(rawBody) as LineCallback;
-  const supabase = createServiceClient();
   const lineClient = new messagingApi.MessagingApiClient({
-    channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN ?? "",
+    channelAccessToken:
+      account?.channel_access_token ?? process.env.LINE_CHANNEL_ACCESS_TOKEN ?? "",
   });
 
   await Promise.all(
@@ -60,6 +76,8 @@ export async function POST(request: NextRequest) {
 
         await supabase.from("inquiries").insert({
           lead_id: lead.id,
+          store_id: account?.store_id ?? null,
+          line_account_id: account?.id ?? null,
           channel: "line",
           status: "new",
           subject: "LINE友だち追加",
@@ -71,7 +89,7 @@ export async function POST(request: NextRequest) {
         const lead = await upsertLineLead(supabase, lineClient, lineUserId);
         if (!lead) return;
 
-        const inquiry = await findOrCreateLineInquiry(supabase, lead);
+        const inquiry = await findOrCreateLineInquiry(supabase, lead, account);
         if (!inquiry) return;
 
         const body =
@@ -95,6 +113,14 @@ export async function POST(request: NextRequest) {
   );
 
   return NextResponse.json({ ok: true }, { status: 200 });
+}
+
+function parseLinePayload(rawBody: string) {
+  try {
+    return JSON.parse(rawBody) as LineCallback;
+  } catch {
+    return null;
+  }
 }
 
 async function upsertLineLead(
@@ -128,13 +154,20 @@ async function upsertLineLead(
 async function findOrCreateLineInquiry(
   supabase: ReturnType<typeof createServiceClient>,
   lead: Lead,
+  account: LineAccount | null,
 ) {
-  const { data: existing } = await supabase
+  let query = supabase
     .from("inquiries")
     .select("*")
     .eq("lead_id", lead.id)
     .eq("channel", "line")
-    .in("status", activeStatuses)
+    .in("status", activeStatuses);
+
+  query = account?.id
+    ? query.eq("line_account_id", account.id)
+    : query.is("line_account_id", null);
+
+  const { data: existing } = await query
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -145,6 +178,8 @@ async function findOrCreateLineInquiry(
     .from("inquiries")
     .insert({
       lead_id: lead.id,
+      store_id: account?.store_id ?? null,
+      line_account_id: account?.id ?? null,
       channel: "line",
       status: "new",
       subject: "LINEメッセージ",
