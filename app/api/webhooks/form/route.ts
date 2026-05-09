@@ -21,12 +21,23 @@ export async function POST(request: NextRequest) {
 
   const supabase = createServiceClient();
   const normalizedEmail = body.email.trim().toLowerCase();
+  const normalizedPhone = body.phone?.trim() || null;
 
-  const { data: existingLead } = await supabase
+  // メールで既存リードを検索、なければ電話番号で検索
+  let { data: existingLead } = await supabase
     .from("leads")
     .select("*")
     .eq("email", normalizedEmail)
     .maybeSingle();
+
+  if (!existingLead && normalizedPhone) {
+    const { data: phoneMatch } = await supabase
+      .from("leads")
+      .select("*")
+      .eq("phone", normalizedPhone)
+      .maybeSingle();
+    existingLead = phoneMatch;
+  }
 
   const leadPayload = {
     display_name: body.name.trim(),

@@ -24,6 +24,7 @@ type InboxPageProps = {
     store?: string | string[];
     id?: string | string[];
     page?: string | string[];
+    assignee?: string | string[];
   }>;
 };
 
@@ -34,6 +35,7 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
   const requestedStore = firstValue(params.store);
   const requestedId = firstValue(params.id);
   const page = Math.max(1, parseInt(firstValue(params.page) ?? "1", 10) || 1);
+  const assigneeFilter = firstValue(params.assignee) === "mine" ? "mine" : "all";
   const authClient = await createClient();
   const {
     data: { user },
@@ -91,6 +93,10 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
     inquiryQuery = inquiryQuery.eq("channel", channel);
   }
 
+  if (assigneeFilter === "mine" && currentStaff) {
+    inquiryQuery = inquiryQuery.eq("assigned_to", currentStaff.id);
+  }
+
   if (store !== "all") {
     inquiryQuery = inquiryQuery.eq("store_id", store);
   } else if (!canUseAllStores) {
@@ -137,9 +143,11 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
   return (
     <AppShell>
       <RealtimeInbox
-        key={`${status}:${channel}:${store}:${page}:${selectedId ?? ""}`}
+        key={`${status}:${channel}:${store}:${assigneeFilter}:${page}:${selectedId ?? ""}`}
         canUseAllStores={canUseAllStores}
+        currentStaffId={currentStaff?.id ?? null}
         hasMore={hasMore}
+        initialAssignee={assigneeFilter}
         initialChannel={channel}
         initialInquiries={inquiries}
         initialMessages={(messageRows ?? []) as Message[]}

@@ -23,6 +23,7 @@ export type Database = {
           status: string;
           core_synced_at: string | null;
           core_appointment_id: string | null;
+          reminder_sent_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -38,6 +39,7 @@ export type Database = {
           status?: string;
           core_synced_at?: string | null;
           core_appointment_id?: string | null;
+          reminder_sent_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -53,6 +55,7 @@ export type Database = {
           status?: string;
           core_synced_at?: string | null;
           core_appointment_id?: string | null;
+          reminder_sent_at?: string | null;
           created_at?: string;
         };
         Relationships: [

@@ -42,6 +42,7 @@ export default async function DashboardPage() {
     { data: recentRows },
     { data: channelRows },
     { data: weeklyRows },
+    { data: lostTagRows },
   ] = await Promise.all([
     supabase
       .from("inquiries")
@@ -80,6 +81,10 @@ export default async function DashboardPage() {
       .select("created_at")
       .gte("created_at", sevenDaysAgo.toISOString())
       .order("created_at", { ascending: true }),
+    supabase
+      .from("inquiry_tags")
+      .select("tag, inquiries!inner(status)")
+      .eq("inquiries.status", "lost"),
   ]);
 
   const recentInquiries = (recentRows ?? []) as unknown as InquiryWithLead[];
@@ -97,6 +102,14 @@ export default async function DashboardPage() {
   );
 
   const weeklyData = buildWeeklyData(weeklyRows ?? [], sevenDaysAgo);
+
+  const lostTagCounts = (lostTagRows ?? []).reduce<Record<string, number>>((acc, r) => {
+    acc[r.tag] = (acc[r.tag] ?? 0) + 1;
+    return acc;
+  }, {});
+  const topLostTags = Object.entries(lostTagCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8);
 
   const summaryCards = [
     { title: "新着", value: newCount ?? 0, icon: Inbox },
@@ -249,6 +262,36 @@ export default async function DashboardPage() {
               </CardContent>
             </Card>
           </div>
+
+          {topLostTags.length > 0 ? (
+            <div className="mt-6">
+              <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
+                <CardHeader>
+                  <CardTitle>失注タグ分析</CardTitle>
+                  <CardDescription>失注反響に付いているタグの頻度（上位8件）</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {topLostTags.map(([tag, cnt]) => {
+                      const max = topLostTags[0]?.[1] ?? 1;
+                      const pct = Math.round((cnt / max) * 100);
+                      return (
+                        <div key={tag} className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="font-medium text-zinc-700">{tag}</span>
+                            <span className="text-zinc-500">{cnt}件</span>
+                          </div>
+                          <div className="h-1.5 w-full rounded-full bg-zinc-100">
+                            <div className="h-1.5 rounded-full bg-red-400 transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
         </div>
       </div>
     </AppShell>
