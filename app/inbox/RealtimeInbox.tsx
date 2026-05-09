@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CalendarPlus, Send, Tag, X } from "lucide-react";
+import { CalendarPlus, ChevronLeft, Menu, Send, Tag, X } from "lucide-react";
 
 import { ChannelBadge, StatusBadge } from "@/components/badges";
 import { AppointmentModal } from "@/components/inbox/AppointmentModal";
@@ -80,6 +80,7 @@ export function RealtimeInbox({
   const tagInputRef = useRef<HTMLInputElement>(null);
   const [internalNote, setInternalNote] = useState("");
   const [noteSaving, setNoteSaving] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<"sidebar" | "list" | "detail">("list");
   const [toast, setToast] = useState<{
     title: string;
     description?: string;
@@ -310,8 +311,39 @@ export function RealtimeInbox({
 
   return (
     <>
-      <div className="grid h-screen grid-cols-[260px_minmax(360px,480px)_minmax(460px,1fr)] overflow-hidden">
-        <aside className="overflow-y-auto border-r border-zinc-200 bg-white">
+      {/* モバイルナビバー */}
+      <div className="flex items-center gap-3 border-b border-zinc-200 bg-white px-4 py-3 md:hidden">
+        {mobilePanel === "list" ? (
+          <button
+            className="flex items-center gap-1 text-sm font-medium text-zinc-600"
+            onClick={() => setMobilePanel("sidebar")}
+            type="button"
+          >
+            <Menu className="size-4" />
+            フィルター
+          </button>
+        ) : (
+          <button
+            className="flex items-center gap-1 text-sm font-medium text-zinc-600"
+            onClick={() =>
+              setMobilePanel(mobilePanel === "sidebar" ? "list" : "list")
+            }
+            type="button"
+          >
+            <ChevronLeft className="size-4" />
+            戻る
+          </button>
+        )}
+        <span className="text-sm font-semibold">
+          {mobilePanel === "sidebar"
+            ? "フィルター"
+            : mobilePanel === "list"
+              ? "反響一覧"
+              : selectedInquiry?.subject ?? "詳細"}
+        </span>
+      </div>
+      <div className="flex min-h-0 flex-1 overflow-hidden md:grid md:grid-cols-[260px_minmax(360px,480px)_minmax(460px,1fr)]">
+        <aside className={cn("overflow-y-auto border-r border-zinc-200 bg-white", mobilePanel !== "sidebar" && "hidden md:block")}>
           <div className="border-b border-zinc-200 p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
               Inbox
@@ -374,7 +406,7 @@ export function RealtimeInbox({
           </div>
         </aside>
 
-        <section className="overflow-y-auto border-r border-zinc-200 bg-zinc-50">
+        <section className={cn("overflow-y-auto border-r border-zinc-200 bg-zinc-50", mobilePanel !== "list" && "hidden md:block")}>
           <div className="sticky top-0 z-10 border-b border-zinc-200 bg-zinc-50/95 px-5 py-4 backdrop-blur">
             <div className="flex items-end justify-between gap-4">
               <div>
@@ -403,6 +435,7 @@ export function RealtimeInbox({
                 )}
                 onClick={() => {
                   setSelectedId(item.id);
+                  setMobilePanel("detail");
                   updateQuery({ id: item.id });
                 }}
                 type="button"
@@ -461,7 +494,7 @@ export function RealtimeInbox({
           </div>
         </section>
 
-        <section className="flex min-w-0 flex-col bg-white">
+        <section className={cn("flex min-w-0 flex-col bg-white", mobilePanel !== "detail" && "hidden md:flex")}>
           {selectedInquiry ? (
             <>
               <div className="border-b border-zinc-200 px-6 py-4">
