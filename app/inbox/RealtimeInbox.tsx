@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CalendarPlus, Send, Tag } from "lucide-react";
+import { CalendarPlus, Send, Tag, X } from "lucide-react";
 
 import { ChannelBadge, StatusBadge } from "@/components/badges";
 import { AppointmentModal } from "@/components/inbox/AppointmentModal";
@@ -74,6 +74,10 @@ export function RealtimeInbox({
   const [selectedId, setSelectedId] = useState(initialSelectedId);
   const [replyBody, setReplyBody] = useState("");
   const [appointmentOpen, setAppointmentOpen] = useState(false);
+  const [tagInput, setTagInput] = useState("");
+  const [allTags, setAllTags] = useState<string[]>([]);
+  const [showTagSuggestions, setShowTagSuggestions] = useState(false);
+  const tagInputRef = useRef<HTMLInputElement>(null);
   const [toast, setToast] = useState<{
     title: string;
     description?: string;
@@ -203,6 +207,65 @@ export function RealtimeInbox({
       const payload = (await response.json()) as { inquiry: InquiryWithLead };
       replaceInquiry(payload.inquiry);
       router.refresh();
+    }
+  };
+
+  useEffect(() => {
+    fetch("/api/tags")
+      .then((res) => res.json())
+      .then((data: { tags?: string[] }) => setAllTags(data.tags ?? []))
+      .catch(() => {});
+  }, []);
+
+  const tagSuggestions = tagInput.trim()
+    ? allTags.filter(
+        (t) =>
+          t.toLowerCase().includes(tagInput.toLowerCase()) &&
+          !(selectedInquiry?.inquiry_tags ?? []).some((it) => it.tag === t),
+      )
+    : [];
+
+  const handleAddTag = async (tag: string) => {
+    if (!selectedInquiry || !tag.trim()) return;
+
+    const res = await fetch(`/api/inquiries/${selectedInquiry.id}/tags`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tag: tag.trim() }),
+    });
+
+    if (res.ok) {
+      replaceInquiry({
+        ...selectedInquiry,
+        inquiry_tags: [
+          ...(selectedInquiry.inquiry_tags ?? []),
+          { inquiry_id: selectedInquiry.id, tag: tag.trim() },
+        ],
+      });
+      setTagInput("");
+      setShowTagSuggestions(false);
+      if (!allTags.includes(tag.trim())) {
+        setAllTags((prev) => [...prev, tag.trim()].sort());
+      }
+    }
+  };
+
+  const handleRemoveTag = async (tag: string) => {
+    if (!selectedInquiry) return;
+
+    const res = await fetch(`/api/inquiries/${selectedInquiry.id}/tags`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tag }),
+    });
+
+    if (res.ok) {
+      replaceInquiry({
+        ...selectedInquiry,
+        inquiry_tags: (selectedInquiry.inquiry_tags ?? []).filter(
+          (it) => it.tag !== tag,
+        ),
+      });
     }
   };
 
@@ -541,20 +604,59 @@ export function RealtimeInbox({
                         <Tag className="size-3.5" aria-hidden="true" />
                         タグ
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        {(selectedInquiry.inquiry_tags ?? []).length > 0 ? (
-                          selectedInquiry.inquiry_tags?.map((tag) => (
-                            <Badge
-                              key={tag.tag}
-                              variant="outline"
-                              className="rounded-md bg-white"
+                      <div className="flex flex-wrap gap-1.5">
+                        {(selectedInquiry.inquiry_tags ?? []).map((tag) => (
+                          <Badge
+                            key={tag.tag}
+                            variant="outline"
+                            className="rounded-md bg-white pr-1 text-xs"
+                          >
+                            {tag.tag}
+                            <button
+                              className="ml-1 rounded hover:text-red-500"
+                              onClick={() => handleRemoveTag(tag.tag)}
+                              type="button"
                             >
-                              {tag.tag}
-                            </Badge>
-                          ))
-                        ) : (
-                          <span className="text-sm text-zinc-500">未設定</span>
-                        )}
+                              <X className="size-2.5" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="relative">
+                        <input
+                          ref={tagInputRef}
+                          className="h-7 w-full rounded-md border border-zinc-200 bg-white px-2 text-xs placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+                          onBlur={() =>
+                            setTimeout(() => setShowTagSuggestions(false), 150)
+                          }
+                          onChange={(e) => {
+                            setTagInput(e.target.value);
+                            setShowTagSuggestions(true);
+                          }}
+                          onFocus={() => setShowTagSuggestions(true)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && tagInput.trim()) {
+                              e.preventDefault();
+                              void handleAddTag(tagInput);
+                            }
+                          }}
+                          placeholder="タグを追加（Enter で確定）"
+                          value={tagInput}
+                        />
+                        {showTagSuggestions && tagSuggestions.length > 0 ? (
+                          <div className="absolute z-20 mt-1 max-h-40 w-full overflow-y-auto rounded-md border border-zinc-200 bg-white shadow-md">
+                            {tagSuggestions.map((t) => (
+                              <button
+                                key={t}
+                                className="w-full px-3 py-1.5 text-left text-xs hover:bg-zinc-50"
+                                onMouseDown={() => handleAddTag(t)}
+                                type="button"
+                              >
+                                {t}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
                     </div>
 
