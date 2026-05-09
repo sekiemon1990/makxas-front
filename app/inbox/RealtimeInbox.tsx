@@ -41,6 +41,7 @@ import type {
 type StatusFilter = InquiryStatus | "all";
 type ChannelFilter = InquiryChannel | "all";
 type StoreFilter = string | "all";
+type AssigneeFilter = "mine" | "all";
 
 type RelatedInquiry = {
   id: string;
@@ -53,7 +54,9 @@ type RelatedInquiry = {
 
 export function RealtimeInbox({
   canUseAllStores,
+  currentStaffId,
   hasMore,
+  initialAssignee,
   initialChannel,
   initialInquiries,
   initialMessages,
@@ -67,7 +70,9 @@ export function RealtimeInbox({
   totalCount,
 }: {
   canUseAllStores: boolean;
+  currentStaffId: string | null;
   hasMore: boolean;
+  initialAssignee: AssigneeFilter;
   initialChannel: ChannelFilter;
   initialInquiries: InquiryWithLead[];
   initialMessages: Message[];
@@ -106,6 +111,7 @@ export function RealtimeInbox({
   const [reminderDate, setReminderDate] = useState("");
   const [reminderNote, setReminderNote] = useState("");
   const [relatedInquiries, setRelatedInquiries] = useState<RelatedInquiry[]>([]);
+  const [duplicateLeads, setDuplicateLeads] = useState<{ id: string; display_name: string | null; phone: string | null; first_channel: string | null }[]>([]);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionStart, setMentionStart] = useState(0);
   const noteRef = useRef<HTMLTextAreaElement>(null);
@@ -273,6 +279,7 @@ export function RealtimeInbox({
   useEffect(() => {
     if (!selectedInquiry?.lead_id) {
       setRelatedInquiries([]);
+      setDuplicateLeads([]);
       return;
     }
     fetch(`/api/leads/${selectedInquiry.lead_id}/inquiries`)
@@ -281,6 +288,12 @@ export function RealtimeInbox({
         setRelatedInquiries(
           (data.inquiries ?? []).filter((i) => i.id !== selectedInquiry.id),
         );
+      })
+      .catch(() => {});
+    fetch(`/api/leads/${selectedInquiry.lead_id}/duplicates`)
+      .then((r) => r.json())
+      .then((data: { duplicates?: { id: string; display_name: string | null; phone: string | null; first_channel: string | null }[] }) => {
+        setDuplicateLeads(data.duplicates ?? []);
       })
       .catch(() => {});
   }, [selectedInquiry?.id, selectedInquiry?.lead_id]);
@@ -536,6 +549,22 @@ export function RealtimeInbox({
                 </FilterButton>
               ))}
             </FilterSection>
+            {currentStaffId ? (
+              <FilterSection title="担当者フィルター">
+                <FilterButton
+                  active={initialAssignee === "all"}
+                  onClick={() => updateQuery({ assignee: "all", id: null })}
+                >
+                  全員
+                </FilterButton>
+                <FilterButton
+                  active={initialAssignee === "mine"}
+                  onClick={() => updateQuery({ assignee: "mine", id: null })}
+                >
+                  自分の担当のみ
+                </FilterButton>
+              </FilterSection>
+            ) : null}
             <FilterSection title="ステータスフィルター">
               {statusFilters.map((filter) => (
                 <FilterButton
@@ -800,6 +829,22 @@ export function RealtimeInbox({
                         {r.subject ?? "件名なし"}
                         <StatusBadge status={r.status} />
                       </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {duplicateLeads.length > 0 ? (
+                <div className="border-b border-red-200 bg-red-50 px-6 py-3">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-red-800">
+                    <AlertTriangle className="size-3.5 shrink-0" aria-hidden="true" />
+                    同一電話/メールの別リードが {duplicateLeads.length} 件あります（重複の可能性）
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
+                    {duplicateLeads.map((d) => (
+                      <span key={d.id} className="text-xs text-red-700">
+                        {d.display_name ?? "名前なし"} ({d.first_channel ?? "—"}) {d.phone ?? ""}
+                      </span>
                     ))}
                   </div>
                 </div>
