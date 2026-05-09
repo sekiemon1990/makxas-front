@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
     .update({
       updated_at: now,
       first_response_at: inquiry.first_response_at ?? now,
+      ai_suggested_reply: null,
     })
     .eq("id", body.inquiry_id);
 

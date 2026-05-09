@@ -257,6 +257,7 @@ export type Database = {
           priority: number | null;
           internal_note: string | null;
           first_response_at: string | null;
+          ai_suggested_reply: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -278,6 +279,7 @@ export type Database = {
           priority?: number | null;
           internal_note?: string | null;
           first_response_at?: string | null;
+          ai_suggested_reply?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -299,6 +301,7 @@ export type Database = {
           priority?: number | null;
           internal_note?: string | null;
           first_response_at?: string | null;
+          ai_suggested_reply?: string | null;
           created_at?: string;
           updated_at?: string;
         };
