@@ -9,10 +9,13 @@ This version has breaking changes — APIs, conventions, and file structure may 
 # makxas-front 開発メモ
 
 ## 概要
-- 目的: 買取マクサス インサイドセールスチーム向けリード・反響管理システム
+- 目的: マクサス社が運営する全買取ブランドのインサイドセールスチーム向け、反響・リード一元管理システム
+- 対象ブランド（屋号）: 買取マクサス・銀座リパール・ブックリバー・カグウル 等（全て買取事業）
+  - チャネル（LINE・メール・電話等）はブランドごとに別アカウントを持つ → マルチブランド×マルチアカウント構成
+  - DBの `stores` テーブルがブランド/店舗の親となり、全チャネルはstoreに紐付く
 - 担当範囲: 反響受付（LINE/Webフォーム/メール/電話/比較サイト）→ アポ取得 → マクサスコアへ引き継ぎ
 - スタッフ規模: 4〜10名
-- 反響件数: 月500件以上
+- 反響件数: 月500件以上（全ブランド合計）
 - 個人情報: 取り扱いあり（リード氏名・電話・メール・LINE ID）
 - 顧客接点: あり（/inquiry 公開Webフォームは一般公開）
 - 業務クリティカル度: **高**（顧客接点あり・個人情報あり）
@@ -94,3 +97,65 @@ Supabase Pro昇格の判断基準: DB容量400MB超 / 同時接続上限頻発 /
 | 2 | コアへ渡す項目の最終確認 | 高 |
 | 3 | LINE Channel Secret / Access Token の取得 | 高（Phase 1実装時） |
 | 4 | Google Sheetsの書き出し先シートID | 中（アポ設定実装時） |
+
+---
+
+## Codex CLI との分業
+
+このプロジェクトでは Claude Code と Codex CLI を **タスクの規模・難易度で使い分ける**。コピペ往復を避けるため、`/codex` および `/codex-review` スラッシュコマンドで Codex を直接呼び出す。
+
+### 役割分担の判断基準
+
+- **小〜中規模の実装・修正・調査** → Claude Code が直接実装（Codex 委譲しない）
+- **大規模／設計が複雑な実装** → Claude Code は設計・指示作成・レビューに専念し、Codex に実装を委譲
+
+委譲するかどうかはユーザーから明示指示がある場合のみ Codex を使う。ユーザーが指示していないのに勝手に Codex に委譲しないこと。
+
+### Codex 委譲時のフロー
+
+1. Claude Code 側で要件を整理し、Codex に渡す指示文（必要なファイル内容・型定義・受け入れ基準を含む）を作成する
+2. `/codex <指示>` で Codex に実装させ、出力を取り込む
+3. 取り込んだ実装を Claude Code 側でレビューし、必要なら修正・追加指示
+4. 大きめの差分は `/codex-review` で Codex 側にもクロスレビューさせると盲点が減る
+
+### 暴走防止ルール（必ず守る）
+
+- 同一タスクで `/codex` 往復は最大 3 回まで。4 回目以降は人間に判断を仰ぐ
+- 1 PR は概ね 300 行以内。超えそうなら Issue を分割する
+- 受け入れ条件にない変更は実装しない（範囲外への拡張禁止）
+- Supabase RLS の権限緩和、依存関係のメジャーバージョン更新、CI 設定変更は人間の承認必須
+
+## GitHub 運用
+
+- Issue は `.github/ISSUE_TEMPLATE/` のテンプレートに従う
+- PR は `.github/pull_request_template.md` に従う。1 Issue = 1 PR、本文に `Closes #N` を必ず書く
+- ラベル運用: `needs-design` / `ready-for-codex` / `in-progress` / `needs-review` / `blocked`
+- コミットメッセージ: `feat:` `fix:` `chore:` `docs:` `refactor:` のいずれかをプレフィックス
+
+### Codex に指示を渡すときの注意
+
+- Codex は別セッションでリポジトリ状態を共有しないため、関連ファイルの内容や型定義をプロンプトに含める
+- ファイル編集まで自動で行わせる場合は `codex --full-auto` を使う（既定は読み取りのみ）
+- 認証エラー時は `codex login status` を確認
+
+## よく使うコマンド
+
+- `npm run dev` — 開発サーバー起動（port 3000）
+- `npm run build` — 本番ビルド（デプロイ前に必ず確認）
+- `npm run lint` — ESLint チェック
+- `npx tsc --noEmit` — 型チェック
+
+## コーディング規約
+
+- TypeScript 必須。`any` は禁止、Supabase データには `supabase gen types` で生成した型を使う
+- コンポーネントは `components/` 配下にトピック別で配置、shadcn/ui のコンポーネントを優先利用
+- Supabase クライアントは `lib/supabase/` 経由で統一（直接 import 禁止）
+- API Route は `app/api/` 配下、Webhook は `app/api/webhooks/` 配下
+
+## やってはいけないこと
+
+- `.env.local` / `.env` のコミット（`git add -f` 等での強制追加も禁止）
+- Supabase RLS ポリシーの権限緩和 → ユーザー承認必須
+- LINE Webhook エンドポイント (`/api/webhooks/line`) の仕様変更 → LINE チャンネル設定と連動するため要確認
+- 依存パッケージのメジャーバージョン更新 → 動作確認なしでの実施禁止
+- 本番 Supabase プロジェクトへのスキーマ変更（DROP / ALTER）は明示指示があるときのみ
