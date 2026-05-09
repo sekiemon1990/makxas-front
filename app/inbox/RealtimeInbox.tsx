@@ -41,24 +41,30 @@ type StoreFilter = string | "all";
 
 export function RealtimeInbox({
   canUseAllStores,
+  hasMore,
   initialChannel,
   initialInquiries,
   initialMessages,
   initialSelectedId,
   initialStatus,
   initialStore,
+  page,
   staff,
   stores,
+  totalCount,
 }: {
   canUseAllStores: boolean;
+  hasMore: boolean;
   initialChannel: ChannelFilter;
   initialInquiries: InquiryWithLead[];
   initialMessages: Message[];
   initialSelectedId: string | null;
   initialStatus: StatusFilter;
   initialStore: StoreFilter;
+  page: number;
   staff: Staff[];
   stores: Store[];
+  totalCount: number;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -294,7 +300,8 @@ export function RealtimeInbox({
                   反響一覧
                 </h2>
                 <p className="mt-1 text-sm text-zinc-500">
-                  {items.length}件を表示中
+                  全{totalCount}件中 {(page - 1) * 50 + 1}〜
+                  {Math.min(page * 50, totalCount)}件
                 </p>
               </div>
               <Badge variant="outline" className="rounded-md bg-white">
@@ -344,6 +351,29 @@ export function RealtimeInbox({
             {items.length === 0 ? (
               <div className="rounded-lg border border-dashed border-zinc-300 bg-white p-6 text-center text-sm text-zinc-500">
                 条件に一致する反響はありません。
+              </div>
+            ) : null}
+            {(page > 1 || hasMore) ? (
+              <div className="flex items-center justify-between pt-1">
+                <Button
+                  className="h-8 px-3 text-xs"
+                  disabled={page <= 1}
+                  onClick={() => updateQuery({ page: String(page - 1), id: null })}
+                  size="sm"
+                  variant="outline"
+                >
+                  前へ
+                </Button>
+                <span className="text-xs text-zinc-500">{page}ページ</span>
+                <Button
+                  className="h-8 px-3 text-xs"
+                  disabled={!hasMore}
+                  onClick={() => updateQuery({ page: String(page + 1), id: null })}
+                  size="sm"
+                  variant="outline"
+                >
+                  次へ
+                </Button>
               </div>
             ) : null}
           </div>
