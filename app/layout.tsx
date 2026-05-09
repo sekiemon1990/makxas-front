@@ -3,7 +3,13 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "makxas-front",
-  description: "UI prototype for makxas-front",
+  description: "買取マクサス インサイドセールス管理",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "makxas",
+  },
 };
 
 export default function RootLayout({
