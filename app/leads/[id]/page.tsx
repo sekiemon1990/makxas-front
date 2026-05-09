@@ -1,0 +1,207 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+
+import { AppShell } from "@/components/app-shell";
+import { ChannelBadge, StatusBadge } from "@/components/badges";
+import { createServiceClient } from "@/lib/supabase/service";
+import type { InquiryWithLead, Message } from "@/types/database";
+
+export const dynamic = "force-dynamic";
+
+export default async function LeadDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const supabase = createServiceClient();
+
+  const { data: lead } = await supabase
+    .from("leads")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!lead) notFound();
+
+  const { data: inquiryRows } = await supabase
+    .from("inquiries")
+    .select(
+      "*, leads(*), staff:assigned_to(id,name,email), brands(id,name,brand_code), stores(id,name,store_code,store_type), inquiry_tags(tag)",
+    )
+    .eq("lead_id", id)
+    .order("created_at", { ascending: false });
+
+  const inquiries = (inquiryRows ?? []) as unknown as InquiryWithLead[];
+
+  const inquiryIds = inquiries.map((i) => i.id);
+  const { data: messageRows } =
+    inquiryIds.length > 0
+      ? await supabase
+          .from("messages")
+          .select("*")
+          .in("inquiry_id", inquiryIds)
+          .order("created_at", { ascending: true })
+      : { data: [] };
+
+  const messages = (messageRows ?? []) as Message[];
+  const messagesByInquiry = new Map<string, Message[]>();
+  for (const msg of messages) {
+    const existing = messagesByInquiry.get(msg.inquiry_id) ?? [];
+    messagesByInquiry.set(msg.inquiry_id, [...existing, msg]);
+  }
+
+  const leadName =
+    lead.display_name ?? lead.email ?? lead.phone ?? "名前未登録";
+
+  return (
+    <AppShell>
+      <div className="mx-auto max-w-4xl px-6 py-8">
+        <Link
+          href="/leads"
+          className="mb-6 inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900"
+        >
+          <ArrowLeft className="size-4" />
+          リード一覧へ戻る
+        </Link>
+
+        {/* リード情報カード */}
+        <div className="rounded-xl border border-zinc-200 bg-white p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">
+                {leadName}
+              </h1>
+              <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-zinc-500">
+                {lead.phone ? <span>📞 {lead.phone}</span> : null}
+                {lead.email ? <span>✉️ {lead.email}</span> : null}
+                {lead.line_user_id ? (
+                  <span>LINE ID: {lead.line_user_id}</span>
+                ) : null}
+              </div>
+            </div>
+            <div className="text-right text-xs text-zinc-400">
+              <p>登録: {formatDate(lead.created_at)}</p>
+              <p>更新: {formatDate(lead.updated_at)}</p>
+            </div>
+          </div>
+
+          {(lead.line_tags ?? []).length > 0 ? (
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              {(lead.line_tags ?? []).map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs text-zinc-600"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        {/* 反響タイムライン */}
+        <h2 className="mt-8 mb-4 text-lg font-semibold">
+          接触履歴
+          <span className="ml-2 text-sm font-normal text-zinc-500">
+            {inquiries.length} 件
+          </span>
+        </h2>
+
+        {inquiries.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-zinc-300 bg-white p-8 text-center text-sm text-zinc-500">
+            反響データがありません。
+          </div>
+        ) : null}
+
+        <div className="space-y-6">
+          {inquiries.map((inquiry) => {
+            const msgs = messagesByInquiry.get(inquiry.id) ?? [];
+            return (
+              <div
+                key={inquiry.id}
+                className="rounded-xl border border-zinc-200 bg-white"
+              >
+                <div className="flex items-start justify-between gap-4 border-b border-zinc-100 px-5 py-4">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <ChannelBadge channel={inquiry.channel} showLabel />
+                    <StatusBadge status={inquiry.status} />
+                    <span className="truncate font-medium text-zinc-900">
+                      {inquiry.subject ?? "件名なし"}
+                    </span>
+                  </div>
+                  <div className="shrink-0 text-right text-xs text-zinc-400">
+                    <p>{formatDate(inquiry.created_at)}</p>
+                    {inquiry.stores?.name ? (
+                      <p className="mt-0.5">{inquiry.stores.name}</p>
+                    ) : null}
+                  </div>
+                </div>
+
+                {/* メッセージスレッド */}
+                {msgs.length > 0 ? (
+                  <div className="space-y-3 px-5 py-4">
+                    {msgs.map((msg) => (
+                      <div
+                        key={msg.id}
+                        className={`flex ${msg.direction === "outbound" ? "justify-end" : "justify-start"}`}
+                      >
+                        <div
+                          className={`max-w-[75%] rounded-lg px-3 py-2 text-sm leading-6 ${
+                            msg.direction === "outbound"
+                              ? "bg-zinc-950 text-white"
+                              : "border border-zinc-200 bg-zinc-50 text-zinc-900"
+                          }`}
+                        >
+                          <p className="whitespace-pre-wrap">
+                            {msg.body ?? ""}
+                          </p>
+                          <p
+                            className={`mt-1 text-xs ${msg.direction === "outbound" ? "text-zinc-400" : "text-zinc-400"}`}
+                          >
+                            {formatDateTime(msg.created_at)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="px-5 py-3 text-xs text-zinc-400">
+                    メッセージなし
+                  </p>
+                )}
+
+                <div className="border-t border-zinc-100 px-5 py-3">
+                  <Link
+                    href={`/inbox?id=${inquiry.id}`}
+                    className="text-xs text-zinc-500 hover:text-zinc-900 hover:underline"
+                  >
+                    インボックスで開く →
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </AppShell>
+  );
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(value));
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat("ja-JP", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}

@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AlertTriangle, CalendarPlus, ChevronLeft, Menu, Send, Tag, X } from "lucide-react";
 
 import { ChannelBadge, StatusBadge } from "@/components/badges";
+import { AiChatWidget } from "@/components/inbox/AiChatWidget";
 import { AppointmentModal } from "@/components/inbox/AppointmentModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -90,6 +91,9 @@ export function RealtimeInbox({
   const [internalNote, setInternalNote] = useState("");
   const [noteSaving, setNoteSaving] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<"sidebar" | "list" | "detail">("list");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkApplying, setBulkApplying] = useState(false);
   const [relatedInquiries, setRelatedInquiries] = useState<RelatedInquiry[]>([]);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionStart, setMentionStart] = useState(0);
@@ -252,6 +256,36 @@ export function RealtimeInbox({
       })
       .catch(() => {});
   }, [selectedInquiry?.id, selectedInquiry?.lead_id]);
+
+  const handleBulkUpdate = async (update: {
+    status?: InquiryStatus;
+    assigned_to?: string | null;
+  }) => {
+    if (selectedIds.size === 0) return;
+    setBulkApplying(true);
+    const res = await fetch("/api/inquiries/bulk", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: [...selectedIds], ...update }),
+    });
+    if (res.ok) {
+      setSelectedIds(new Set());
+      router.refresh();
+    }
+    setBulkApplying(false);
+  };
+
+  const filteredItems = searchQuery.trim()
+    ? items.filter((item) => {
+        const q = searchQuery.toLowerCase();
+        return (
+          (item.subject ?? "").toLowerCase().includes(q) ||
+          (item.leads?.display_name ?? "").toLowerCase().includes(q) ||
+          (item.leads?.phone ?? "").includes(q) ||
+          (item.leads?.email ?? "").toLowerCase().includes(q)
+        );
+      })
+    : items;
 
   const mentionSuggestions =
     mentionQuery !== null
@@ -498,50 +532,78 @@ export function RealtimeInbox({
                 Live
               </Badge>
             </div>
+            <div className="mt-3">
+              <input
+                className="h-8 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="件名・顧客名・電話・メールで検索"
+                type="search"
+                value={searchQuery}
+              />
+            </div>
           </div>
           <div className="space-y-3 p-4">
-            {items.map((item) => (
-              <button
+            {filteredItems.map((item) => (
+              <div
                 key={item.id}
                 className={cn(
-                  "w-full rounded-lg border bg-white p-4 text-left shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50",
+                  "group relative rounded-lg border bg-white shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50",
                   item.id === selectedInquiry?.id
                     ? "border-zinc-950 ring-2 ring-zinc-950/10"
                     : "border-zinc-200",
                 )}
-                onClick={() => {
-                  setSelectedId(item.id);
-                  setMobilePanel("detail");
-                  updateQuery({ id: item.id });
-                }}
-                type="button"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <ChannelBadge channel={item.channel} />
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">
-                        {getCustomerName(item)}
-                      </p>
-                      <p className="mt-1 truncate text-sm text-zinc-600">
-                        {item.subject ?? "件名なし"}
-                      </p>
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(item.id)}
+                  onChange={(e) => {
+                    setSelectedIds((prev) => {
+                      const next = new Set(prev);
+                      if (e.target.checked) next.add(item.id);
+                      else next.delete(item.id);
+                      return next;
+                    });
+                  }}
+                  className="absolute left-3 top-4 size-3.5 cursor-pointer accent-zinc-950 opacity-0 group-hover:opacity-100 data-[checked]:opacity-100"
+                  data-checked={selectedIds.has(item.id) ? "" : undefined}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <button
+                  className="w-full p-4 text-left"
+                  onClick={() => {
+                    setSelectedId(item.id);
+                    setMobilePanel("detail");
+                    updateQuery({ id: item.id });
+                  }}
+                  type="button"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <ChannelBadge channel={item.channel} />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">
+                          {getCustomerName(item)}
+                        </p>
+                        <p className="mt-1 truncate text-sm text-zinc-600">
+                          {item.subject ?? "件名なし"}
+                        </p>
+                      </div>
                     </div>
+                    <StatusBadge status={item.status} />
                   </div>
-                  <StatusBadge status={item.status} />
-                </div>
-                <div className="mt-4 flex items-center justify-between text-xs text-zinc-500">
-                  <span>{formatElapsed(item.created_at)}</span>
-                  <span>
-                    {item.stores?.name ?? "店舗未設定"} /{" "}
-                    {item.staff?.name ?? "未アサイン"}
-                  </span>
-                </div>
-              </button>
+                  <div className="mt-4 flex items-center justify-between text-xs text-zinc-500">
+                    <span>{formatElapsed(item.created_at)}</span>
+                    <span>
+                      {item.stores?.name ?? "店舗未設定"} /{" "}
+                      {item.staff?.name ?? "未アサイン"}
+                    </span>
+                  </div>
+                </button>
+              </div>
             ))}
-            {items.length === 0 ? (
+            {filteredItems.length === 0 ? (
               <div className="rounded-lg border border-dashed border-zinc-300 bg-white p-6 text-center text-sm text-zinc-500">
-                条件に一致する反響はありません。
+                {searchQuery ? `"${searchQuery}" に一致する反響はありません。` : "条件に一致する反響はありません。"}
               </div>
             ) : null}
             {(page > 1 || hasMore) ? (
@@ -568,6 +630,64 @@ export function RealtimeInbox({
               </div>
             ) : null}
           </div>
+          {/* 一括操作バー */}
+          {selectedIds.size > 0 ? (
+            <div className="sticky bottom-0 border-t border-zinc-200 bg-white p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-zinc-600">
+                  {selectedIds.size} 件選択中
+                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Select
+                    value=""
+                    onValueChange={(value) =>
+                      handleBulkUpdate({ status: value as InquiryStatus })
+                    }
+                  >
+                    <SelectTrigger className="h-7 w-32 bg-white text-xs">
+                      <SelectValue placeholder="ステータス変更" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statusFilters
+                        .filter((f) => f.value !== "all")
+                        .map((f) => (
+                          <SelectItem key={f.value} value={f.value}>
+                            {f.label}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value=""
+                    onValueChange={(value) =>
+                      handleBulkUpdate({ assigned_to: value === "unassigned" ? null : value })
+                    }
+                  >
+                    <SelectTrigger className="h-7 w-32 bg-white text-xs">
+                      <SelectValue placeholder="担当者変更" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unassigned">未アサイン</SelectItem>
+                      {staff.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    className="h-7 px-2 text-xs"
+                    disabled={bulkApplying}
+                    onClick={() => setSelectedIds(new Set())}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    キャンセル
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </section>
 
         <section className={cn("flex min-w-0 flex-col bg-white", mobilePanel !== "detail" && "hidden md:flex")}>
@@ -882,6 +1002,8 @@ export function RealtimeInbox({
         }}
         open={appointmentOpen}
       />
+
+      <AiChatWidget inquiry={selectedInquiry} messages={messages} />
 
       {toast ? (
         <Toast
