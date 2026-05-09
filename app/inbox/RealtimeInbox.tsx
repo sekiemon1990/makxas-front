@@ -782,7 +782,7 @@ export function RealtimeInbox({
         <section className={cn("flex min-w-0 flex-col bg-white", mobilePanel !== "detail" && "hidden md:flex")}>
           {selectedInquiry ? (
             <>
-              <div className="border-b border-zinc-200 px-6 py-4">
+              <div className="sticky top-0 z-10 border-b border-zinc-200 bg-white px-6 py-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex items-center gap-3">
@@ -1075,13 +1075,14 @@ export function RealtimeInbox({
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-xs font-medium text-zinc-500">
-                        内部メモ
+                      <label className="text-xs font-medium text-amber-700 flex items-center gap-1.5">
+                        <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
+                        内部メモ（顧客には非表示）
                       </label>
                       <div className="relative">
                         <Textarea
                           ref={noteRef}
-                          className="min-h-20 resize-none bg-white"
+                          className="min-h-20 resize-none border-amber-200 bg-amber-50 placeholder:text-amber-400 focus-visible:ring-amber-300"
                           onBlur={() =>
                             setTimeout(() => setMentionQuery(null), 150)
                           }
@@ -1228,11 +1229,11 @@ function FilterSection({
   title: string;
 }) {
   return (
-    <section>
-      <h2 className="mb-3 text-xs font-semibold tracking-[0.12em] text-zinc-500">
+    <section className="rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
+      <h2 className="mb-2.5 text-[11px] font-bold uppercase tracking-widest text-zinc-400">
         {title}
       </h2>
-      <div className="space-y-1.5">{children}</div>
+      <div className="space-y-1">{children}</div>
     </section>
   );
 }

@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 
 type Appointment = {
   id: string;
+  inquiry_id: string;
   scheduled_at: string;
   item_category: string | null;
   item_description: string | null;
@@ -142,14 +143,28 @@ export default function AppointmentsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
-                  {appointments.map((appt) => (
-                    <tr key={appt.id} className="hover:bg-zinc-50">
+                  {appointments.map((appt) => {
+                    const isUnassigned = !appt.staff?.name;
+                    return (
+                    <tr
+                      key={appt.id}
+                      className={cn("transition-colors", appt.inquiry_id ? "cursor-pointer hover:bg-zinc-50" : "hover:bg-zinc-50")}
+                      onClick={() => { if (appt.inquiry_id) window.location.href = `/inbox?id=${appt.inquiry_id}`; }}
+                    >
                       <td className="px-4 py-3 font-medium">{fmt(appt.scheduled_at)}</td>
-                      <td className="px-4 py-3">{appt.leads?.display_name ?? "—"}</td>
+                      <td className="px-4 py-3 font-medium text-zinc-900">{appt.leads?.display_name ?? "—"}</td>
                       <td className="px-4 py-3 text-zinc-500">{appt.leads?.phone ?? "—"}</td>
                       <td className="px-4 py-3">{appt.item_category ?? "—"}</td>
                       <td className="px-4 py-3">{appt.preferred_method === "delivery" ? "宅配" : "訪問"}</td>
-                      <td className="px-4 py-3">{appt.staff?.name ?? "未割当"}</td>
+                      <td className="px-4 py-3">
+                        {isUnassigned ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
+                            ⚠ 未割当
+                          </span>
+                        ) : (
+                          <span className="text-sm text-zinc-700">{appt.staff!.name}</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", STATUS_COLOR[appt.status] ?? "bg-zinc-100 text-zinc-700")}>
                           {STATUS_LABEL[appt.status] ?? appt.status}
@@ -163,7 +178,8 @@ export default function AppointmentsPage() {
                         )}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -215,13 +231,15 @@ export default function AppointmentsPage() {
                       </p>
                       <div className="space-y-0.5">
                         {dayAppts.map((appt) => (
-                          <div
+                          <button
                             key={appt.id}
-                            className="truncate rounded bg-zinc-950 px-1.5 py-0.5 text-[10px] font-medium text-white"
+                            type="button"
+                            className="w-full truncate rounded bg-zinc-950 px-1.5 py-0.5 text-left text-[10px] font-medium text-white hover:bg-zinc-700 transition-colors"
                             title={`${appt.leads?.display_name ?? "顧客"} ${appt.item_category ?? ""}`}
+                            onClick={() => { if (appt.inquiry_id) window.location.href = `/inbox?id=${appt.inquiry_id}`; }}
                           >
                             {new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" }).format(new Date(appt.scheduled_at))} {appt.leads?.display_name ?? "—"}
-                          </div>
+                          </button>
                         ))}
                       </div>
                     </div>
