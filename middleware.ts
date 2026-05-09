@@ -9,6 +9,7 @@ const PUBLIC_PREFIXES = [
   "/auth/callback",
   "/api/auth/google",
   "/api/webhooks",
+  "/api/cron",
 ];
 
 export async function middleware(request: NextRequest) {
