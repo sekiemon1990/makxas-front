@@ -4,25 +4,27 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => null)) as {
-    name?: string;
-    brand_id?: string | null;
-    store_code?: string;
-    store_type?: "direct" | "fc";
+    staff_id?: string;
+    brand_id?: string;
   } | null;
 
-  if (!body?.name?.trim()) {
-    return NextResponse.json({ error: "name is required" }, { status: 400 });
+  if (!body?.staff_id || !body.brand_id) {
+    return NextResponse.json(
+      { error: "staff_id and brand_id are required" },
+      { status: 400 },
+    );
   }
 
   const supabase = createServiceClient();
   const { data, error } = await supabase
-    .from("stores")
-    .insert({
-      name: body.name.trim(),
-      brand_id: body.brand_id || null,
-      store_code: body.store_code?.trim() || null,
-      store_type: body.store_type ?? "fc",
-    })
+    .from("staff_brand_access")
+    .upsert(
+      {
+        staff_id: body.staff_id,
+        brand_id: body.brand_id,
+      },
+      { onConflict: "staff_id,brand_id" },
+    )
     .select("*")
     .single();
 
@@ -30,5 +32,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ store: data });
+  return NextResponse.json({ staff_brand_access: data });
 }

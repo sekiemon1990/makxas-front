@@ -75,6 +75,13 @@ export function RealtimeInbox({
 
   useEffect(() => {
     const supabase = createClient();
+    const matchesFilters = (row: Inquiry) => {
+      return !(
+        (initialStatus !== "all" && row.status !== initialStatus) ||
+        (initialChannel !== "all" && row.channel !== initialChannel) ||
+        (initialStore !== "all" && row.store_id !== initialStore)
+      );
+    };
     const channel = supabase
       .channel("inquiries-realtime")
       .on(
@@ -83,11 +90,7 @@ export function RealtimeInbox({
         (payload) => {
           const row = payload.new as Inquiry;
 
-          if (
-            (initialStatus !== "all" && row.status !== initialStatus) ||
-            (initialChannel !== "all" && row.channel !== initialChannel) ||
-            (initialStore !== "all" && row.store_id !== initialStore)
-          ) {
+          if (!matchesFilters(row)) {
             return;
           }
 
@@ -109,6 +112,23 @@ export function RealtimeInbox({
           });
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "inquiries" },
+        (payload) => {
+          const row = payload.new as Inquiry;
+
+          setItems((current) => {
+            if (!matchesFilters(row)) {
+              return current.filter((item) => item.id !== row.id);
+            }
+
+            return current.map((item) =>
+              item.id === row.id ? { ...item, ...row } : item,
+            );
+          });
+        },
+      )
       .subscribe();
 
     return () => {
@@ -119,6 +139,11 @@ export function RealtimeInbox({
   const selectedInquiry = useMemo(() => {
     return items.find((item) => item.id === selectedId) ?? items[0] ?? null;
   }, [items, selectedId]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- AI提案のRealtime更新を編集可能な返信欄へ即時反映する。
+    setReplyBody(selectedInquiry?.ai_suggested_reply ?? "");
+  }, [selectedInquiry?.id, selectedInquiry?.ai_suggested_reply]);
 
   const updateQuery = (updates: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -384,6 +409,9 @@ export function RealtimeInbox({
                               : "text-zinc-500",
                           )}
                         >
+                          {message.direction === "outbound" && message.sent_by
+                            ? `${staff.find((s) => s.id === message.sent_by)?.name ?? "スタッフ"} · `
+                            : ""}
                           {formatDateTime(message.created_at)}
                         </p>
                       </div>
@@ -406,6 +434,14 @@ export function RealtimeInbox({
                       placeholder="返信メッセージを入力"
                       value={replyBody}
                     />
+                    {selectedInquiry.ai_suggested_reply ? (
+                      <Badge
+                        variant="outline"
+                        className="w-fit rounded-md border-zinc-200 bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600"
+                      >
+                        AI提案
+                      </Badge>
+                    ) : null}
                     <div className="flex justify-end">
                       <Button onClick={handleSendMessage} type="button">
                         <Send className="size-4" aria-hidden="true" />

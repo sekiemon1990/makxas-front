@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { updateInquirySuggestedReply } from "@/lib/ai/suggest-reply";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export async function POST(request: NextRequest) {
@@ -85,10 +86,21 @@ export async function POST(request: NextRequest) {
     body.item_description,
   ].join("\n");
 
-  await supabase.from("messages").insert({
+  const { error: messageError } = await supabase.from("messages").insert({
     inquiry_id: inquiry.id,
     direction: "inbound",
     body: messageBody,
+  });
+
+  if (messageError) {
+    return NextResponse.json(
+      { error: messageError.message },
+      { status: 500 },
+    );
+  }
+
+  void updateInquirySuggestedReply(supabase, inquiry.id).catch((error) => {
+    console.error("Form AI reply suggestion failed", error);
   });
 
   return NextResponse.json({ ok: true, lead, inquiry });

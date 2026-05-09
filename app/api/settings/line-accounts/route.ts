@@ -5,7 +5,8 @@ import { createServiceClient } from "@/lib/supabase/service";
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => null)) as {
     name?: string;
-    store_id?: string;
+    brand_id?: string | null;
+    store_id?: string | null;
     channel_id?: string;
     channel_secret?: string;
     channel_access_token?: string;
@@ -30,6 +31,7 @@ export async function POST(request: NextRequest) {
     .from("line_accounts")
     .insert({
       name: body.name.trim(),
+      brand_id: body.brand_id || null,
       store_id: body.store_id,
       channel_id: body.channel_id.trim(),
       channel_secret: body.channel_secret.trim(),

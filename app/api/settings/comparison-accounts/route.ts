@@ -4,7 +4,8 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => null)) as {
-    store_id?: string;
+    brand_id?: string | null;
+    store_id?: string | null;
     site?: "oikura" | "uridoki" | "hikakaku";
     account_email?: string;
     notification_email?: string;
@@ -21,6 +22,7 @@ export async function POST(request: NextRequest) {
   const { data, error } = await supabase
     .from("comparison_site_accounts")
     .insert({
+      brand_id: body.brand_id || null,
       store_id: body.store_id,
       site: body.site,
       account_email: body.account_email?.trim().toLowerCase() || null,

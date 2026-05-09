@@ -5,9 +5,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => null)) as {
     name?: string;
-    brand_id?: string | null;
-    store_code?: string;
-    store_type?: "direct" | "fc";
+    brand_code?: string;
   } | null;
 
   if (!body?.name?.trim()) {
@@ -16,12 +14,10 @@ export async function POST(request: NextRequest) {
 
   const supabase = createServiceClient();
   const { data, error } = await supabase
-    .from("stores")
+    .from("brands")
     .insert({
       name: body.name.trim(),
-      brand_id: body.brand_id || null,
-      store_code: body.store_code?.trim() || null,
-      store_type: body.store_type ?? "fc",
+      brand_code: body.brand_code?.trim() || null,
     })
     .select("*")
     .single();
@@ -30,5 +26,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ store: data });
+  return NextResponse.json({ brand: data });
 }

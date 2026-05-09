@@ -79,6 +79,30 @@ export type Database = {
           },
         ];
       };
+      brands: {
+        Row: {
+          id: string;
+          name: string;
+          brand_code: string | null;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          brand_code?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          brand_code?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       core_sync_log: {
         Row: {
           id: string;
@@ -115,6 +139,7 @@ export type Database = {
       comparison_site_accounts: {
         Row: {
           id: string;
+          brand_id: string | null;
           store_id: string | null;
           site: "oikura" | "uridoki" | "hikakaku";
           account_email: string | null;
@@ -124,6 +149,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          brand_id?: string | null;
           store_id?: string | null;
           site: "oikura" | "uridoki" | "hikakaku";
           account_email?: string | null;
@@ -133,6 +159,7 @@ export type Database = {
         };
         Update: {
           id?: string;
+          brand_id?: string | null;
           store_id?: string | null;
           site?: "oikura" | "uridoki" | "hikakaku";
           account_email?: string | null;
@@ -141,6 +168,13 @@ export type Database = {
           created_at?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "comparison_site_accounts_brand_id_fkey";
+            columns: ["brand_id"];
+            isOneToOne: false;
+            referencedRelation: "brands";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "comparison_site_accounts_store_id_fkey";
             columns: ["store_id"];
@@ -153,6 +187,7 @@ export type Database = {
       email_accounts: {
         Row: {
           id: string;
+          brand_id: string | null;
           store_id: string | null;
           email: string;
           display_name: string | null;
@@ -164,6 +199,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          brand_id?: string | null;
           store_id?: string | null;
           email: string;
           display_name?: string | null;
@@ -175,6 +211,7 @@ export type Database = {
         };
         Update: {
           id?: string;
+          brand_id?: string | null;
           store_id?: string | null;
           email?: string;
           display_name?: string | null;
@@ -185,6 +222,13 @@ export type Database = {
           created_at?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "email_accounts_brand_id_fkey";
+            columns: ["brand_id"];
+            isOneToOne: false;
+            referencedRelation: "brands";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "email_accounts_store_id_fkey";
             columns: ["store_id"];
@@ -198,6 +242,7 @@ export type Database = {
         Row: {
           id: string;
           lead_id: string | null;
+          brand_id: string | null;
           store_id: string | null;
           line_account_id: string | null;
           email_account_id: string | null;
@@ -212,12 +257,14 @@ export type Database = {
           priority: number | null;
           internal_note: string | null;
           first_response_at: string | null;
+          ai_suggested_reply: string | null;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           id?: string;
           lead_id?: string | null;
+          brand_id?: string | null;
           store_id?: string | null;
           line_account_id?: string | null;
           email_account_id?: string | null;
@@ -232,12 +279,14 @@ export type Database = {
           priority?: number | null;
           internal_note?: string | null;
           first_response_at?: string | null;
+          ai_suggested_reply?: string | null;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           id?: string;
           lead_id?: string | null;
+          brand_id?: string | null;
           store_id?: string | null;
           line_account_id?: string | null;
           email_account_id?: string | null;
@@ -252,6 +301,7 @@ export type Database = {
           priority?: number | null;
           internal_note?: string | null;
           first_response_at?: string | null;
+          ai_suggested_reply?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -261,6 +311,13 @@ export type Database = {
             columns: ["lead_id"];
             isOneToOne: false;
             referencedRelation: "leads";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "inquiries_brand_id_fkey";
+            columns: ["brand_id"];
+            isOneToOne: false;
+            referencedRelation: "brands";
             referencedColumns: ["id"];
           },
           {
@@ -365,6 +422,7 @@ export type Database = {
       line_accounts: {
         Row: {
           id: string;
+          brand_id: string | null;
           store_id: string | null;
           name: string;
           channel_id: string;
@@ -376,6 +434,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          brand_id?: string | null;
           store_id?: string | null;
           name: string;
           channel_id: string;
@@ -387,6 +446,7 @@ export type Database = {
         };
         Update: {
           id?: string;
+          brand_id?: string | null;
           store_id?: string | null;
           name?: string;
           channel_id?: string;
@@ -397,6 +457,13 @@ export type Database = {
           created_at?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "line_accounts_brand_id_fkey";
+            columns: ["brand_id"];
+            isOneToOne: false;
+            referencedRelation: "brands";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "line_accounts_store_id_fkey";
             columns: ["store_id"];
@@ -460,6 +527,7 @@ export type Database = {
       phone_numbers: {
         Row: {
           id: string;
+          brand_id: string | null;
           store_id: string | null;
           phone_number: string;
           twilio_sid: string | null;
@@ -468,6 +536,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          brand_id?: string | null;
           store_id?: string | null;
           phone_number: string;
           twilio_sid?: string | null;
@@ -476,6 +545,7 @@ export type Database = {
         };
         Update: {
           id?: string;
+          brand_id?: string | null;
           store_id?: string | null;
           phone_number?: string;
           twilio_sid?: string | null;
@@ -483,6 +553,13 @@ export type Database = {
           created_at?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "phone_numbers_brand_id_fkey";
+            columns: ["brand_id"];
+            isOneToOne: false;
+            referencedRelation: "brands";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "phone_numbers_store_id_fkey";
             columns: ["store_id"];
@@ -522,6 +599,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      staff_brand_access: {
+        Row: {
+          staff_id: string;
+          brand_id: string;
+        };
+        Insert: {
+          staff_id: string;
+          brand_id: string;
+        };
+        Update: {
+          staff_id?: string;
+          brand_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "staff_brand_access_staff_id_fkey";
+            columns: ["staff_id"];
+            isOneToOne: false;
+            referencedRelation: "staff";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "staff_brand_access_brand_id_fkey";
+            columns: ["brand_id"];
+            isOneToOne: false;
+            referencedRelation: "brands";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       staff_store_access: {
         Row: {
           staff_id: string;
@@ -555,6 +662,7 @@ export type Database = {
       stores: {
         Row: {
           id: string;
+          brand_id: string | null;
           name: string;
           store_code: string | null;
           store_type: "direct" | "fc";
@@ -563,6 +671,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          brand_id?: string | null;
           name: string;
           store_code?: string | null;
           store_type?: "direct" | "fc";
@@ -571,13 +680,22 @@ export type Database = {
         };
         Update: {
           id?: string;
+          brand_id?: string | null;
           name?: string;
           store_code?: string | null;
           store_type?: "direct" | "fc";
           is_active?: boolean;
           created_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "stores_brand_id_fkey";
+            columns: ["brand_id"];
+            isOneToOne: false;
+            referencedRelation: "brands";
+            referencedColumns: ["id"];
+          },
+        ];
       };
     };
     Views: Record<string, never>;
@@ -616,12 +734,15 @@ export type Message = Database["public"]["Tables"]["messages"]["Row"];
 export type Appointment = Database["public"]["Tables"]["appointments"]["Row"];
 export type Staff = Database["public"]["Tables"]["staff"]["Row"];
 export type InquiryTag = Database["public"]["Tables"]["inquiry_tags"]["Row"];
+export type Brand = Database["public"]["Tables"]["brands"]["Row"];
 export type Store = Database["public"]["Tables"]["stores"]["Row"];
 export type LineAccount = Database["public"]["Tables"]["line_accounts"]["Row"];
 export type EmailAccount = Database["public"]["Tables"]["email_accounts"]["Row"];
 export type ComparisonSiteAccount =
   Database["public"]["Tables"]["comparison_site_accounts"]["Row"];
 export type PhoneNumber = Database["public"]["Tables"]["phone_numbers"]["Row"];
+export type StaffBrandAccess =
+  Database["public"]["Tables"]["staff_brand_access"]["Row"];
 export type StaffStoreAccess =
   Database["public"]["Tables"]["staff_store_access"]["Row"];
 export type InquiryChannel = Database["public"]["Enums"]["inquiry_channel"];
@@ -631,6 +752,7 @@ export type MessageDirection = Database["public"]["Enums"]["message_direction"];
 export type InquiryWithLead = Inquiry & {
   leads: Lead | null;
   staff: Pick<Staff, "id" | "name" | "email"> | null;
+  brands?: Pick<Brand, "id" | "name" | "brand_code"> | null;
   stores?: Pick<Store, "id" | "name" | "store_code" | "store_type"> | null;
   line_accounts?: Pick<LineAccount, "id" | "name" | "destination"> | null;
   email_accounts?: Pick<EmailAccount, "id" | "email" | "display_name"> | null;
