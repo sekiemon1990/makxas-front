@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Bot,
   CalendarDays,
   Gauge,
   Inbox,
   ListChecks,
   Settings,
 } from "lucide-react";
+import { FloatingWidget } from "./ai/FloatingWidget";
 
 import { cn } from "@/lib/utils";
 
@@ -18,6 +20,7 @@ const navItems = [
   { href: "/inbox", label: "インボックス", icon: Inbox, badge: "inbox" },
   { href: "/leads", label: "リード一覧", icon: ListChecks },
   { href: "/appointments", label: "アポ一覧", icon: CalendarDays },
+  { href: "/ai", label: "AIアシスタント", icon: Bot },
   { href: "/settings", label: "設定", icon: Settings },
 ];
 
@@ -94,6 +97,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       <main className="min-w-0 flex-1 pb-16 md:pb-0">{children}</main>
+      <FloatingWidget />
 
       {/* モバイルボトムナビ */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex border-t border-zinc-200 bg-white md:hidden">

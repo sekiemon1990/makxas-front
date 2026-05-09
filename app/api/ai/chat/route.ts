@@ -1,32 +1,108 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
-const MODEL = "claude-haiku-4-5-20251001";
+const MODEL = "claude-sonnet-4-6";
 
-export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+const tools: Anthropic.Tool[] = [
+  {
+    name: "get_summary",
+    description:
+      "反響・リード・アポイントメントの集計サマリーを取得する。現状把握やレポート作成時に使う。",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "search_data",
+    description:
+      "反響・リードをキーワードや条件で検索する。顧客名・件名・電話番号などで絞り込める。",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "検索キーワード" },
+        target: {
+          type: "string",
+          enum: ["inquiries", "leads"],
+          description: "検索対象: inquiries（反響）または leads（リード）",
+        },
+        status: { type: "string", description: "ステータスで絞り込む（任意）" },
+      },
+      required: ["query", "target"],
+    },
+  },
+];
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+async function runTool(
+  name: string,
+  input: Record<string, unknown>,
+): Promise<string> {
+  const supabase = createServiceClient();
+
+  if (name === "get_summary") {
+    const [
+      { count: newCount },
+      { count: inProgressCount },
+      { count: apptCount },
+      { count: leadCount },
+    ] = await Promise.all([
+      supabase.from("inquiries").select("id", { count: "exact", head: true }).eq("status", "new"),
+      supabase.from("inquiries").select("id", { count: "exact", head: true }).eq("status", "in_progress"),
+      supabase.from("appointments").select("id", { count: "exact", head: true }),
+      supabase.from("leads").select("id", { count: "exact", head: true }),
+    ]);
+    return JSON.stringify({
+      新着反響: newCount ?? 0,
+      対応中反響: inProgressCount ?? 0,
+      累計アポ数: apptCount ?? 0,
+      登録リード数: leadCount ?? 0,
+    });
   }
 
+  if (name === "search_data") {
+    const query = String(input.query ?? "");
+    const target = String(input.target ?? "inquiries");
+    const status = input.status ? String(input.status) : null;
+
+    if (target === "inquiries") {
+      let q = supabase
+        .from("inquiries")
+        .select("id, subject, channel, status, created_at, leads(display_name, phone)")
+        .or(`subject.ilike.%${query}%`)
+        .limit(10);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (status) q = q.eq("status", status as any);
+      const { data } = await q;
+      return JSON.stringify(data ?? []);
+    } else {
+      const { data } = await supabase
+        .from("leads")
+        .select("id, display_name, phone, email, first_channel, created_at")
+        .or(`display_name.ilike.%${query}%,phone.ilike.%${query}%,email.ilike.%${query}%`)
+        .limit(10);
+      return JSON.stringify(data ?? []);
+    }
+  }
+
+  return JSON.stringify({ error: "unknown tool" });
+}
+
+export async function POST(request: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return NextResponse.json(
-      { error: "ANTHROPIC_API_KEY not configured" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
   }
 
   const body = (await request.json().catch(() => null)) as {
     messages?: Array<{ role: "user" | "assistant"; content: string }>;
+    pageContext?: string;
+    systemExtra?: string;
     context?: {
       subject?: string | null;
       channel?: string;
@@ -44,9 +120,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "messages required" }, { status: 400 });
   }
 
+  // インボックスの反響コンテキスト（AiChatWidget から）
   const ctx = body.context;
   const contextLines: string[] = [];
-
   if (ctx) {
     if (ctx.customerName) contextLines.push(`顧客名: ${ctx.customerName}`);
     if (ctx.subject) contextLines.push(`件名: ${ctx.subject}`);
@@ -54,46 +130,92 @@ export async function POST(request: NextRequest) {
     if (ctx.status) contextLines.push(`ステータス: ${ctx.status}`);
     if (ctx.storeName) contextLines.push(`店舗: ${ctx.storeName}`);
     if (ctx.brandName) contextLines.push(`ブランド: ${ctx.brandName}`);
-    if (ctx.tags && ctx.tags.length > 0)
-      contextLines.push(`タグ: ${ctx.tags.join(", ")}`);
-    if (ctx.internalNote)
-      contextLines.push(`内部メモ: ${ctx.internalNote}`);
-    if (ctx.recentMessages && ctx.recentMessages.length > 0) {
+    if (ctx.tags?.length) contextLines.push(`タグ: ${ctx.tags.join(", ")}`);
+    if (ctx.internalNote) contextLines.push(`内部メモ: ${ctx.internalNote}`);
+    if (ctx.recentMessages?.length) {
       const msgLines = ctx.recentMessages
-        .map(
-          (m) =>
-            `${m.direction === "inbound" ? "顧客" : "担当者"}: ${m.body}`,
-        )
+        .map((m) => `${m.direction === "inbound" ? "顧客" : "担当者"}: ${m.body}`)
         .join("\n");
       contextLines.push(`\n直近のメッセージ:\n${msgLines}`);
     }
   }
 
-  const systemPrompt = `あなたは買取マクサスのインサイドセールスをサポートするAIアシスタントです。
-スタッフからの質問に対して、以下の反響情報を参考に的確なアドバイスや返信案を提供してください。
-
-${contextLines.length > 0 ? `【現在の反響情報】\n${contextLines.join("\n")}` : ""}
-
-- 返信案を求められたら、具体的な文章を提案する
-- 会話の要約を求められたら、簡潔にまとめる
-- 次のアクションを聞かれたら、状況に応じた具体的な提案をする
-- 日本語で回答する`;
+  const systemPrompt = [
+    "あなたは買取マクサスのインサイドセールスチームをサポートするAIアシスタントです。",
+    "買取マクサス・銀座リパール・ブックリバー・カグウルなど複数の買取ブランドを運営する会社の、",
+    "LINE・Webフォーム・メール・電話・比較サイトからの反響を管理し、アポイントメント（査定予約）取得を支援するシステムです。",
+    "",
+    "スタッフからの質問に対して、以下の能力を活用して的確なサポートをしてください：",
+    "- get_summary ツールでシステム全体の現状を把握",
+    "- search_data ツールで顧客・反響を検索",
+    "- 返信案の作成、会話要約、次のアクション提案",
+    "- 常に日本語で回答する",
+    "",
+    body.pageContext ? `【現在のページ】${body.pageContext}` : "",
+    body.systemExtra ? `【業務コンテキスト】\n${body.systemExtra}` : "",
+    contextLines.length > 0 ? `\n【現在の反響情報】\n${contextLines.join("\n")}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   try {
     const anthropic = new Anthropic({ apiKey });
-    const response = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 500,
-      system: systemPrompt,
-      messages: body.messages,
-    });
+    let messages: Anthropic.MessageParam[] = body.messages.map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
 
-    const text = response.content
-      .map((c) => (c.type === "text" ? c.text : ""))
-      .join("")
-      .trim();
+    let reply = "";
+    for (let i = 0; i < 5; i++) {
+      const response = await anthropic.messages.create({
+        model: MODEL,
+        max_tokens: 1024,
+        system: systemPrompt,
+        tools,
+        messages,
+      });
 
-    return NextResponse.json({ reply: text });
+      if (response.stop_reason === "end_turn") {
+        reply = response.content
+          .filter((c): c is Anthropic.TextBlock => c.type === "text")
+          .map((c) => c.text)
+          .join("")
+          .trim();
+        break;
+      }
+
+      if (response.stop_reason === "tool_use") {
+        const toolUses = response.content.filter(
+          (c): c is Anthropic.ToolUseBlock => c.type === "tool_use",
+        );
+
+        messages = [
+          ...messages,
+          { role: "assistant", content: response.content },
+          {
+            role: "user",
+            content: await Promise.all(
+              toolUses.map(async (tu) => ({
+                type: "tool_result" as const,
+                tool_use_id: tu.id,
+                content: await runTool(tu.name, tu.input as Record<string, unknown>),
+              })),
+            ),
+          },
+        ];
+        continue;
+      }
+
+      // その他の stop_reason（max_tokens など）
+      reply = response.content
+        .filter((c): c is Anthropic.TextBlock => c.type === "text")
+        .map((c) => c.text)
+        .join("")
+        .trim();
+      break;
+    }
+
+    return NextResponse.json({ reply: reply || "応答を生成できませんでした。" });
   } catch (err) {
     console.error("AI chat error", err);
     return NextResponse.json({ error: "AI request failed" }, { status: 500 });
