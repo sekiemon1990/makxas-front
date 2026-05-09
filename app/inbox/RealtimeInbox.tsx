@@ -183,6 +183,38 @@ export function RealtimeInbox({
     };
   }, [initialChannel, initialStatus, initialStore]);
 
+  // messagesテーブルのRealtime購読 — 顧客返信・他スタッフ送信を即時反映
+  useEffect(() => {
+    if (!selectedId) return;
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`messages-realtime-${selectedId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `inquiry_id=eq.${selectedId}`,
+        },
+        (payload) => {
+          const msg = payload.new as Message;
+          // handleSendMessage で楽観的に追加済みの場合は重複しない
+          setMessages((current) =>
+            current.some((m) => m.id === msg.id)
+              ? current
+              : [...current, msg],
+          );
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedId]);
+
   const selectedInquiry = useMemo(() => {
     return items.find((item) => item.id === selectedId) ?? items[0] ?? null;
   }, [items, selectedId]);
