@@ -18,54 +18,92 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { channelFilters, channelMeta } from "@/lib/inquiry-options";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import type { InquiryChannel, InquiryWithLead } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const { data: rows } = await supabase
-    .from("inquiries")
-    .select("*, leads(*), staff:assigned_to(id,name,email), inquiry_tags(tag)")
-    .order("updated_at", { ascending: false })
-    .limit(50);
-  const inquiries = (rows ?? []) as unknown as InquiryWithLead[];
+  const supabase = createServiceClient();
+
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const tomorrowStart = new Date(todayStart);
   tomorrowStart.setDate(tomorrowStart.getDate() + 1);
-  const { count: todayAppointments } = await supabase
-    .from("appointments")
-    .select("id", { count: "exact", head: true })
-    .gte("scheduled_at", todayStart.toISOString())
-    .lt("scheduled_at", tomorrowStart.toISOString());
+  const sevenDaysAgo = new Date(todayStart);
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
 
-  const appointmentSetCount = inquiries.filter(
-    (item) => item.status === "appointment_set",
-  ).length;
+  const [
+    { count: newCount },
+    { count: inProgressCount },
+    { count: todayAppointments },
+    { count: totalInquiries },
+    { count: appointmentSetCount },
+    { data: recentRows },
+    { data: channelRows },
+    { data: weeklyRows },
+  ] = await Promise.all([
+    supabase
+      .from("inquiries")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "new"),
+    supabase
+      .from("inquiries")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "in_progress"),
+    supabase
+      .from("appointments")
+      .select("id", { count: "exact", head: true })
+      .gte("scheduled_at", todayStart.toISOString())
+      .lt("scheduled_at", tomorrowStart.toISOString()),
+    supabase
+      .from("inquiries")
+      .select("id", { count: "exact", head: true })
+      .not("status", "in", '("lost","closed")'),
+    supabase
+      .from("inquiries")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "appointment_set"),
+    supabase
+      .from("inquiries")
+      .select(
+        "*, leads(*), staff:assigned_to(id,name,email), inquiry_tags(tag)",
+      )
+      .order("updated_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("inquiries")
+      .select("channel", { count: "exact" })
+      .not("status", "in", '("lost","closed")'),
+    supabase
+      .from("inquiries")
+      .select("created_at")
+      .gte("created_at", sevenDaysAgo.toISOString())
+      .order("created_at", { ascending: true }),
+  ]);
+
+  const recentInquiries = (recentRows ?? []) as unknown as InquiryWithLead[];
   const appointmentRate =
-    inquiries.length > 0
-      ? Math.round((appointmentSetCount / inquiries.length) * 100)
+    (totalInquiries ?? 0) > 0
+      ? Math.round(((appointmentSetCount ?? 0) / (totalInquiries ?? 1)) * 100)
       : 0;
+
+  const channelCounts = channelFilters.reduce<Record<string, number>>(
+    (acc, ch) => {
+      acc[ch] = (channelRows ?? []).filter((r) => r.channel === ch).length;
+      return acc;
+    },
+    {},
+  );
+
+  const weeklyData = buildWeeklyData(weeklyRows ?? [], sevenDaysAgo);
+
   const summaryCards = [
+    { title: "新着", value: newCount ?? 0, icon: Inbox },
+    { title: "対応中", value: inProgressCount ?? 0, icon: CircleDot },
+    { title: "本日のアポ", value: todayAppointments ?? 0, icon: CalendarCheck },
     {
-      title: "新着",
-      value: inquiries.filter((item) => item.status === "new").length,
-      icon: Inbox,
-    },
-    {
-      title: "対応中",
-      value: inquiries.filter((item) => item.status === "in_progress").length,
-      icon: CircleDot,
-    },
-    {
-      title: "本日のアポ",
-      value: todayAppointments ?? 0,
-      icon: CalendarCheck,
-    },
-    {
-      title: "今月のアポ取得率",
+      title: "アポ取得率（累計）",
       value: `${appointmentRate}%`,
       icon: TrendingUp,
     },
@@ -119,30 +157,63 @@ export default async function DashboardPage() {
           </div>
 
           <div className="mt-6 grid grid-cols-[360px_1fr] gap-6">
-            <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
-              <CardHeader>
-                <CardTitle>チャネル別件数</CardTitle>
-                <CardDescription>現在登録されている反響の内訳</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {channelFilters.map((channel) => (
-                  <ChannelCount
-                    key={channel}
-                    channel={channel}
-                    inquiries={inquiries}
-                  />
-                ))}
-              </CardContent>
-            </Card>
+            <div className="space-y-6">
+              <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
+                <CardHeader>
+                  <CardTitle>チャネル別件数</CardTitle>
+                  <CardDescription>
+                    対応中・アクティブな反響の内訳
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {channelFilters.map((channel) => (
+                    <ChannelCountRow
+                      key={channel}
+                      channel={channel}
+                      count={channelCounts[channel] ?? 0}
+                      total={totalInquiries ?? 0}
+                    />
+                  ))}
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
+                <CardHeader>
+                  <CardTitle>過去7日間の受信数</CardTitle>
+                  <CardDescription>日別反響数トレンド</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-end gap-1.5 h-24">
+                    {weeklyData.map(({ label, count: cnt, max }) => (
+                      <div
+                        key={label}
+                        className="flex flex-1 flex-col items-center gap-1"
+                      >
+                        <span className="text-[10px] font-medium text-zinc-700">
+                          {cnt}
+                        </span>
+                        <div
+                          className="w-full rounded-t bg-zinc-900"
+                          style={{
+                            height: max > 0 ? `${Math.max(4, (cnt / max) * 60)}px` : "4px",
+                          }}
+                        />
+                        <span className="text-[10px] text-zinc-500">{label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
             <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
               <CardHeader>
-                <CardTitle>最近の反響一覧</CardTitle>
-                <CardDescription>直近5件の反響</CardDescription>
+                <CardTitle>最近の反響</CardTitle>
+                <CardDescription>直近5件</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-0">
-                  {inquiries.slice(0, 5).map((item, index) => (
+                  {recentInquiries.slice(0, 5).map((item, index) => (
                     <div key={item.id}>
                       <Link
                         href={`/inbox?id=${item.id}`}
@@ -164,12 +235,12 @@ export default async function DashboardPage() {
                           <StatusBadge status={item.status} />
                         </div>
                       </Link>
-                      {index < Math.min(inquiries.length, 5) - 1 ? (
+                      {index < Math.min(recentInquiries.length, 5) - 1 ? (
                         <Separator />
                       ) : null}
                     </div>
                   ))}
-                  {inquiries.length === 0 ? (
+                  {recentInquiries.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50 p-6 text-center text-sm text-zinc-500">
                       まだ反響はありません。
                     </div>
@@ -184,21 +255,52 @@ export default async function DashboardPage() {
   );
 }
 
-function ChannelCount({
+function buildWeeklyData(rows: { created_at: string }[], from: Date) {
+  const counts: Record<string, number> = {};
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(from);
+    d.setDate(d.getDate() + i);
+    counts[d.toDateString()] = 0;
+  }
+  for (const row of rows) {
+    const key = new Date(row.created_at).toDateString();
+    if (key in counts) counts[key] = (counts[key] ?? 0) + 1;
+  }
+  const max = Math.max(...Object.values(counts), 1);
+  return Object.entries(counts).map(([key, count]) => ({
+    label: new Intl.DateTimeFormat("ja-JP", { month: "numeric", day: "numeric" }).format(new Date(key)),
+    count,
+    max,
+  }));
+}
+
+function ChannelCountRow({
   channel,
-  inquiries,
+  count,
+  total,
 }: {
   channel: InquiryChannel;
-  inquiries: InquiryWithLead[];
+  count: number;
+  total: number;
 }) {
-  const count = inquiries.filter((item) => item.channel === channel).length;
+  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
 
   return (
-    <div className="flex items-center justify-between rounded-lg border border-zinc-200 px-3 py-2">
-      <ChannelBadge channel={channel} showLabel />
-      <div className="text-right">
-        <p className="text-lg font-semibold">{count}</p>
-        <p className="text-xs text-zinc-500">{channelMeta[channel].label}</p>
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <ChannelBadge channel={channel} showLabel />
+        <span className="text-sm font-semibold">
+          {count}
+          <span className="ml-1 text-xs font-normal text-zinc-500">
+            ({pct}%)
+          </span>
+        </span>
+      </div>
+      <div className="h-1.5 w-full rounded-full bg-zinc-100">
+        <div
+          className="h-1.5 rounded-full bg-zinc-900 transition-all"
+          style={{ width: `${pct}%` }}
+        />
       </div>
     </div>
   );
