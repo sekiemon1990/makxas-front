@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Calendar, MessageSquare, Phone, Mail, Hash } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
 import { ChannelBadge, StatusBadge } from "@/components/badges";
@@ -25,13 +25,20 @@ export default async function LeadDetailPage({
 
   if (!lead) notFound();
 
-  const { data: inquiryRows } = await supabase
-    .from("inquiries")
-    .select(
-      "*, leads(*), staff:assigned_to(id,name,email), brands(id,name,brand_code), stores(id,name,store_code,store_type), inquiry_tags(tag)",
-    )
-    .eq("lead_id", id)
-    .order("created_at", { ascending: false });
+  const [{ data: inquiryRows }, { data: appointmentRows }] = await Promise.all([
+    supabase
+      .from("inquiries")
+      .select(
+        "*, leads(*), staff:assigned_to(id,name,email), brands(id,name,brand_code), stores(id,name,store_code,store_type), inquiry_tags(tag)",
+      )
+      .eq("lead_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("appointments")
+      .select("*, staff:staff_id(name)")
+      .eq("lead_id", id)
+      .order("scheduled_at", { ascending: false }),
+  ]);
 
   const inquiries = (inquiryRows ?? []) as unknown as InquiryWithLead[];
 
@@ -52,8 +59,12 @@ export default async function LeadDetailPage({
     messagesByInquiry.set(msg.inquiry_id, [...existing, msg]);
   }
 
+  const appointments = appointmentRows ?? [];
   const leadName =
     lead.display_name ?? lead.email ?? lead.phone ?? "名前未登録";
+
+  const lastContact = inquiries[0]?.created_at ?? null;
+  const appointmentCount = appointments.length;
 
   return (
     <AppShell>
@@ -73,11 +84,24 @@ export default async function LeadDetailPage({
               <h1 className="text-2xl font-semibold tracking-tight">
                 {leadName}
               </h1>
-              <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-zinc-500">
-                {lead.phone ? <span>📞 {lead.phone}</span> : null}
-                {lead.email ? <span>✉️ {lead.email}</span> : null}
+              <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1.5 text-sm text-zinc-500">
+                {lead.phone ? (
+                  <span className="flex items-center gap-1.5">
+                    <Phone className="size-3.5" />
+                    {lead.phone}
+                  </span>
+                ) : null}
+                {lead.email ? (
+                  <span className="flex items-center gap-1.5">
+                    <Mail className="size-3.5" />
+                    {lead.email}
+                  </span>
+                ) : null}
                 {lead.line_user_id ? (
-                  <span>LINE ID: {lead.line_user_id}</span>
+                  <span className="flex items-center gap-1.5">
+                    <Hash className="size-3.5" />
+                    LINE: {lead.line_user_id}
+                  </span>
                 ) : null}
               </div>
             </div>
@@ -99,11 +123,99 @@ export default async function LeadDetailPage({
               ))}
             </div>
           ) : null}
+
+          {/* 統計サマリー */}
+          <div className="mt-5 grid grid-cols-3 gap-3 border-t border-zinc-100 pt-5">
+            <div className="rounded-lg bg-zinc-50 px-4 py-3 text-center">
+              <div className="flex items-center justify-center gap-1.5 text-zinc-500 text-xs mb-1">
+                <MessageSquare className="size-3.5" />
+                総反響数
+              </div>
+              <p className="text-2xl font-semibold text-zinc-900">{inquiries.length}</p>
+            </div>
+            <div className="rounded-lg bg-zinc-50 px-4 py-3 text-center">
+              <div className="flex items-center justify-center gap-1.5 text-zinc-500 text-xs mb-1">
+                <Calendar className="size-3.5" />
+                アポ数
+              </div>
+              <p className="text-2xl font-semibold text-zinc-900">{appointmentCount}</p>
+            </div>
+            <div className="rounded-lg bg-zinc-50 px-4 py-3 text-center">
+              <div className="text-zinc-500 text-xs mb-1">最終接触</div>
+              <p className="text-sm font-medium text-zinc-900">
+                {lastContact ? formatDate(lastContact) : "—"}
+              </p>
+            </div>
+          </div>
         </div>
+
+        {/* アポイントメント履歴 */}
+        {appointments.length > 0 ? (
+          <>
+            <h2 className="mt-8 mb-4 text-lg font-semibold">
+              アポイントメント履歴
+              <span className="ml-2 text-sm font-normal text-zinc-500">
+                {appointments.length} 件
+              </span>
+            </h2>
+            <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-zinc-100 bg-zinc-50 text-left">
+                    <th className="px-4 py-3 font-medium text-zinc-500">査定日時</th>
+                    <th className="px-4 py-3 font-medium text-zinc-500">品目</th>
+                    <th className="px-4 py-3 font-medium text-zinc-500">方法</th>
+                    <th className="px-4 py-3 font-medium text-zinc-500">担当</th>
+                    <th className="px-4 py-3 font-medium text-zinc-500">ステータス</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                  {appointments.map((apt) => (
+                    <tr key={apt.id} className="hover:bg-zinc-50 transition-colors">
+                      <td className="px-4 py-3 font-medium text-zinc-900">
+                        {formatDateTime(apt.scheduled_at)}
+                      </td>
+                      <td className="px-4 py-3 text-zinc-600">
+                        {apt.item_category ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-zinc-600">
+                        {apt.preferred_method === "visit"
+                          ? "訪問"
+                          : apt.preferred_method === "delivery"
+                            ? "宅配"
+                            : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-zinc-600">
+                        {(apt.staff as { name?: string } | null)?.name ?? "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                            apt.status === "confirmed"
+                              ? "bg-green-100 text-green-700"
+                              : apt.status === "cancelled"
+                                ? "bg-red-100 text-red-700"
+                                : "bg-zinc-100 text-zinc-600"
+                          }`}
+                        >
+                          {apt.status === "confirmed"
+                            ? "確定"
+                            : apt.status === "cancelled"
+                              ? "キャンセル"
+                              : apt.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : null}
 
         {/* 反響タイムライン */}
         <h2 className="mt-8 mb-4 text-lg font-semibold">
-          接触履歴
+          反響・接触履歴
           <span className="ml-2 text-sm font-normal text-zinc-500">
             {inquiries.length} 件
           </span>
@@ -139,10 +251,24 @@ export default async function LeadDetailPage({
                   </div>
                 </div>
 
+                {/* タグ */}
+                {(inquiry.inquiry_tags ?? []).length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5 px-5 pt-3">
+                    {(inquiry.inquiry_tags ?? []).map((t: { tag: string }) => (
+                      <span
+                        key={t.tag}
+                        className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600"
+                      >
+                        {t.tag}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+
                 {/* メッセージスレッド */}
                 {msgs.length > 0 ? (
                   <div className="space-y-3 px-5 py-4">
-                    {msgs.map((msg) => (
+                    {msgs.slice(0, 3).map((msg) => (
                       <div
                         key={msg.id}
                         className={`flex ${msg.direction === "outbound" ? "justify-end" : "justify-start"}`}
@@ -154,17 +280,20 @@ export default async function LeadDetailPage({
                               : "border border-zinc-200 bg-zinc-50 text-zinc-900"
                           }`}
                         >
-                          <p className="whitespace-pre-wrap">
+                          <p className="whitespace-pre-wrap line-clamp-3">
                             {msg.body ?? ""}
                           </p>
-                          <p
-                            className={`mt-1 text-xs ${msg.direction === "outbound" ? "text-zinc-400" : "text-zinc-400"}`}
-                          >
+                          <p className="mt-1 text-xs text-zinc-400">
                             {formatDateTime(msg.created_at)}
                           </p>
                         </div>
                       </div>
                     ))}
+                    {msgs.length > 3 ? (
+                      <p className="text-center text-xs text-zinc-400">
+                        他 {msgs.length - 3} 件のメッセージ
+                      </p>
+                    ) : null}
                   </div>
                 ) : (
                   <p className="px-5 py-3 text-xs text-zinc-400">
