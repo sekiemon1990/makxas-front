@@ -15,12 +15,15 @@ import { RealtimeInbox } from "./RealtimeInbox";
 
 export const dynamic = "force-dynamic";
 
+const PAGE_SIZE = 50;
+
 type InboxPageProps = {
   searchParams: Promise<{
     status?: string | string[];
     channel?: string | string[];
     store?: string | string[];
     id?: string | string[];
+    page?: string | string[];
   }>;
 };
 
@@ -30,6 +33,7 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
   const channel = getChannelParam(firstValue(params.channel));
   const requestedStore = firstValue(params.store);
   const requestedId = firstValue(params.id);
+  const page = Math.max(1, parseInt(firstValue(params.page) ?? "1", 10) || 1);
   const authClient = await createClient();
   const {
     data: { user },
@@ -74,9 +78,10 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
     .from("inquiries")
     .select(
       "*, leads(*), staff:assigned_to(id,name,email), brands(id,name,brand_code), stores(id,name,store_code,store_type), line_accounts(id,name,destination), email_accounts(id,email,display_name), comparison_site_accounts(id,site,notification_email), inquiry_tags(tag)",
+      { count: "exact" },
     )
     .order("updated_at", { ascending: false })
-    .limit(50);
+    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
   if (status !== "all") {
     inquiryQuery = inquiryQuery.eq("status", status);
@@ -95,8 +100,10 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
         : inquiryQuery.eq("store_id", "00000000-0000-0000-0000-000000000000");
   }
 
-  const { data: inquiryRows } = await inquiryQuery;
+  const { data: inquiryRows, count: inquiryCount } = await inquiryQuery;
   const inquiries = (inquiryRows ?? []) as unknown as InquiryWithLead[];
+  const totalCount = inquiryCount ?? inquiries.length;
+  const hasMore = page * PAGE_SIZE < totalCount;
   const selectedId =
     requestedId && inquiries.some((inquiry) => inquiry.id === requestedId)
       ? requestedId
@@ -119,18 +126,19 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
   return (
     <AppShell>
       <RealtimeInbox
-        key={`${status}:${channel}:${store}:${selectedId ?? ""}:${inquiries
-          .map((inquiry) => inquiry.id)
-          .join(",")}`}
+        key={`${status}:${channel}:${store}:${page}:${selectedId ?? ""}`}
         canUseAllStores={canUseAllStores}
+        hasMore={hasMore}
         initialChannel={channel}
         initialInquiries={inquiries}
         initialMessages={(messageRows ?? []) as Message[]}
         initialSelectedId={selectedId ?? null}
         initialStatus={status}
         initialStore={store}
+        page={page}
         staff={(staffRows ?? []) as Staff[]}
         stores={stores}
+        totalCount={totalCount}
       />
     </AppShell>
   );

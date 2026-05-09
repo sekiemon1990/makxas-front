@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CalendarPlus, Send, Tag } from "lucide-react";
+import { CalendarPlus, ChevronLeft, Menu, Send, Tag, X } from "lucide-react";
 
 import { ChannelBadge, StatusBadge } from "@/components/badges";
 import { AppointmentModal } from "@/components/inbox/AppointmentModal";
@@ -41,24 +41,30 @@ type StoreFilter = string | "all";
 
 export function RealtimeInbox({
   canUseAllStores,
+  hasMore,
   initialChannel,
   initialInquiries,
   initialMessages,
   initialSelectedId,
   initialStatus,
   initialStore,
+  page,
   staff,
   stores,
+  totalCount,
 }: {
   canUseAllStores: boolean;
+  hasMore: boolean;
   initialChannel: ChannelFilter;
   initialInquiries: InquiryWithLead[];
   initialMessages: Message[];
   initialSelectedId: string | null;
   initialStatus: StatusFilter;
   initialStore: StoreFilter;
+  page: number;
   staff: Staff[];
   stores: Store[];
+  totalCount: number;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -68,6 +74,13 @@ export function RealtimeInbox({
   const [selectedId, setSelectedId] = useState(initialSelectedId);
   const [replyBody, setReplyBody] = useState("");
   const [appointmentOpen, setAppointmentOpen] = useState(false);
+  const [tagInput, setTagInput] = useState("");
+  const [allTags, setAllTags] = useState<string[]>([]);
+  const [showTagSuggestions, setShowTagSuggestions] = useState(false);
+  const tagInputRef = useRef<HTMLInputElement>(null);
+  const [internalNote, setInternalNote] = useState("");
+  const [noteSaving, setNoteSaving] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<"sidebar" | "list" | "detail">("list");
   const [toast, setToast] = useState<{
     title: string;
     description?: string;
@@ -200,6 +213,82 @@ export function RealtimeInbox({
     }
   };
 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 反響切り替え時に内部メモをリセット
+    setInternalNote(selectedInquiry?.internal_note ?? "");
+  }, [selectedInquiry?.id]);
+
+  useEffect(() => {
+    fetch("/api/tags")
+      .then((res) => res.json())
+      .then((data: { tags?: string[] }) => setAllTags(data.tags ?? []))
+      .catch(() => {});
+  }, []);
+
+  const tagSuggestions = tagInput.trim()
+    ? allTags.filter(
+        (t) =>
+          t.toLowerCase().includes(tagInput.toLowerCase()) &&
+          !(selectedInquiry?.inquiry_tags ?? []).some((it) => it.tag === t),
+      )
+    : [];
+
+  const handleAddTag = async (tag: string) => {
+    if (!selectedInquiry || !tag.trim()) return;
+
+    const res = await fetch(`/api/inquiries/${selectedInquiry.id}/tags`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tag: tag.trim() }),
+    });
+
+    if (res.ok) {
+      replaceInquiry({
+        ...selectedInquiry,
+        inquiry_tags: [
+          ...(selectedInquiry.inquiry_tags ?? []),
+          { inquiry_id: selectedInquiry.id, tag: tag.trim() },
+        ],
+      });
+      setTagInput("");
+      setShowTagSuggestions(false);
+      if (!allTags.includes(tag.trim())) {
+        setAllTags((prev) => [...prev, tag.trim()].sort());
+      }
+    }
+  };
+
+  const handleRemoveTag = async (tag: string) => {
+    if (!selectedInquiry) return;
+
+    const res = await fetch(`/api/inquiries/${selectedInquiry.id}/tags`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tag }),
+    });
+
+    if (res.ok) {
+      replaceInquiry({
+        ...selectedInquiry,
+        inquiry_tags: (selectedInquiry.inquiry_tags ?? []).filter(
+          (it) => it.tag !== tag,
+        ),
+      });
+    }
+  };
+
+  const handleSaveNote = async () => {
+    if (!selectedInquiry) return;
+    setNoteSaving(true);
+    await fetch(`/api/inquiries/${selectedInquiry.id}/note`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ internal_note: internalNote }),
+    });
+    setNoteSaving(false);
+    replaceInquiry({ ...selectedInquiry, internal_note: internalNote });
+  };
+
   const handleSendMessage = async () => {
     if (!selectedInquiry || !replyBody.trim()) return;
 
@@ -222,8 +311,39 @@ export function RealtimeInbox({
 
   return (
     <>
-      <div className="grid h-screen grid-cols-[260px_minmax(360px,480px)_minmax(460px,1fr)] overflow-hidden">
-        <aside className="overflow-y-auto border-r border-zinc-200 bg-white">
+      {/* モバイルナビバー */}
+      <div className="flex items-center gap-3 border-b border-zinc-200 bg-white px-4 py-3 md:hidden">
+        {mobilePanel === "list" ? (
+          <button
+            className="flex items-center gap-1 text-sm font-medium text-zinc-600"
+            onClick={() => setMobilePanel("sidebar")}
+            type="button"
+          >
+            <Menu className="size-4" />
+            フィルター
+          </button>
+        ) : (
+          <button
+            className="flex items-center gap-1 text-sm font-medium text-zinc-600"
+            onClick={() =>
+              setMobilePanel(mobilePanel === "sidebar" ? "list" : "list")
+            }
+            type="button"
+          >
+            <ChevronLeft className="size-4" />
+            戻る
+          </button>
+        )}
+        <span className="text-sm font-semibold">
+          {mobilePanel === "sidebar"
+            ? "フィルター"
+            : mobilePanel === "list"
+              ? "反響一覧"
+              : selectedInquiry?.subject ?? "詳細"}
+        </span>
+      </div>
+      <div className="flex min-h-0 flex-1 overflow-hidden md:grid md:grid-cols-[260px_minmax(360px,480px)_minmax(460px,1fr)]">
+        <aside className={cn("overflow-y-auto border-r border-zinc-200 bg-white", mobilePanel !== "sidebar" && "hidden md:block")}>
           <div className="border-b border-zinc-200 p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
               Inbox
@@ -286,7 +406,7 @@ export function RealtimeInbox({
           </div>
         </aside>
 
-        <section className="overflow-y-auto border-r border-zinc-200 bg-zinc-50">
+        <section className={cn("overflow-y-auto border-r border-zinc-200 bg-zinc-50", mobilePanel !== "list" && "hidden md:block")}>
           <div className="sticky top-0 z-10 border-b border-zinc-200 bg-zinc-50/95 px-5 py-4 backdrop-blur">
             <div className="flex items-end justify-between gap-4">
               <div>
@@ -294,7 +414,8 @@ export function RealtimeInbox({
                   反響一覧
                 </h2>
                 <p className="mt-1 text-sm text-zinc-500">
-                  {items.length}件を表示中
+                  全{totalCount}件中 {(page - 1) * 50 + 1}〜
+                  {Math.min(page * 50, totalCount)}件
                 </p>
               </div>
               <Badge variant="outline" className="rounded-md bg-white">
@@ -314,6 +435,7 @@ export function RealtimeInbox({
                 )}
                 onClick={() => {
                   setSelectedId(item.id);
+                  setMobilePanel("detail");
                   updateQuery({ id: item.id });
                 }}
                 type="button"
@@ -346,10 +468,33 @@ export function RealtimeInbox({
                 条件に一致する反響はありません。
               </div>
             ) : null}
+            {(page > 1 || hasMore) ? (
+              <div className="flex items-center justify-between pt-1">
+                <Button
+                  className="h-8 px-3 text-xs"
+                  disabled={page <= 1}
+                  onClick={() => updateQuery({ page: String(page - 1), id: null })}
+                  size="sm"
+                  variant="outline"
+                >
+                  前へ
+                </Button>
+                <span className="text-xs text-zinc-500">{page}ページ</span>
+                <Button
+                  className="h-8 px-3 text-xs"
+                  disabled={!hasMore}
+                  onClick={() => updateQuery({ page: String(page + 1), id: null })}
+                  size="sm"
+                  variant="outline"
+                >
+                  次へ
+                </Button>
+              </div>
+            ) : null}
           </div>
         </section>
 
-        <section className="flex min-w-0 flex-col bg-white">
+        <section className={cn("flex min-w-0 flex-col bg-white", mobilePanel !== "detail" && "hidden md:flex")}>
           {selectedInquiry ? (
             <>
               <div className="border-b border-zinc-200 px-6 py-4">
@@ -409,6 +554,9 @@ export function RealtimeInbox({
                               : "text-zinc-500",
                           )}
                         >
+                          {message.direction === "outbound" && message.sent_by
+                            ? `${staff.find((s) => s.id === message.sent_by)?.name ?? "スタッフ"} · `
+                            : ""}
                           {formatDateTime(message.created_at)}
                         </p>
                       </div>
@@ -508,20 +656,59 @@ export function RealtimeInbox({
                         <Tag className="size-3.5" aria-hidden="true" />
                         タグ
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        {(selectedInquiry.inquiry_tags ?? []).length > 0 ? (
-                          selectedInquiry.inquiry_tags?.map((tag) => (
-                            <Badge
-                              key={tag.tag}
-                              variant="outline"
-                              className="rounded-md bg-white"
+                      <div className="flex flex-wrap gap-1.5">
+                        {(selectedInquiry.inquiry_tags ?? []).map((tag) => (
+                          <Badge
+                            key={tag.tag}
+                            variant="outline"
+                            className="rounded-md bg-white pr-1 text-xs"
+                          >
+                            {tag.tag}
+                            <button
+                              className="ml-1 rounded hover:text-red-500"
+                              onClick={() => handleRemoveTag(tag.tag)}
+                              type="button"
                             >
-                              {tag.tag}
-                            </Badge>
-                          ))
-                        ) : (
-                          <span className="text-sm text-zinc-500">未設定</span>
-                        )}
+                              <X className="size-2.5" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="relative">
+                        <input
+                          ref={tagInputRef}
+                          className="h-7 w-full rounded-md border border-zinc-200 bg-white px-2 text-xs placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+                          onBlur={() =>
+                            setTimeout(() => setShowTagSuggestions(false), 150)
+                          }
+                          onChange={(e) => {
+                            setTagInput(e.target.value);
+                            setShowTagSuggestions(true);
+                          }}
+                          onFocus={() => setShowTagSuggestions(true)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && tagInput.trim()) {
+                              e.preventDefault();
+                              void handleAddTag(tagInput);
+                            }
+                          }}
+                          placeholder="タグを追加（Enter で確定）"
+                          value={tagInput}
+                        />
+                        {showTagSuggestions && tagSuggestions.length > 0 ? (
+                          <div className="absolute z-20 mt-1 max-h-40 w-full overflow-y-auto rounded-md border border-zinc-200 bg-white shadow-md">
+                            {tagSuggestions.map((t) => (
+                              <button
+                                key={t}
+                                className="w-full px-3 py-1.5 text-left text-xs hover:bg-zinc-50"
+                                onMouseDown={() => handleAddTag(t)}
+                                type="button"
+                              >
+                                {t}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
                     </div>
 
@@ -531,9 +718,26 @@ export function RealtimeInbox({
                       </label>
                       <Textarea
                         className="min-h-20 resize-none bg-white"
-                        defaultValue={selectedInquiry.internal_note ?? ""}
+                        onChange={(e) => setInternalNote(e.target.value)}
                         placeholder="スタッフ向けメモ"
+                        value={internalNote}
                       />
+                      <div className="flex justify-end">
+                        <Button
+                          className="h-7 px-3 text-xs"
+                          disabled={
+                            noteSaving ||
+                            internalNote ===
+                              (selectedInquiry.internal_note ?? "")
+                          }
+                          onClick={handleSaveNote}
+                          size="sm"
+                          type="button"
+                          variant="outline"
+                        >
+                          {noteSaving ? "保存中..." : "保存"}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>

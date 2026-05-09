@@ -1,6 +1,7 @@
 import * as line from "@line/bot-sdk";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export async function POST(request: NextRequest) {
@@ -18,6 +19,23 @@ export async function POST(request: NextRequest) {
 
   const supabase = createServiceClient();
   const now = new Date().toISOString();
+
+  // 送信者のスタッフIDを取得
+  let sentByStaffId: string | null = null;
+  try {
+    const authClient = await createServerClient();
+    const { data: { user } } = await authClient.auth.getUser();
+    if (user) {
+      const { data: staffRow } = await supabase
+        .from("staff")
+        .select("id")
+        .eq("auth_id", user.id)
+        .maybeSingle();
+      sentByStaffId = staffRow?.id ?? null;
+    }
+  } catch {
+    // 取得失敗時はnullのまま続行
+  }
 
   // 反響とリード情報を取得
   const { data: inquiry } = await supabase
@@ -37,6 +55,7 @@ export async function POST(request: NextRequest) {
       inquiry_id: body.inquiry_id,
       direction: "outbound",
       body: body.body.trim(),
+      sent_by: sentByStaffId,
     })
     .select("*")
     .single();
