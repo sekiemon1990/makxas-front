@@ -23,19 +23,23 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type {
+  Brand,
   ComparisonSiteAccount,
   EmailAccount,
   LineAccount,
   Staff,
-  StaffStoreAccess,
+  StaffBrandAccess,
   Store,
 } from "@/types/database";
 
-type Tab = "stores" | "line" | "email" | "comparison" | "staff";
+type Tab = "brands" | "stores" | "line" | "email" | "comparison" | "staff";
 
+type BrandRef = Pick<Brand, "id" | "name" | "brand_code">;
 type StoreRef = Pick<Store, "id" | "name">;
+type StoreWithBrand = Store & { brands?: BrandRef | null };
 
 const tabs: Array<{ value: Tab; label: string }> = [
+  { value: "brands", label: "ブランド管理" },
   { value: "stores", label: "店舗管理" },
   { value: "line", label: "LINEアカウント" },
   { value: "email", label: "メールアカウント" },
@@ -44,34 +48,49 @@ const tabs: Array<{ value: Tab; label: string }> = [
 ];
 
 export function SettingsClient({
+  brands,
   comparisonAccounts,
   emailAccounts,
   lineAccounts,
   staff,
-  staffAccess,
+  staffBrandAccess,
   stores,
 }: {
+  brands: Brand[];
   comparisonAccounts: Array<
-    ComparisonSiteAccount & { stores: StoreRef | null }
-  >;
-  emailAccounts: Array<EmailAccount & { stores: StoreRef | null }>;
-  lineAccounts: Array<LineAccount & { stores: StoreRef | null }>;
-  staff: Staff[];
-  staffAccess: Array<
-    StaffStoreAccess & {
-      staff: Pick<Staff, "id" | "name" | "email"> | null;
+    ComparisonSiteAccount & {
+      brands: BrandRef | null;
       stores: StoreRef | null;
     }
   >;
-  stores: Store[];
+  emailAccounts: Array<
+    EmailAccount & {
+      brands: BrandRef | null;
+      stores: StoreRef | null;
+    }
+  >;
+  lineAccounts: Array<
+    LineAccount & {
+      brands: BrandRef | null;
+      stores: StoreRef | null;
+    }
+  >;
+  staff: Staff[];
+  staffBrandAccess: Array<
+    StaffBrandAccess & {
+      staff: Pick<Staff, "id" | "name" | "email"> | null;
+      brands: BrandRef | null;
+    }
+  >;
+  stores: StoreWithBrand[];
 }) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<Tab>("stores");
+  const [activeTab, setActiveTab] = useState<Tab>("brands");
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const modalTitle = useMemo(() => {
-    if (activeTab === "staff") return "店舗アクセス権を追加";
+    if (activeTab === "staff") return "ブランドアクセス権を追加";
     return `${tabs.find((tab) => tab.value === activeTab)?.label ?? ""}を追加`;
   }, [activeTab]);
 
@@ -135,6 +154,7 @@ export function SettingsClient({
         </div>
 
         <div className="mt-6">
+          {activeTab === "brands" ? <BrandsList brands={brands} /> : null}
           {activeTab === "stores" ? <StoresList stores={stores} /> : null}
           {activeTab === "line" ? (
             <LineAccountsList accounts={lineAccounts} />
@@ -146,7 +166,7 @@ export function SettingsClient({
             <ComparisonAccountsList accounts={comparisonAccounts} />
           ) : null}
           {activeTab === "staff" ? (
-            <StaffAccessList access={staffAccess} staff={staff} />
+            <StaffAccessList access={staffBrandAccess} staff={staff} />
           ) : null}
         </div>
       </div>
@@ -163,18 +183,23 @@ export function SettingsClient({
             <DialogHeader>
               <DialogTitle>{modalTitle}</DialogTitle>
               <DialogDescription>
-                店舗を中心に各チャンネルの接続情報を管理します。
+                ブランドと店舗を分けて各チャンネルの接続情報を管理します。
               </DialogDescription>
             </DialogHeader>
             <div className="mt-5 grid gap-4">
-              {activeTab === "stores" ? <StoreForm /> : null}
-              {activeTab === "line" ? <LineForm stores={stores} /> : null}
-              {activeTab === "email" ? <EmailForm stores={stores} /> : null}
+              {activeTab === "brands" ? <BrandForm /> : null}
+              {activeTab === "stores" ? <StoreForm brands={brands} /> : null}
+              {activeTab === "line" ? (
+                <LineForm brands={brands} stores={stores} />
+              ) : null}
+              {activeTab === "email" ? (
+                <EmailForm brands={brands} stores={stores} />
+              ) : null}
               {activeTab === "comparison" ? (
-                <ComparisonForm stores={stores} />
+                <ComparisonForm brands={brands} stores={stores} />
               ) : null}
               {activeTab === "staff" ? (
-                <StaffAccessForm staff={staff} stores={stores} />
+                <StaffAccessForm brands={brands} staff={staff} />
               ) : null}
               {error ? <p className="text-sm text-rose-600">{error}</p> : null}
             </div>
@@ -190,12 +215,37 @@ export function SettingsClient({
   );
 }
 
-function StoresList({ stores }: { stores: Store[] }) {
+function BrandsList({ brands }: { brands: Brand[] }) {
+  return (
+    <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
+      <CardHeader>
+        <CardTitle>ブランド一覧</CardTitle>
+        <CardDescription>全店舗・全チャンネルの親となるブランド</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {brands.map((brand) => (
+          <Row key={brand.id}>
+            <div>
+              <p className="font-medium">{brand.name}</p>
+              <p className="mt-1 text-xs text-zinc-500">
+                {brand.brand_code ?? "コード未設定"}
+              </p>
+            </div>
+            <Status isActive={brand.is_active} />
+          </Row>
+        ))}
+        {brands.length === 0 ? <EmptyText /> : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function StoresList({ stores }: { stores: StoreWithBrand[] }) {
   return (
     <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
       <CardHeader>
         <CardTitle>店舗一覧</CardTitle>
-        <CardDescription>全チャンネルの親となる店舗マスタ</CardDescription>
+        <CardDescription>ブランド配下の店舗マスタ</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
         {stores.map((store) => (
@@ -203,6 +253,7 @@ function StoresList({ stores }: { stores: Store[] }) {
             <div>
               <p className="font-medium">{store.name}</p>
               <p className="mt-1 text-xs text-zinc-500">
+                {store.brands?.name ?? "ブランド未設定"} /{" "}
                 {store.store_code ?? "コード未設定"}
               </p>
             </div>
@@ -220,7 +271,9 @@ function StoresList({ stores }: { stores: Store[] }) {
 function LineAccountsList({
   accounts,
 }: {
-  accounts: Array<LineAccount & { stores: StoreRef | null }>;
+  accounts: Array<
+    LineAccount & { brands: BrandRef | null; stores: StoreRef | null }
+  >;
 }) {
   return (
     <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
@@ -234,6 +287,7 @@ function LineAccountsList({
             <div>
               <p className="font-medium">{account.name}</p>
               <p className="mt-1 text-xs text-zinc-500">
+                {account.brands?.name ?? "ブランド未設定"} /{" "}
                 {account.stores?.name ?? "店舗未設定"} / destination:{" "}
                 {account.destination ?? "-"}
               </p>
@@ -250,7 +304,9 @@ function LineAccountsList({
 function EmailAccountsList({
   accounts,
 }: {
-  accounts: Array<EmailAccount & { stores: StoreRef | null }>;
+  accounts: Array<
+    EmailAccount & { brands: BrandRef | null; stores: StoreRef | null }
+  >;
 }) {
   return (
     <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
@@ -264,6 +320,7 @@ function EmailAccountsList({
             <div>
               <p className="font-medium">{account.email}</p>
               <p className="mt-1 text-xs text-zinc-500">
+                {account.brands?.name ?? "ブランド未設定"} /{" "}
                 {account.stores?.name ?? "店舗未設定"} /{" "}
                 {account.purpose === "reply" ? "返信用" : "問い合わせ用"}
               </p>
@@ -280,7 +337,12 @@ function EmailAccountsList({
 function ComparisonAccountsList({
   accounts,
 }: {
-  accounts: Array<ComparisonSiteAccount & { stores: StoreRef | null }>;
+  accounts: Array<
+    ComparisonSiteAccount & {
+      brands: BrandRef | null;
+      stores: StoreRef | null;
+    }
+  >;
 }) {
   return (
     <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
@@ -294,6 +356,7 @@ function ComparisonAccountsList({
             <div>
               <p className="font-medium">{siteLabel(account.site)}</p>
               <p className="mt-1 text-xs text-zinc-500">
+                {account.brands?.name ?? "ブランド未設定"} /{" "}
                 {account.stores?.name ?? "店舗未設定"} /{" "}
                 {account.notification_email ?? "通知メール未設定"}
               </p>
@@ -312,9 +375,9 @@ function StaffAccessList({
   staff,
 }: {
   access: Array<
-    StaffStoreAccess & {
+    StaffBrandAccess & {
       staff: Pick<Staff, "id" | "name" | "email"> | null;
-      stores: StoreRef | null;
+      brands: BrandRef | null;
     }
   >;
   staff: Staff[];
@@ -323,11 +386,11 @@ function StaffAccessList({
     <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
       <CardHeader>
         <CardTitle>スタッフ管理</CardTitle>
-        <CardDescription>スタッフと閲覧可能店舗の対応</CardDescription>
+        <CardDescription>スタッフと閲覧可能ブランドの対応</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
         {staff.map((member) => {
-          const storesForMember = access.filter(
+          const brandsForMember = access.filter(
             (item) => item.staff_id === member.id,
           );
 
@@ -340,14 +403,14 @@ function StaffAccessList({
                 </p>
               </div>
               <div className="flex max-w-[420px] flex-wrap justify-end gap-2">
-                {storesForMember.length > 0 ? (
-                  storesForMember.map((item) => (
+                {brandsForMember.length > 0 ? (
+                  brandsForMember.map((item) => (
                     <Badge
-                      key={`${item.staff_id}-${item.store_id}`}
+                      key={`${item.staff_id}-${item.brand_id}`}
                       variant="outline"
                       className="rounded-md bg-white"
                     >
-                      {item.stores?.name ?? "店舗不明"}
+                      {item.brands?.name ?? "ブランド不明"}
                     </Badge>
                   ))
                 ) : (
@@ -363,9 +426,23 @@ function StaffAccessList({
   );
 }
 
-function StoreForm() {
+function BrandForm() {
   return (
     <>
+      <Field label="ブランド名">
+        <Input name="name" required />
+      </Field>
+      <Field label="ブランドコード">
+        <Input name="brand_code" />
+      </Field>
+    </>
+  );
+}
+
+function StoreForm({ brands }: { brands: Brand[] }) {
+  return (
+    <>
+      <BrandSelect brands={brands} />
       <Field label="店舗名">
         <Input name="name" required />
       </Field>
@@ -382,13 +459,20 @@ function StoreForm() {
   );
 }
 
-function LineForm({ stores }: { stores: Store[] }) {
+function LineForm({
+  brands,
+  stores,
+}: {
+  brands: Brand[];
+  stores: StoreWithBrand[];
+}) {
   return (
     <>
       <Field label="アカウント名">
         <Input name="name" required />
       </Field>
-      <StoreSelect stores={stores} />
+      <BrandSelect brands={brands} required />
+      <StoreSelect stores={stores} required />
       <Field label="チャンネルID">
         <Input name="channel_id" required />
       </Field>
@@ -412,10 +496,17 @@ function LineForm({ stores }: { stores: Store[] }) {
   );
 }
 
-function EmailForm({ stores }: { stores: Store[] }) {
+function EmailForm({
+  brands,
+  stores,
+}: {
+  brands: Brand[];
+  stores: StoreWithBrand[];
+}) {
   return (
     <>
-      <StoreSelect stores={stores} />
+      <BrandSelect brands={brands} required />
+      <StoreSelect stores={stores} required />
       <Field label="メールアドレス">
         <Input name="email" required type="email" />
       </Field>
@@ -432,10 +523,17 @@ function EmailForm({ stores }: { stores: Store[] }) {
   );
 }
 
-function ComparisonForm({ stores }: { stores: Store[] }) {
+function ComparisonForm({
+  brands,
+  stores,
+}: {
+  brands: Brand[];
+  stores: StoreWithBrand[];
+}) {
   return (
     <>
-      <StoreSelect stores={stores} />
+      <BrandSelect brands={brands} required />
+      <StoreSelect stores={stores} required />
       <Field label="サイト">
         <NativeSelect name="site">
           <option value="oikura">おいくら</option>
@@ -454,11 +552,11 @@ function ComparisonForm({ stores }: { stores: Store[] }) {
 }
 
 function StaffAccessForm({
+  brands,
   staff,
-  stores,
 }: {
+  brands: Brand[];
   staff: Staff[];
-  stores: Store[];
 }) {
   return (
     <>
@@ -471,18 +569,48 @@ function StaffAccessForm({
           ))}
         </NativeSelect>
       </Field>
-      <StoreSelect stores={stores} />
+      <BrandSelect brands={brands} required />
     </>
   );
 }
 
-function StoreSelect({ stores }: { stores: Store[] }) {
+function BrandSelect({
+  brands,
+  required = false,
+}: {
+  brands: Brand[];
+  required?: boolean;
+}) {
+  return (
+    <Field label="ブランド">
+      <NativeSelect name="brand_id" required={required}>
+        <option value="">ブランド未設定</option>
+        {brands.map((brand) => (
+          <option key={brand.id} value={brand.id}>
+            {brand.name}
+          </option>
+        ))}
+      </NativeSelect>
+    </Field>
+  );
+}
+
+function StoreSelect({
+  stores,
+  required = false,
+}: {
+  stores: StoreWithBrand[];
+  required?: boolean;
+}) {
   return (
     <Field label="店舗">
-      <NativeSelect name="store_id">
+      <NativeSelect name="store_id" required={required}>
+        <option value="">店舗未設定</option>
         {stores.map((store) => (
           <option key={store.id} value={store.id}>
-            {store.name}
+            {store.brands?.name
+              ? `${store.brands.name} / ${store.name}`
+              : store.name}
           </option>
         ))}
       </NativeSelect>
@@ -508,14 +636,17 @@ function Field({
 function NativeSelect({
   children,
   name,
+  required = false,
 }: {
   children: React.ReactNode;
   name: string;
+  required?: boolean;
 }) {
   return (
     <select
       className="h-9 rounded-lg border border-input bg-white px-3 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50"
       name={name}
+      required={required}
     >
       {children}
     </select>
@@ -555,11 +686,12 @@ function EmptyText() {
 
 function endpointFor(tab: Tab) {
   const endpoints: Record<Tab, string> = {
+    brands: "/api/settings/brands",
     stores: "/api/settings/stores",
     line: "/api/settings/line-accounts",
     email: "/api/settings/email-accounts",
     comparison: "/api/settings/comparison-accounts",
-    staff: "/api/settings/staff-store-access",
+    staff: "/api/settings/staff-brand-access",
   };
 
   return endpoints[tab];
@@ -567,10 +699,19 @@ function endpointFor(tab: Tab) {
 
 function payloadFor(tab: Tab, formData: FormData) {
   const value = (name: string) => String(formData.get(name) ?? "");
+  const nullableId = (name: string) => value(name) || null;
+
+  if (tab === "brands") {
+    return {
+      name: value("name"),
+      brand_code: value("brand_code"),
+    };
+  }
 
   if (tab === "stores") {
     return {
       name: value("name"),
+      brand_id: nullableId("brand_id"),
       store_code: value("store_code"),
       store_type: value("store_type"),
     };
@@ -579,7 +720,8 @@ function payloadFor(tab: Tab, formData: FormData) {
   if (tab === "line") {
     return {
       name: value("name"),
-      store_id: value("store_id"),
+      brand_id: nullableId("brand_id"),
+      store_id: nullableId("store_id"),
       channel_id: value("channel_id"),
       channel_secret: value("channel_secret"),
       channel_access_token: value("channel_access_token"),
@@ -589,7 +731,8 @@ function payloadFor(tab: Tab, formData: FormData) {
 
   if (tab === "email") {
     return {
-      store_id: value("store_id"),
+      brand_id: nullableId("brand_id"),
+      store_id: nullableId("store_id"),
       email: value("email"),
       display_name: value("display_name"),
       purpose: value("purpose"),
@@ -598,7 +741,8 @@ function payloadFor(tab: Tab, formData: FormData) {
 
   if (tab === "comparison") {
     return {
-      store_id: value("store_id"),
+      brand_id: nullableId("brand_id"),
+      store_id: nullableId("store_id"),
       site: value("site"),
       account_email: value("account_email"),
       notification_email: value("notification_email"),
@@ -607,7 +751,7 @@ function payloadFor(tab: Tab, formData: FormData) {
 
   return {
     staff_id: value("staff_id"),
-    store_id: value("store_id"),
+    brand_id: value("brand_id"),
   };
 }
 
