@@ -533,8 +533,7 @@ function LineForm({
       <Field label="アカウント名">
         <Input name="name" required />
       </Field>
-      <BrandSelect brands={brands} required />
-      <StoreSelect stores={stores} required />
+      <BrandStoreFields brands={brands} stores={stores} storeRequired />
       <Field label="チャンネルID">
         <Input name="channel_id" required />
       </Field>
@@ -567,8 +566,7 @@ function EmailForm({
 }) {
   return (
     <>
-      <BrandSelect brands={brands} required />
-      <StoreSelect stores={stores} required />
+      <BrandStoreFields brands={brands} stores={stores} storeRequired />
       <Field label="メールアドレス">
         <Input name="email" required type="email" />
       </Field>
@@ -594,8 +592,7 @@ function ComparisonForm({
 }) {
   return (
     <>
-      <BrandSelect brands={brands} required />
-      <StoreSelect stores={stores} required />
+      <BrandStoreFields brands={brands} stores={stores} storeRequired />
       <Field label="サイト">
         <NativeSelect name="site">
           <option value="oikura">おいくら</option>
@@ -680,6 +677,52 @@ function StoreSelect({
   );
 }
 
+/** ブランド選択→店舗を連動フィルタする複合フィールド */
+function BrandStoreFields({
+  brands,
+  stores,
+  storeRequired = false,
+}: {
+  brands: Brand[];
+  stores: StoreWithBrand[];
+  storeRequired?: boolean;
+}) {
+  const [selectedBrandId, setSelectedBrandId] = useState("");
+
+  const filteredStores = selectedBrandId
+    ? stores.filter((s) => s.brand_id === selectedBrandId)
+    : stores;
+
+  return (
+    <>
+      <Field label="ブランド">
+        <NativeSelect
+          name="brand_id"
+          onChange={(e) => setSelectedBrandId(e.target.value)}
+          value={selectedBrandId}
+        >
+          <option value="">ブランド未設定</option>
+          {brands.map((brand) => (
+            <option key={brand.id} value={brand.id}>
+              {brand.name}
+            </option>
+          ))}
+        </NativeSelect>
+      </Field>
+      <Field label="店舗">
+        <NativeSelect name="store_id" required={storeRequired}>
+          <option value="">店舗未設定</option>
+          {filteredStores.map((store) => (
+            <option key={store.id} value={store.id}>
+              {store.name}
+            </option>
+          ))}
+        </NativeSelect>
+      </Field>
+    </>
+  );
+}
+
 function Field({
   children,
   label,
@@ -698,17 +741,23 @@ function Field({
 function NativeSelect({
   children,
   name,
+  onChange,
   required = false,
+  value,
 }: {
   children: React.ReactNode;
   name: string;
+  onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   required?: boolean;
+  value?: string;
 }) {
   return (
     <select
       className="h-9 rounded-lg border border-input bg-white px-3 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50"
       name={name}
+      onChange={onChange}
       required={required}
+      value={value}
     >
       {children}
     </select>
