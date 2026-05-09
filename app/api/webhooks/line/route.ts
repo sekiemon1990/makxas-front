@@ -1,6 +1,7 @@
 import { messagingApi, validateSignature } from "@line/bot-sdk";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { updateInquirySuggestedReply } from "@/lib/ai/suggest-reply";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { Inquiry, Lead, LineAccount } from "@/types/database";
 
@@ -98,11 +99,20 @@ export async function POST(request: NextRequest) {
             ? event.message.text ?? ""
             : `[${event.message?.type ?? "unknown"}メッセージ]`;
 
-        await supabase.from("messages").insert({
+        const { error: messageError } = await supabase.from("messages").insert({
           inquiry_id: inquiry.id,
           direction: "inbound",
           body,
           line_msg_id: event.message?.id ?? null,
+        });
+
+        if (messageError) {
+          console.error("LINE message insert failed", messageError);
+          return;
+        }
+
+        void updateInquirySuggestedReply(supabase, inquiry.id).catch((error) => {
+          console.error("LINE AI reply suggestion failed", error);
         });
 
         await supabase

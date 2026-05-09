@@ -26,9 +26,37 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - **Codex**: 実装（コード生成・ファイル作成）
 
 ## フェーズ
-- **Phase 1 MVP（3〜4週）**: Supabase構築 / Google認証 / LINE受信返信 / Webフォーム / インボックス / アポ設定 / Vercelデプロイ
-- **Phase 2（1〜2ヶ月）**: マクサスコア正式API連携 / Gmail / 比較サイトメール解析+スクレイピング / Twilio電話
-- **Phase 3（2〜3ヶ月後）**: AI自動返信（LINE/比較サイト）/ 即時架電 / 優先度スコアリング
+
+### Phase 1 ✅ 完了
+Supabase構築 / Google認証 / LINE受信返信 / Webフォーム / 統合インボックス / アポ設定 / Vercelデプロイ / マルチブランド・マルチアカウント / 設定UI
+
+### Phase 1.5（実運用開始）
+- 本番LINEアカウント登録（/settings）
+- LINE Webhook URL本番切り替え
+- スタッフアカウント登録
+
+### Phase 2（1〜2ヶ月）
+- 比較サイト対応（おいくら・ウリドキ・ヒカカク）: メール受信→GPT構造化→Inbox取込
+- Gmail受信連携: メール問い合わせをInboxに集約
+- Resendメール送信: システムからメール返信
+- マクサスコアAPI正式連携: アポ取得時にREST POST
+- makxas-phone統合（Twilio + Railway）: 電話反響もInboxで管理
+- 全返信に対応者記録: messages.sent_by を必須化・表示
+
+### Phase 3（2〜3ヶ月後）
+- **AI返信サジェスト**: 受信メッセージが届いた瞬間にClaude APIで会話履歴を読んで返信案を自動生成し、返信入力欄にデフォルト表示。スタッフはそのまま送信 or 修正して送信。複数案も表示可能。
+- **未返信アラート + 通知**: 一定時間返信なしでPC通知・プッシュ通知・Chatwork通知
+- **ダッシュボード**: チャネル別・ブランド別の反響数・アポ率・平均応答時間
+- **アポ自動確認メッセージ**: アポ確定時にリードへLINEで自動送信
+- **タグオートコンプリート**: 既存タグを候補表示し表記ゆれ防止
+- **Inboxページネーション**: 50件超の反響に対応
+- **モバイルレスポンシブ**: スマホからの確認・返信対応
+- **リード重複検出**: 同一電話/LINEで複数ブランドへの問い合わせを自動統合
+- **スタッフメンション**: 内部メモで @名前 通知
+
+### Phase 4（将来）
+- AI即時架電: アポ取得前の自動電話フォロー
+- 優先度スコアリング: 成約確率の高いリードを自動で上位表示
 
 ## アーキテクチャ
 - フロント: Next.js 15 (App Router) + TypeScript + shadcn/ui + Tailwind CSS v4
@@ -39,7 +67,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - メール送信: Resend（Phase 2）
 - メール受信: Gmail API ポーリング（Phase 2）
 - 比較サイト: メール解析（GPT-4o-mini）+ スクレイピング（Phase 2）
-- 電話: Twilio + Railway（ai-phone-screening-poc流用、Phase 2）
+- 電話: Twilio + Railway（makxas-phone流用、Phase 2）
 - マクサスコア連携: REST API or Webhook（Phase 1暫定はGoogle Sheets書き出し）
 
 ## コスト
