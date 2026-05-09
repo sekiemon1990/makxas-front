@@ -409,6 +409,9 @@ export function RealtimeInbox({
                               : "text-zinc-500",
                           )}
                         >
+                          {message.direction === "outbound" && message.sent_by
+                            ? `${staff.find((s) => s.id === message.sent_by)?.name ?? "スタッフ"} · `
+                            : ""}
                           {formatDateTime(message.created_at)}
                         </p>
                       </div>
