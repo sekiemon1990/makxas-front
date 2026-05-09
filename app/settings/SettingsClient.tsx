@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Check, Loader2, Plus, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,12 +27,13 @@ import type {
   ComparisonSiteAccount,
   EmailAccount,
   LineAccount,
+  ReplyTemplate,
   Staff,
   StaffBrandAccess,
   Store,
 } from "@/types/database";
 
-type Tab = "brands" | "stores" | "line" | "email" | "comparison" | "staff";
+type Tab = "brands" | "stores" | "line" | "email" | "comparison" | "staff" | "templates" | "ai" | "feedback";
 
 type BrandRef = Pick<Brand, "id" | "name" | "brand_code">;
 type StoreRef = Pick<Store, "id" | "name">;
@@ -45,6 +46,9 @@ const tabs: Array<{ value: Tab; label: string }> = [
   { value: "email", label: "メールアカウント" },
   { value: "comparison", label: "比較サイト" },
   { value: "staff", label: "スタッフ管理" },
+  { value: "templates", label: "返信テンプレート" },
+  { value: "ai", label: "AI設定" },
+  { value: "feedback", label: "フィードバック" },
 ];
 
 export function SettingsClient({
@@ -89,6 +93,19 @@ export function SettingsClient({
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [templateList, setTemplateList] = useState<ReplyTemplate[]>([]);
+  const [templateName, setTemplateName] = useState("");
+  const [templateBody, setTemplateBody] = useState("");
+
+  useEffect(() => {
+    fetch("/api/settings/reply-templates")
+      .then((r) => r.json())
+      .then((d: { templates?: ReplyTemplate[] }) => {
+        if (d.templates) setTemplateList(d.templates);
+      })
+      .catch(() => {});
+  }, []);
+
   const modalTitle = useMemo(() => {
     if (activeTab === "staff") return "ブランドアクセス権を追加";
     return `${tabs.find((tab) => tab.value === activeTab)?.label ?? ""}を追加`;
@@ -98,6 +115,26 @@ export function SettingsClient({
     event.preventDefault();
     setSaving(true);
     setError(null);
+
+    if (activeTab === "templates") {
+      const res = await fetch("/api/settings/reply-templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: templateName, body: templateBody }),
+      });
+      setSaving(false);
+      if (!res.ok) {
+        const p = (await res.json().catch(() => null)) as { error?: string } | null;
+        setError(p?.error ?? "保存に失敗しました。");
+        return;
+      }
+      const d = (await res.json()) as { template?: ReplyTemplate };
+      if (d.template) setTemplateList((prev) => [...prev, d.template!]);
+      setTemplateName("");
+      setTemplateBody("");
+      setOpen(false);
+      return;
+    }
 
     const formData = new FormData(event.currentTarget);
     const response = await fetch(endpointFor(activeTab), {
@@ -130,10 +167,12 @@ export function SettingsClient({
             </p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight">設定</h1>
           </div>
-          <Button onClick={() => setOpen(true)} type="button">
-            <Plus className="size-4" aria-hidden="true" />
-            追加
-          </Button>
+          {activeTab !== "ai" && activeTab !== "feedback" ? (
+            <Button onClick={() => setOpen(true)} type="button">
+              <Plus className="size-4" aria-hidden="true" />
+              追加
+            </Button>
+          ) : null}
         </div>
 
         <div className="mt-8 flex gap-2 border-b border-zinc-200">
@@ -168,6 +207,21 @@ export function SettingsClient({
           {activeTab === "staff" ? (
             <StaffAccessList access={staffBrandAccess} staff={staff} />
           ) : null}
+          {activeTab === "templates" ? (
+            <TemplatesList
+              templates={templateList}
+              onDelete={async (id) => {
+                await fetch("/api/settings/reply-templates", {
+                  method: "DELETE",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ id }),
+                });
+                setTemplateList((prev) => prev.filter((t) => t.id !== id));
+              }}
+            />
+          ) : null}
+          {activeTab === "ai" ? <AiConfigSection /> : null}
+          {activeTab === "feedback" ? <FeedbackSection /> : null}
         </div>
       </div>
 
@@ -200,6 +254,14 @@ export function SettingsClient({
               ) : null}
               {activeTab === "staff" ? (
                 <StaffAccessForm brands={brands} staff={staff} />
+              ) : null}
+              {activeTab === "templates" ? (
+                <TemplateForm
+                  name={templateName}
+                  body={templateBody}
+                  onNameChange={setTemplateName}
+                  onBodyChange={setTemplateBody}
+                />
               ) : null}
               {error ? <p className="text-sm text-rose-600">{error}</p> : null}
             </div>
@@ -471,8 +533,7 @@ function LineForm({
       <Field label="アカウント名">
         <Input name="name" required />
       </Field>
-      <BrandSelect brands={brands} required />
-      <StoreSelect stores={stores} required />
+      <BrandStoreFields brands={brands} stores={stores} storeRequired />
       <Field label="チャンネルID">
         <Input name="channel_id" required />
       </Field>
@@ -505,8 +566,7 @@ function EmailForm({
 }) {
   return (
     <>
-      <BrandSelect brands={brands} required />
-      <StoreSelect stores={stores} required />
+      <BrandStoreFields brands={brands} stores={stores} storeRequired />
       <Field label="メールアドレス">
         <Input name="email" required type="email" />
       </Field>
@@ -532,8 +592,7 @@ function ComparisonForm({
 }) {
   return (
     <>
-      <BrandSelect brands={brands} required />
-      <StoreSelect stores={stores} required />
+      <BrandStoreFields brands={brands} stores={stores} storeRequired />
       <Field label="サイト">
         <NativeSelect name="site">
           <option value="oikura">おいくら</option>
@@ -618,6 +677,52 @@ function StoreSelect({
   );
 }
 
+/** ブランド選択→店舗を連動フィルタする複合フィールド */
+function BrandStoreFields({
+  brands,
+  stores,
+  storeRequired = false,
+}: {
+  brands: Brand[];
+  stores: StoreWithBrand[];
+  storeRequired?: boolean;
+}) {
+  const [selectedBrandId, setSelectedBrandId] = useState("");
+
+  const filteredStores = selectedBrandId
+    ? stores.filter((s) => s.brand_id === selectedBrandId)
+    : stores;
+
+  return (
+    <>
+      <Field label="ブランド">
+        <NativeSelect
+          name="brand_id"
+          onChange={(e) => setSelectedBrandId(e.target.value)}
+          value={selectedBrandId}
+        >
+          <option value="">ブランド未設定</option>
+          {brands.map((brand) => (
+            <option key={brand.id} value={brand.id}>
+              {brand.name}
+            </option>
+          ))}
+        </NativeSelect>
+      </Field>
+      <Field label="店舗">
+        <NativeSelect name="store_id" required={storeRequired}>
+          <option value="">店舗未設定</option>
+          {filteredStores.map((store) => (
+            <option key={store.id} value={store.id}>
+              {store.name}
+            </option>
+          ))}
+        </NativeSelect>
+      </Field>
+    </>
+  );
+}
+
 function Field({
   children,
   label,
@@ -636,17 +741,23 @@ function Field({
 function NativeSelect({
   children,
   name,
+  onChange,
   required = false,
+  value,
 }: {
   children: React.ReactNode;
   name: string;
+  onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   required?: boolean;
+  value?: string;
 }) {
   return (
     <select
       className="h-9 rounded-lg border border-input bg-white px-3 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50"
       name={name}
+      onChange={onChange}
       required={required}
+      value={value}
     >
       {children}
     </select>
@@ -658,6 +769,81 @@ function Row({ children }: { children: React.ReactNode }) {
     <div className="flex items-center justify-between gap-4 rounded-lg border border-zinc-200 px-4 py-3 text-sm">
       {children}
     </div>
+  );
+}
+
+function TemplatesList({
+  templates,
+  onDelete,
+}: {
+  templates: ReplyTemplate[];
+  onDelete: (id: string) => void;
+}) {
+  if (templates.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center text-sm text-zinc-500">
+        返信テンプレートがまだありません。「追加」から作成してください。
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      {templates.map((t) => (
+        <div
+          key={t.id}
+          className="flex items-start justify-between gap-4 rounded-lg border border-zinc-200 px-4 py-3"
+        >
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-zinc-900">{t.name}</p>
+            <p className="mt-1 truncate text-sm text-zinc-500">{t.body}</p>
+          </div>
+          <button
+            className="shrink-0 text-xs text-zinc-400 hover:text-red-500"
+            onClick={() => onDelete(t.id)}
+            type="button"
+          >
+            削除
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TemplateForm({
+  name,
+  body,
+  onNameChange,
+  onBodyChange,
+}: {
+  name: string;
+  body: string;
+  onNameChange: (v: string) => void;
+  onBodyChange: (v: string) => void;
+}) {
+  return (
+    <>
+      <div className="space-y-1.5">
+        <label className="text-sm font-medium">テンプレート名</label>
+        <input
+          className="h-9 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm focus:outline-none focus:ring-1 focus:ring-zinc-300"
+          onChange={(e) => onNameChange(e.target.value)}
+          placeholder="例: 初回ご連絡"
+          required
+          value={name}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <label className="text-sm font-medium">本文</label>
+        <textarea
+          className="min-h-32 w-full resize-none rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-zinc-300"
+          onChange={(e) => onBodyChange(e.target.value)}
+          placeholder="返信テンプレートの本文を入力"
+          required
+          value={body}
+        />
+      </div>
+    </>
   );
 }
 
@@ -692,6 +878,9 @@ function endpointFor(tab: Tab) {
     email: "/api/settings/email-accounts",
     comparison: "/api/settings/comparison-accounts",
     staff: "/api/settings/staff-brand-access",
+    templates: "/api/settings/reply-templates",
+    ai: "/api/ai/config",
+    feedback: "/api/ai/feedback",
   };
 
   return endpoints[tab];
@@ -774,4 +963,171 @@ function siteLabel(site: ComparisonSiteAccount["site"]) {
   };
 
   return labels[site];
+}
+
+/* ── AI設定セクション ─────────────────────────────────── */
+function AiConfigSection() {
+  const [prompt, setPrompt] = useState("");
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const originalRef = useRef("");
+
+  useEffect(() => {
+    fetch("/api/ai/config")
+      .then((r) => r.json())
+      .then((d: { system_prompt?: string }) => {
+        const p = d.system_prompt ?? "";
+        setPrompt(p);
+        originalRef.current = p;
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    setSaved(false);
+    await fetch("/api/ai/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ system_prompt: prompt }),
+    });
+    originalRef.current = prompt;
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  };
+
+  return (
+    <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
+      <CardHeader>
+        <CardTitle>AIシステムプロンプト</CardTitle>
+        <CardDescription>
+          AIアシスタントへの業務コンテキスト・追加指示を設定します。設定しない場合はデフォルトのプロンプトが使われます。
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="flex items-center gap-2 text-sm text-zinc-500">
+            <Loader2 className="size-4 animate-spin" />
+            読み込み中...
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <textarea
+              className="min-h-[200px] w-full resize-y rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300"
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="例: 対応エリアは東京・神奈川・埼玉です。&#10;査定は平日10:00〜19:00、土日も対応可能です。"
+              value={prompt}
+            />
+            <div className="flex items-center gap-3">
+              <Button disabled={saving} onClick={save} type="button">
+                {saving ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                保存する
+              </Button>
+              {saved ? (
+                <span className="flex items-center gap-1 text-sm text-emerald-600">
+                  <Check className="size-4" />
+                  保存しました
+                </span>
+              ) : null}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ── フィードバック管理セクション ─────────────────────── */
+type FeedbackLog = {
+  id: string;
+  type: string;
+  author: string | null;
+  title: string;
+  body: string;
+  page_href: string | null;
+  status: string;
+  created_at: string;
+};
+
+const FEEDBACK_TYPE_LABELS: Record<string, string> = {
+  bug: "🐛 バグ",
+  feature: "✨ 機能追加",
+  improvement: "💡 改善",
+  other: "💬 その他",
+};
+
+function FeedbackSection() {
+  const [items, setItems] = useState<FeedbackLog[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = () => {
+    setLoading(true);
+    fetch("/api/ai/feedback")
+      .then((r) => r.json())
+      .then((d: { feedbacks?: FeedbackLog[] }) => setItems(d.feedbacks ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const toggle = async (item: FeedbackLog) => {
+    const next = item.status === "open" ? "done" : "open";
+    await fetch("/api/ai/feedback", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: item.id, status: next }),
+    });
+    setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, status: next } : i));
+  };
+
+  return (
+    <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
+      <CardHeader>
+        <CardTitle>フィードバック一覧</CardTitle>
+        <CardDescription>スタッフから送信されたバグ報告・改善提案（直近100件）</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="flex items-center gap-2 text-sm text-zinc-500">
+            <Loader2 className="size-4 animate-spin" />
+            読み込み中...
+          </div>
+        ) : items.length === 0 ? (
+          <p className="text-sm text-zinc-400">フィードバックはまだありません</p>
+        ) : (
+          <div className="flex flex-col divide-y divide-zinc-100">
+            {items.map((item) => (
+              <div key={item.id} className="flex items-start gap-3 py-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-zinc-500">{FEEDBACK_TYPE_LABELS[item.type] ?? item.type}</span>
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${item.status === "done" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                      {item.status === "done" ? "対応済" : "未対応"}
+                    </span>
+                    {item.author ? <span className="text-xs text-zinc-400">{item.author}</span> : null}
+                    <span className="text-xs text-zinc-300">{new Date(item.created_at).toLocaleDateString("ja-JP")}</span>
+                  </div>
+                  <p className="mt-0.5 text-sm font-medium text-zinc-900">{item.title}</p>
+                  <p className="mt-0.5 text-xs text-zinc-500 whitespace-pre-wrap">{item.body}</p>
+                  {item.page_href ? <p className="mt-0.5 truncate text-[10px] text-zinc-300">{item.page_href}</p> : null}
+                </div>
+                <button
+                  className="shrink-0 rounded-lg border border-zinc-200 p-1.5 text-zinc-500 transition hover:bg-zinc-100"
+                  onClick={() => void toggle(item)}
+                  title={item.status === "done" ? "未対応に戻す" : "対応済にする"}
+                  type="button"
+                >
+                  {item.status === "done" ? <Trash2 className="size-3.5" /> : <Check className="size-3.5" />}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }

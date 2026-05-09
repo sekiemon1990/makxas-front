@@ -1,27 +1,44 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Bot,
   CalendarDays,
   Gauge,
   Inbox,
   ListChecks,
   Settings,
 } from "lucide-react";
+import { FloatingWidget } from "./ai/FloatingWidget";
 
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/dashboard", label: "ダッシュボード", icon: Gauge },
-  { href: "/inbox", label: "インボックス", icon: Inbox },
+  { href: "/inbox", label: "インボックス", icon: Inbox, badge: "inbox" },
   { href: "/leads", label: "リード一覧", icon: ListChecks },
   { href: "/appointments", label: "アポ一覧", icon: CalendarDays },
+  { href: "/ai", label: "AIアシスタント", icon: Bot },
   { href: "/settings", label: "設定", icon: Settings },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [newCount, setNewCount] = useState(0);
+
+  useEffect(() => {
+    const fetchCount = () => {
+      fetch("/api/inquiries/new-count")
+        .then((r) => r.json())
+        .then((d: { count?: number }) => setNewCount(d.count ?? 0))
+        .catch(() => {});
+    };
+    fetchCount();
+    const id = setInterval(fetchCount, 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50 text-zinc-950 md:flex-row">
@@ -39,6 +56,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href;
+            const count = item.badge === "inbox" ? newCount : 0;
 
             return (
               <Link
@@ -51,15 +69,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 )}
                 title={item.label}
               >
-                <Icon className="size-4" aria-hidden="true" />
-                <span>{item.label}</span>
+                <Icon className="size-4 shrink-0" aria-hidden="true" />
+                <span className="flex-1">{item.label}</span>
+                {count > 0 ? (
+                  <span
+                    className={cn(
+                      "flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold",
+                      active
+                        ? "bg-white/20 text-white"
+                        : "bg-red-500 text-white",
+                    )}
+                  >
+                    {count > 99 ? "99+" : count}
+                  </span>
+                ) : null}
               </Link>
             );
           })}
         </nav>
-        <div className="border-t border-zinc-200 p-4 text-xs leading-5 text-zinc-500">
-          静的UIプロトタイプ
-        </div>
       </aside>
 
       {/* モバイルヘッダー */}
@@ -70,23 +97,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       <main className="min-w-0 flex-1 pb-16 md:pb-0">{children}</main>
+      <FloatingWidget />
 
       {/* モバイルボトムナビ */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex border-t border-zinc-200 bg-white md:hidden">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href;
+          const count = item.badge === "inbox" ? newCount : 0;
 
           return (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-1 flex-col items-center gap-1 py-2 text-[10px] font-medium text-zinc-500 transition-colors",
+                "relative flex flex-1 flex-col items-center gap-1 py-2 text-[10px] font-medium text-zinc-500 transition-colors",
                 active && "text-zinc-950",
               )}
             >
               <Icon className={cn("size-5", active && "text-zinc-950")} aria-hidden="true" />
+              {count > 0 ? (
+                <span className="absolute right-2 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                  {count > 99 ? "99+" : count}
+                </span>
+              ) : null}
               <span className="hidden xs:block">{item.label.replace("一覧", "")}</span>
             </Link>
           );

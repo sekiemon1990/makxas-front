@@ -9,6 +9,8 @@ export async function PATCH(
   const { id } = await params;
   const body = (await request.json().catch(() => null)) as {
     internal_note?: string;
+    mentioned_staff_ids?: string[];
+    inquiry_subject?: string;
   } | null;
 
   if (body === null) {
@@ -24,6 +26,37 @@ export async function PATCH(
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // @メンションされたスタッフへ Chatwork 通知
+  if (body.mentioned_staff_ids && body.mentioned_staff_ids.length > 0) {
+    const chatworkToken = process.env.CHATWORK_API_TOKEN;
+    const chatworkRoomId = process.env.CHATWORK_ROOM_ID;
+
+    if (chatworkToken && chatworkRoomId) {
+      const { data: mentionedStaff } = await supabase
+        .from("staff")
+        .select("id, name")
+        .in("id", body.mentioned_staff_ids);
+
+      const appUrl =
+        process.env.NEXT_PUBLIC_APP_URL ?? "https://makxas-front.vercel.app";
+      const names = (mentionedStaff ?? []).map((s) => `@${s.name}`).join(", ");
+      const subject = body.inquiry_subject ?? "件名なし";
+      const message = `【メンション通知】\n${names} さんへの内部メモのメンションがあります。\n\n反響: ${subject}\n確認: ${appUrl}/inbox?id=${id}`;
+
+      await fetch(
+        `https://api.chatwork.com/v2/rooms/${chatworkRoomId}/messages`,
+        {
+          method: "POST",
+          headers: {
+            "X-ChatWorkToken": chatworkToken,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({ body: message }),
+        },
+      ).catch(() => {});
+    }
   }
 
   return NextResponse.json({ ok: true });

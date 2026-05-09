@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/check-unanswered",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/check-reminders",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/appointment-reminder",
+      "schedule": "0 0 * * *"
     }
   ]
 }

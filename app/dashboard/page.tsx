@@ -1,6 +1,9 @@
 import Link from "next/link";
 import {
   ArrowRight,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus,
   CalendarCheck,
   CircleDot,
   Inbox,
@@ -32,6 +35,8 @@ export default async function DashboardPage() {
   tomorrowStart.setDate(tomorrowStart.getDate() + 1);
   const sevenDaysAgo = new Date(todayStart);
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+  const fourteenDaysAgo = new Date(todayStart);
+  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 13);
 
   const [
     { count: newCount },
@@ -42,6 +47,9 @@ export default async function DashboardPage() {
     { data: recentRows },
     { data: channelRows },
     { data: weeklyRows },
+    { data: lostTagRows },
+    { count: prevNewCount },
+    { count: prevInProgressCount },
   ] = await Promise.all([
     supabase
       .from("inquiries")
@@ -80,6 +88,22 @@ export default async function DashboardPage() {
       .select("created_at")
       .gte("created_at", sevenDaysAgo.toISOString())
       .order("created_at", { ascending: true }),
+    supabase
+      .from("inquiry_tags")
+      .select("tag, inquiries!inner(status)")
+      .eq("inquiries.status", "lost"),
+    supabase
+      .from("inquiries")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "new")
+      .lt("created_at", sevenDaysAgo.toISOString())
+      .gte("created_at", fourteenDaysAgo.toISOString()),
+    supabase
+      .from("inquiries")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "in_progress")
+      .lt("created_at", sevenDaysAgo.toISOString())
+      .gte("created_at", fourteenDaysAgo.toISOString()),
   ]);
 
   const recentInquiries = (recentRows ?? []) as unknown as InquiryWithLead[];
@@ -98,15 +122,26 @@ export default async function DashboardPage() {
 
   const weeklyData = buildWeeklyData(weeklyRows ?? [], sevenDaysAgo);
 
+  const lostTagCounts = (lostTagRows ?? []).reduce<Record<string, number>>((acc, r) => {
+    acc[r.tag] = (acc[r.tag] ?? 0) + 1;
+    return acc;
+  }, {});
+  const topLostTags = Object.entries(lostTagCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8);
+
+  const trend = (cur: number, prev: number) => {
+    if (prev === 0) return null;
+    const diff = cur - prev;
+    const pct = Math.round(Math.abs(diff / prev) * 100);
+    return { diff, pct };
+  };
+
   const summaryCards = [
-    { title: "新着", value: newCount ?? 0, icon: Inbox },
-    { title: "対応中", value: inProgressCount ?? 0, icon: CircleDot },
-    { title: "本日のアポ", value: todayAppointments ?? 0, icon: CalendarCheck },
-    {
-      title: "アポ取得率（累計）",
-      value: `${appointmentRate}%`,
-      icon: TrendingUp,
-    },
+    { title: "新着", value: newCount ?? 0, icon: Inbox, trend: trend(newCount ?? 0, prevNewCount ?? 0) },
+    { title: "対応中", value: inProgressCount ?? 0, icon: CircleDot, trend: trend(inProgressCount ?? 0, prevInProgressCount ?? 0) },
+    { title: "本日のアポ", value: todayAppointments ?? 0, icon: CalendarCheck, trend: null },
+    { title: "アポ取得率（累計）", value: `${appointmentRate}%`, icon: TrendingUp, trend: null },
   ];
 
   return (
@@ -115,10 +150,7 @@ export default async function DashboardPage() {
         <div className="mx-auto max-w-6xl">
           <div className="flex items-end justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                Dashboard
-              </p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+              <h1 className="text-3xl font-semibold tracking-tight">
                 ダッシュボード
               </h1>
             </div>
@@ -134,13 +166,13 @@ export default async function DashboardPage() {
           <div className="mt-8 grid grid-cols-4 gap-4">
             {summaryCards.map((card) => {
               const Icon = card.icon;
-
+              const t = card.trend;
               return (
                 <Card
                   key={card.title}
                   className="rounded-lg border-zinc-200 bg-white shadow-sm"
                 >
-                  <CardHeader className="flex-row items-center justify-between">
+                  <CardHeader className="flex-row items-center justify-between pb-2">
                     <CardDescription>{card.title}</CardDescription>
                     <div className="flex size-9 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700">
                       <Icon className="size-4" aria-hidden="true" />
@@ -150,6 +182,13 @@ export default async function DashboardPage() {
                     <p className="text-3xl font-semibold tracking-tight">
                       {card.value}
                     </p>
+                    {t ? (
+                      <div className={`mt-1.5 flex items-center gap-1 text-xs font-medium ${t.diff > 0 ? "text-red-500" : t.diff < 0 ? "text-green-600" : "text-zinc-400"}`}>
+                        {t.diff > 0 ? <ArrowUpRight className="size-3.5" /> : t.diff < 0 ? <ArrowDownRight className="size-3.5" /> : <Minus className="size-3.5" />}
+                        <span>{t.diff > 0 ? "+" : ""}{t.diff} ({t.pct}%)</span>
+                        <span className="text-zinc-400 font-normal">前週比</span>
+                      </div>
+                    ) : null}
                   </CardContent>
                 </Card>
               );
@@ -183,19 +222,20 @@ export default async function DashboardPage() {
                   <CardDescription>日別反響数トレンド</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-end gap-1.5 h-24">
+                  <div className="flex items-end gap-2 h-32">
                     {weeklyData.map(({ label, count: cnt, max }) => (
                       <div
                         key={label}
-                        className="flex flex-1 flex-col items-center gap-1"
+                        className="flex flex-1 flex-col items-center gap-1.5"
                       >
-                        <span className="text-[10px] font-medium text-zinc-700">
-                          {cnt}
+                        <span className="text-xs font-semibold text-zinc-700">
+                          {cnt > 0 ? cnt : ""}
                         </span>
                         <div
-                          className="w-full rounded-t bg-zinc-900"
+                          className="w-full rounded-t bg-zinc-800 transition-all"
                           style={{
-                            height: max > 0 ? `${Math.max(4, (cnt / max) * 60)}px` : "4px",
+                            height: max > 0 ? `${Math.max(6, (cnt / max) * 80)}px` : "6px",
+                            opacity: cnt === 0 ? 0.2 : 1,
                           }}
                         />
                         <span className="text-[10px] text-zinc-500">{label}</span>
@@ -249,6 +289,36 @@ export default async function DashboardPage() {
               </CardContent>
             </Card>
           </div>
+
+          {topLostTags.length > 0 ? (
+            <div className="mt-6">
+              <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
+                <CardHeader>
+                  <CardTitle>失注タグ分析</CardTitle>
+                  <CardDescription>失注反響に付いているタグの頻度（上位8件）</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {topLostTags.map(([tag, cnt]) => {
+                      const max = topLostTags[0]?.[1] ?? 1;
+                      const pct = Math.round((cnt / max) * 100);
+                      return (
+                        <div key={tag} className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="font-medium text-zinc-700">{tag}</span>
+                            <span className="text-zinc-500">{cnt}件</span>
+                          </div>
+                          <div className="h-1.5 w-full rounded-full bg-zinc-100">
+                            <div className="h-1.5 rounded-full bg-red-400 transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
         </div>
       </div>
     </AppShell>
