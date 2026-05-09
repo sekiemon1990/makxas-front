@@ -697,6 +697,84 @@ export type Database = {
           },
         ];
       };
+      reply_templates: {
+        Row: {
+          id: string;
+          name: string;
+          body: string;
+          channel: Database["public"]["Enums"]["inquiry_channel"] | null;
+          store_id: string | null;
+          brand_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          body: string;
+          channel?: Database["public"]["Enums"]["inquiry_channel"] | null;
+          store_id?: string | null;
+          brand_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          body?: string;
+          channel?: Database["public"]["Enums"]["inquiry_channel"] | null;
+          store_id?: string | null;
+          brand_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      reminders: {
+        Row: {
+          id: string;
+          inquiry_id: string;
+          staff_id: string;
+          remind_at: string;
+          note: string | null;
+          is_done: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          inquiry_id: string;
+          staff_id: string;
+          remind_at: string;
+          note?: string | null;
+          is_done?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          inquiry_id?: string;
+          staff_id?: string;
+          remind_at?: string;
+          note?: string | null;
+          is_done?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      inquiry_reads: {
+        Row: {
+          inquiry_id: string;
+          staff_id: string;
+          read_at: string;
+        };
+        Insert: {
+          inquiry_id: string;
+          staff_id: string;
+          read_at?: string;
+        };
+        Update: {
+          inquiry_id?: string;
+          staff_id?: string;
+          read_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -743,6 +821,11 @@ export type ComparisonSiteAccount =
 export type PhoneNumber = Database["public"]["Tables"]["phone_numbers"]["Row"];
 export type StaffBrandAccess =
   Database["public"]["Tables"]["staff_brand_access"]["Row"];
+
+export type ReplyTemplate =
+  Database["public"]["Tables"]["reply_templates"]["Row"];
+export type Reminder = Database["public"]["Tables"]["reminders"]["Row"];
+export type InquiryRead = Database["public"]["Tables"]["inquiry_reads"]["Row"];
 export type StaffStoreAccess =
   Database["public"]["Tables"]["staff_store_access"]["Row"];
 export type InquiryChannel = Database["public"]["Enums"]["inquiry_channel"];
