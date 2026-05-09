@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, CalendarPlus, ChevronLeft, Menu, Send, Tag, X } from "lucide-react";
+import { AlertTriangle, Bell, CalendarPlus, ChevronLeft, FileText, Menu, Send, Tag, X } from "lucide-react";
 
 import { ChannelBadge, StatusBadge } from "@/components/badges";
 import { AiChatWidget } from "@/components/inbox/AiChatWidget";
@@ -32,6 +32,8 @@ import type {
   InquiryStatus,
   InquiryWithLead,
   Message,
+  Reminder,
+  ReplyTemplate,
   Staff,
   Store,
 } from "@/types/database";
@@ -55,6 +57,7 @@ export function RealtimeInbox({
   initialChannel,
   initialInquiries,
   initialMessages,
+  initialReadIds,
   initialSelectedId,
   initialStatus,
   initialStore,
@@ -68,6 +71,7 @@ export function RealtimeInbox({
   initialChannel: ChannelFilter;
   initialInquiries: InquiryWithLead[];
   initialMessages: Message[];
+  initialReadIds: string[];
   initialSelectedId: string | null;
   initialStatus: StatusFilter;
   initialStore: StoreFilter;
@@ -91,9 +95,16 @@ export function RealtimeInbox({
   const [internalNote, setInternalNote] = useState("");
   const [noteSaving, setNoteSaving] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<"sidebar" | "list" | "detail">("list");
+  const [readIds, setReadIds] = useState<Set<string>>(new Set(initialReadIds));
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkApplying, setBulkApplying] = useState(false);
+  const [templates, setTemplates] = useState<ReplyTemplate[]>([]);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [showReminderForm, setShowReminderForm] = useState(false);
+  const [reminderDate, setReminderDate] = useState("");
+  const [reminderNote, setReminderNote] = useState("");
   const [relatedInquiries, setRelatedInquiries] = useState<RelatedInquiry[]>([]);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionStart, setMentionStart] = useState(0);
@@ -243,6 +254,23 @@ export function RealtimeInbox({
   }, []);
 
   useEffect(() => {
+    fetch("/api/settings/reply-templates")
+      .then((r) => r.json())
+      .then((d: { templates?: ReplyTemplate[] }) => setTemplates(d.templates ?? []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!selectedInquiry) return;
+    fetch(`/api/inquiries/${selectedInquiry.id}/reminders`)
+      .then((r) => r.json())
+      .then((d: { reminders?: Reminder[] }) => setReminders(d.reminders ?? []))
+      .catch(() => {});
+    // 既読マーク
+    fetch(`/api/inquiries/${selectedInquiry.id}/read`, { method: "POST" }).catch(() => {});
+  }, [selectedInquiry?.id]);
+
+  useEffect(() => {
     if (!selectedInquiry?.lead_id) {
       setRelatedInquiries([]);
       return;
@@ -256,6 +284,32 @@ export function RealtimeInbox({
       })
       .catch(() => {});
   }, [selectedInquiry?.id, selectedInquiry?.lead_id]);
+
+  const handleSaveReminder = async () => {
+    if (!selectedInquiry || !reminderDate) return;
+    const res = await fetch(`/api/inquiries/${selectedInquiry.id}/reminders`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ remind_at: reminderDate, note: reminderNote || null }),
+    });
+    if (res.ok) {
+      const d = (await res.json()) as { reminder?: Reminder };
+      if (d.reminder) setReminders((prev) => [...prev, d.reminder!]);
+      setShowReminderForm(false);
+      setReminderDate("");
+      setReminderNote("");
+    }
+  };
+
+  const handleDeleteReminder = async (reminderId: string) => {
+    if (!selectedInquiry) return;
+    const res = await fetch(`/api/inquiries/${selectedInquiry.id}/reminders`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reminder_id: reminderId }),
+    });
+    if (res.ok) setReminders((prev) => prev.filter((r) => r.id !== reminderId));
+  };
 
   const handleBulkUpdate = async (update: {
     status?: InquiryStatus;
@@ -574,14 +628,20 @@ export function RealtimeInbox({
                     setSelectedId(item.id);
                     setMobilePanel("detail");
                     updateQuery({ id: item.id });
+                    setReadIds((prev) => new Set([...prev, item.id]));
                   }}
                   type="button"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-start gap-3">
-                      <ChannelBadge channel={item.channel} />
+                      <div className="relative shrink-0">
+                        <ChannelBadge channel={item.channel} />
+                        {!readIds.has(item.id) ? (
+                          <span className="absolute -right-1 -top-1 size-2 rounded-full bg-blue-500" />
+                        ) : null}
+                      </div>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">
+                        <p className={cn("truncate text-sm", readIds.has(item.id) ? "font-medium" : "font-semibold")}>
                           {getCustomerName(item)}
                         </p>
                         <p className="mt-1 truncate text-sm text-zinc-600">
@@ -795,21 +855,56 @@ export function RealtimeInbox({
               <div className="border-t border-zinc-200 bg-zinc-50 p-5">
                 <div className="grid grid-cols-[1fr_280px] gap-5">
                   <div className="space-y-3">
-                    <Textarea
-                      className="min-h-24 resize-none bg-white"
-                      onChange={(event) => setReplyBody(event.target.value)}
-                      placeholder="返信メッセージを入力"
-                      value={replyBody}
-                    />
-                    {selectedInquiry.ai_suggested_reply ? (
-                      <Badge
-                        variant="outline"
-                        className="w-fit rounded-md border-zinc-200 bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600"
-                      >
-                        AI提案
-                      </Badge>
-                    ) : null}
-                    <div className="flex justify-end">
+                    <div className="relative">
+                      <Textarea
+                        className="min-h-24 resize-none bg-white"
+                        onChange={(event) => setReplyBody(event.target.value)}
+                        placeholder="返信メッセージを入力"
+                        value={replyBody}
+                      />
+                      {/* テンプレート選択ドロップダウン */}
+                      {showTemplates && templates.length > 0 ? (
+                        <div className="absolute bottom-full z-20 mb-1 max-h-48 w-full overflow-y-auto rounded-md border border-zinc-200 bg-white shadow-md">
+                          {templates.map((t) => (
+                            <button
+                              key={t.id}
+                              className="w-full px-3 py-2 text-left hover:bg-zinc-50"
+                              onMouseDown={() => {
+                                setReplyBody(t.body);
+                                setShowTemplates(false);
+                              }}
+                              type="button"
+                            >
+                              <p className="text-xs font-semibold text-zinc-800">{t.name}</p>
+                              <p className="mt-0.5 truncate text-xs text-zinc-500">{t.body}</p>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {templates.length > 0 ? (
+                          <Button
+                            className="h-7 gap-1 px-2 text-xs"
+                            onClick={() => setShowTemplates((v) => !v)}
+                            size="sm"
+                            type="button"
+                            variant="outline"
+                          >
+                            <FileText className="size-3" />
+                            テンプレート
+                          </Button>
+                        ) : null}
+                        {selectedInquiry.ai_suggested_reply ? (
+                          <Badge
+                            variant="outline"
+                            className="rounded-md border-zinc-200 bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600"
+                          >
+                            AI提案
+                          </Badge>
+                        ) : null}
+                      </div>
                       <Button onClick={handleSendMessage} type="button">
                         <Send className="size-4" aria-hidden="true" />
                         送信
@@ -980,6 +1075,70 @@ export function RealtimeInbox({
                           {noteSaving ? "保存中..." : "保存"}
                         </Button>
                       </div>
+                    </div>
+                    {/* リマインダー */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-xs font-medium text-zinc-500">
+                          <Bell className="size-3.5" aria-hidden="true" />
+                          リマインダー
+                        </div>
+                        <button
+                          className="text-xs text-zinc-500 hover:text-zinc-900"
+                          onClick={() => setShowReminderForm((v) => !v)}
+                          type="button"
+                        >
+                          {showReminderForm ? "キャンセル" : "+ 追加"}
+                        </button>
+                      </div>
+                      {showReminderForm ? (
+                        <div className="space-y-1.5 rounded-md border border-zinc-200 p-2">
+                          <input
+                            className="h-7 w-full rounded-md border border-zinc-200 bg-white px-2 text-xs focus:outline-none focus:ring-1 focus:ring-zinc-300"
+                            min={new Date().toISOString().slice(0, 16)}
+                            onChange={(e) => setReminderDate(e.target.value)}
+                            type="datetime-local"
+                            value={reminderDate}
+                          />
+                          <input
+                            className="h-7 w-full rounded-md border border-zinc-200 bg-white px-2 text-xs placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+                            onChange={(e) => setReminderNote(e.target.value)}
+                            placeholder="メモ（任意）"
+                            value={reminderNote}
+                          />
+                          <Button
+                            className="h-6 w-full text-xs"
+                            disabled={!reminderDate}
+                            onClick={handleSaveReminder}
+                            size="sm"
+                            type="button"
+                          >
+                            設定
+                          </Button>
+                        </div>
+                      ) : null}
+                      {reminders.filter((r) => !r.is_done).map((r) => (
+                        <div
+                          key={r.id}
+                          className="flex items-start justify-between gap-2 rounded-md border border-zinc-200 px-2 py-1.5"
+                        >
+                          <div>
+                            <p className="text-xs font-medium text-zinc-700">
+                              {formatDateTime(r.remind_at)}
+                            </p>
+                            {r.note ? (
+                              <p className="text-xs text-zinc-500">{r.note}</p>
+                            ) : null}
+                          </div>
+                          <button
+                            className="text-zinc-400 hover:text-red-500"
+                            onClick={() => handleDeleteReminder(r.id)}
+                            type="button"
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>

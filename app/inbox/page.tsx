@@ -123,6 +123,17 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
     .eq("is_active", true)
     .order("name", { ascending: true });
 
+  const inquiryIds = inquiries.map((i) => i.id);
+  const { data: readRows } =
+    currentStaff && inquiryIds.length > 0
+      ? await supabase
+          .from("inquiry_reads")
+          .select("inquiry_id")
+          .eq("staff_id", currentStaff.id)
+          .in("inquiry_id", inquiryIds)
+      : { data: [] };
+  const readInquiryIds = new Set((readRows ?? []).map((r) => r.inquiry_id));
+
   return (
     <AppShell>
       <RealtimeInbox
@@ -132,6 +143,7 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
         initialChannel={channel}
         initialInquiries={inquiries}
         initialMessages={(messageRows ?? []) as Message[]}
+        initialReadIds={[...readInquiryIds]}
         initialSelectedId={selectedId ?? null}
         initialStatus={status}
         initialStore={store}

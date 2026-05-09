@@ -27,12 +27,13 @@ import type {
   ComparisonSiteAccount,
   EmailAccount,
   LineAccount,
+  ReplyTemplate,
   Staff,
   StaffBrandAccess,
   Store,
 } from "@/types/database";
 
-type Tab = "brands" | "stores" | "line" | "email" | "comparison" | "staff";
+type Tab = "brands" | "stores" | "line" | "email" | "comparison" | "staff" | "templates";
 
 type BrandRef = Pick<Brand, "id" | "name" | "brand_code">;
 type StoreRef = Pick<Store, "id" | "name">;
@@ -45,6 +46,7 @@ const tabs: Array<{ value: Tab; label: string }> = [
   { value: "email", label: "メールアカウント" },
   { value: "comparison", label: "比較サイト" },
   { value: "staff", label: "スタッフ管理" },
+  { value: "templates", label: "返信テンプレート" },
 ];
 
 export function SettingsClient({
@@ -89,6 +91,9 @@ export function SettingsClient({
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [templateList, setTemplateList] = useState<ReplyTemplate[]>([]);
+  const [templateName, setTemplateName] = useState("");
+  const [templateBody, setTemplateBody] = useState("");
   const modalTitle = useMemo(() => {
     if (activeTab === "staff") return "ブランドアクセス権を追加";
     return `${tabs.find((tab) => tab.value === activeTab)?.label ?? ""}を追加`;
@@ -98,6 +103,26 @@ export function SettingsClient({
     event.preventDefault();
     setSaving(true);
     setError(null);
+
+    if (activeTab === "templates") {
+      const res = await fetch("/api/settings/reply-templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: templateName, body: templateBody }),
+      });
+      setSaving(false);
+      if (!res.ok) {
+        const p = (await res.json().catch(() => null)) as { error?: string } | null;
+        setError(p?.error ?? "保存に失敗しました。");
+        return;
+      }
+      const d = (await res.json()) as { template?: ReplyTemplate };
+      if (d.template) setTemplateList((prev) => [...prev, d.template!]);
+      setTemplateName("");
+      setTemplateBody("");
+      setOpen(false);
+      return;
+    }
 
     const formData = new FormData(event.currentTarget);
     const response = await fetch(endpointFor(activeTab), {
@@ -168,6 +193,19 @@ export function SettingsClient({
           {activeTab === "staff" ? (
             <StaffAccessList access={staffBrandAccess} staff={staff} />
           ) : null}
+          {activeTab === "templates" ? (
+            <TemplatesList
+              templates={templateList}
+              onDelete={async (id) => {
+                await fetch("/api/settings/reply-templates", {
+                  method: "DELETE",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ id }),
+                });
+                setTemplateList((prev) => prev.filter((t) => t.id !== id));
+              }}
+            />
+          ) : null}
         </div>
       </div>
 
@@ -200,6 +238,14 @@ export function SettingsClient({
               ) : null}
               {activeTab === "staff" ? (
                 <StaffAccessForm brands={brands} staff={staff} />
+              ) : null}
+              {activeTab === "templates" ? (
+                <TemplateForm
+                  name={templateName}
+                  body={templateBody}
+                  onNameChange={setTemplateName}
+                  onBodyChange={setTemplateBody}
+                />
               ) : null}
               {error ? <p className="text-sm text-rose-600">{error}</p> : null}
             </div>
@@ -661,6 +707,81 @@ function Row({ children }: { children: React.ReactNode }) {
   );
 }
 
+function TemplatesList({
+  templates,
+  onDelete,
+}: {
+  templates: ReplyTemplate[];
+  onDelete: (id: string) => void;
+}) {
+  if (templates.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center text-sm text-zinc-500">
+        返信テンプレートがまだありません。「追加」から作成してください。
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      {templates.map((t) => (
+        <div
+          key={t.id}
+          className="flex items-start justify-between gap-4 rounded-lg border border-zinc-200 px-4 py-3"
+        >
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-zinc-900">{t.name}</p>
+            <p className="mt-1 truncate text-sm text-zinc-500">{t.body}</p>
+          </div>
+          <button
+            className="shrink-0 text-xs text-zinc-400 hover:text-red-500"
+            onClick={() => onDelete(t.id)}
+            type="button"
+          >
+            削除
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TemplateForm({
+  name,
+  body,
+  onNameChange,
+  onBodyChange,
+}: {
+  name: string;
+  body: string;
+  onNameChange: (v: string) => void;
+  onBodyChange: (v: string) => void;
+}) {
+  return (
+    <>
+      <div className="space-y-1.5">
+        <label className="text-sm font-medium">テンプレート名</label>
+        <input
+          className="h-9 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm focus:outline-none focus:ring-1 focus:ring-zinc-300"
+          onChange={(e) => onNameChange(e.target.value)}
+          placeholder="例: 初回ご連絡"
+          required
+          value={name}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <label className="text-sm font-medium">本文</label>
+        <textarea
+          className="min-h-32 w-full resize-none rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-zinc-300"
+          onChange={(e) => onBodyChange(e.target.value)}
+          placeholder="返信テンプレートの本文を入力"
+          required
+          value={body}
+        />
+      </div>
+    </>
+  );
+}
+
 function Status({ isActive }: { isActive: boolean }) {
   return (
     <Badge
@@ -692,6 +813,7 @@ function endpointFor(tab: Tab) {
     email: "/api/settings/email-accounts",
     comparison: "/api/settings/comparison-accounts",
     staff: "/api/settings/staff-brand-access",
+    templates: "/api/settings/reply-templates",
   };
 
   return endpoints[tab];
