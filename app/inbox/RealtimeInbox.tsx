@@ -78,6 +78,8 @@ export function RealtimeInbox({
   const [allTags, setAllTags] = useState<string[]>([]);
   const [showTagSuggestions, setShowTagSuggestions] = useState(false);
   const tagInputRef = useRef<HTMLInputElement>(null);
+  const [internalNote, setInternalNote] = useState("");
+  const [noteSaving, setNoteSaving] = useState(false);
   const [toast, setToast] = useState<{
     title: string;
     description?: string;
@@ -211,6 +213,11 @@ export function RealtimeInbox({
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 反響切り替え時に内部メモをリセット
+    setInternalNote(selectedInquiry?.internal_note ?? "");
+  }, [selectedInquiry?.id]);
+
+  useEffect(() => {
     fetch("/api/tags")
       .then((res) => res.json())
       .then((data: { tags?: string[] }) => setAllTags(data.tags ?? []))
@@ -267,6 +274,18 @@ export function RealtimeInbox({
         ),
       });
     }
+  };
+
+  const handleSaveNote = async () => {
+    if (!selectedInquiry) return;
+    setNoteSaving(true);
+    await fetch(`/api/inquiries/${selectedInquiry.id}/note`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ internal_note: internalNote }),
+    });
+    setNoteSaving(false);
+    replaceInquiry({ ...selectedInquiry, internal_note: internalNote });
   };
 
   const handleSendMessage = async () => {
@@ -666,9 +685,26 @@ export function RealtimeInbox({
                       </label>
                       <Textarea
                         className="min-h-20 resize-none bg-white"
-                        defaultValue={selectedInquiry.internal_note ?? ""}
+                        onChange={(e) => setInternalNote(e.target.value)}
                         placeholder="スタッフ向けメモ"
+                        value={internalNote}
                       />
+                      <div className="flex justify-end">
+                        <Button
+                          className="h-7 px-3 text-xs"
+                          disabled={
+                            noteSaving ||
+                            internalNote ===
+                              (selectedInquiry.internal_note ?? "")
+                          }
+                          onClick={handleSaveNote}
+                          size="sm"
+                          type="button"
+                          variant="outline"
+                        >
+                          {noteSaving ? "保存中..." : "保存"}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
