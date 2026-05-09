@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 
@@ -94,6 +94,16 @@ export function SettingsClient({
   const [templateList, setTemplateList] = useState<ReplyTemplate[]>([]);
   const [templateName, setTemplateName] = useState("");
   const [templateBody, setTemplateBody] = useState("");
+
+  useEffect(() => {
+    fetch("/api/settings/reply-templates")
+      .then((r) => r.json())
+      .then((d: { templates?: ReplyTemplate[] }) => {
+        if (d.templates) setTemplateList(d.templates);
+      })
+      .catch(() => {});
+  }, []);
+
   const modalTitle = useMemo(() => {
     if (activeTab === "staff") return "ブランドアクセス権を追加";
     return `${tabs.find((tab) => tab.value === activeTab)?.label ?? ""}を追加`;
