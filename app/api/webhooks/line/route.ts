@@ -76,6 +76,7 @@ export async function POST(request: NextRequest) {
 
         await supabase.from("inquiries").insert({
           lead_id: lead.id,
+          brand_id: account?.brand_id ?? null,
           store_id: account?.store_id ?? null,
           line_account_id: account?.id ?? null,
           channel: "line",
@@ -178,6 +179,7 @@ async function findOrCreateLineInquiry(
     .from("inquiries")
     .insert({
       lead_id: lead.id,
+      brand_id: account?.brand_id ?? null,
       store_id: account?.store_id ?? null,
       line_account_id: account?.id ?? null,
       channel: "line",

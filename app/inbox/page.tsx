@@ -73,7 +73,7 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
   let inquiryQuery = supabase
     .from("inquiries")
     .select(
-      "*, leads(*), staff:assigned_to(id,name,email), stores(id,name,store_code,store_type), line_accounts(id,name,destination), email_accounts(id,email,display_name), comparison_site_accounts(id,site,notification_email), inquiry_tags(tag)",
+      "*, leads(*), staff:assigned_to(id,name,email), brands(id,name,brand_code), stores(id,name,store_code,store_type), line_accounts(id,name,destination), email_accounts(id,email,display_name), comparison_site_accounts(id,site,notification_email), inquiry_tags(tag)",
     )
     .order("updated_at", { ascending: false })
     .limit(50);
