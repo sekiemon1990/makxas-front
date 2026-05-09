@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CalendarPlus, ChevronLeft, Menu, Send, Tag, X } from "lucide-react";
+import { AlertTriangle, CalendarPlus, ChevronLeft, Menu, Send, Tag, X } from "lucide-react";
 
 import { ChannelBadge, StatusBadge } from "@/components/badges";
 import { AppointmentModal } from "@/components/inbox/AppointmentModal";
@@ -38,6 +38,15 @@ import type {
 type StatusFilter = InquiryStatus | "all";
 type ChannelFilter = InquiryChannel | "all";
 type StoreFilter = string | "all";
+
+type RelatedInquiry = {
+  id: string;
+  subject: string | null;
+  channel: InquiryChannel;
+  status: InquiryStatus;
+  created_at: string;
+  stores?: { name: string } | null;
+};
 
 export function RealtimeInbox({
   canUseAllStores,
@@ -81,6 +90,10 @@ export function RealtimeInbox({
   const [internalNote, setInternalNote] = useState("");
   const [noteSaving, setNoteSaving] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<"sidebar" | "list" | "detail">("list");
+  const [relatedInquiries, setRelatedInquiries] = useState<RelatedInquiry[]>([]);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionStart, setMentionStart] = useState(0);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
   const [toast, setToast] = useState<{
     title: string;
     description?: string;
@@ -225,6 +238,57 @@ export function RealtimeInbox({
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (!selectedInquiry?.lead_id) {
+      setRelatedInquiries([]);
+      return;
+    }
+    fetch(`/api/leads/${selectedInquiry.lead_id}/inquiries`)
+      .then((r) => r.json())
+      .then((data: { inquiries?: RelatedInquiry[] }) => {
+        setRelatedInquiries(
+          (data.inquiries ?? []).filter((i) => i.id !== selectedInquiry.id),
+        );
+      })
+      .catch(() => {});
+  }, [selectedInquiry?.id, selectedInquiry?.lead_id]);
+
+  const mentionSuggestions =
+    mentionQuery !== null
+      ? staff.filter(
+          (s) =>
+            mentionQuery === "" ||
+            s.name.toLowerCase().includes(mentionQuery.toLowerCase()),
+        )
+      : [];
+
+  const handleNoteChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    const cursor = e.target.selectionStart ?? value.length;
+    setInternalNote(value);
+    const textBeforeCursor = value.slice(0, cursor);
+    const atIndex = textBeforeCursor.lastIndexOf("@");
+    if (atIndex !== -1) {
+      const query = textBeforeCursor.slice(atIndex + 1);
+      if (!query.includes(" ") && !query.includes("\n")) {
+        setMentionQuery(query);
+        setMentionStart(atIndex);
+        return;
+      }
+    }
+    setMentionQuery(null);
+  };
+
+  const handleInsertMention = (member: Staff) => {
+    const before = internalNote.slice(0, mentionStart);
+    const after = internalNote.slice(
+      mentionStart + 1 + (mentionQuery?.length ?? 0),
+    );
+    setInternalNote(`${before}@${member.name} ${after}`);
+    setMentionQuery(null);
+    noteRef.current?.focus();
+  };
+
   const tagSuggestions = tagInput.trim()
     ? allTags.filter(
         (t) =>
@@ -280,10 +344,22 @@ export function RealtimeInbox({
   const handleSaveNote = async () => {
     if (!selectedInquiry) return;
     setNoteSaving(true);
+    const mentionedNames = [
+      ...new Set(
+        [...internalNote.matchAll(/@([^\s@]+)/g)].map((m) => m[1]),
+      ),
+    ];
+    const mentionedStaffIds = staff
+      .filter((s) => mentionedNames.some((name) => s.name === name))
+      .map((s) => s.id);
     await fetch(`/api/inquiries/${selectedInquiry.id}/note`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ internal_note: internalNote }),
+      body: JSON.stringify({
+        internal_note: internalNote,
+        mentioned_staff_ids: mentionedStaffIds,
+        inquiry_subject: selectedInquiry.subject,
+      }),
     });
     setNoteSaving(false);
     replaceInquiry({ ...selectedInquiry, internal_note: internalNote });
@@ -523,6 +599,32 @@ export function RealtimeInbox({
                 </div>
               </div>
 
+              {relatedInquiries.length > 0 ? (
+                <div className="border-b border-amber-200 bg-amber-50 px-6 py-3">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-amber-800">
+                    <AlertTriangle className="size-3.5 shrink-0" aria-hidden="true" />
+                    このリードは他に {relatedInquiries.length} 件の反響があります
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
+                    {relatedInquiries.map((r) => (
+                      <button
+                        key={r.id}
+                        className="flex items-center gap-1.5 text-xs text-amber-700 underline underline-offset-2 hover:text-amber-900"
+                        onClick={() => {
+                          setSelectedId(r.id);
+                          updateQuery({ id: r.id });
+                        }}
+                        type="button"
+                      >
+                        <ChannelBadge channel={r.channel} />
+                        {r.subject ?? "件名なし"}
+                        <StatusBadge status={r.status} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
                 <div className="space-y-4">
                   {messages.map((message) => (
@@ -716,12 +818,32 @@ export function RealtimeInbox({
                       <label className="text-xs font-medium text-zinc-500">
                         内部メモ
                       </label>
-                      <Textarea
-                        className="min-h-20 resize-none bg-white"
-                        onChange={(e) => setInternalNote(e.target.value)}
-                        placeholder="スタッフ向けメモ"
-                        value={internalNote}
-                      />
+                      <div className="relative">
+                        <Textarea
+                          ref={noteRef}
+                          className="min-h-20 resize-none bg-white"
+                          onBlur={() =>
+                            setTimeout(() => setMentionQuery(null), 150)
+                          }
+                          onChange={handleNoteChange}
+                          placeholder="スタッフ向けメモ（@名前でメンション）"
+                          value={internalNote}
+                        />
+                        {mentionSuggestions.length > 0 ? (
+                          <div className="absolute bottom-full z-20 mb-1 max-h-36 w-full overflow-y-auto rounded-md border border-zinc-200 bg-white shadow-md">
+                            {mentionSuggestions.map((s) => (
+                              <button
+                                key={s.id}
+                                className="w-full px-3 py-1.5 text-left text-xs hover:bg-zinc-50"
+                                onMouseDown={() => handleInsertMention(s)}
+                                type="button"
+                              >
+                                @{s.name}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
                       <div className="flex justify-end">
                         <Button
                           className="h-7 px-3 text-xs"
