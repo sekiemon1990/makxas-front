@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   Bot,
   CalendarDays,
+  Clock,
   Gauge,
   Inbox,
   ListChecks,
@@ -20,6 +21,7 @@ const navItems = [
   { href: "/inbox", label: "インボックス", icon: Inbox, badge: "inbox" },
   { href: "/leads", label: "リード一覧", icon: ListChecks },
   { href: "/appointments", label: "アポ一覧", icon: CalendarDays },
+  { href: "/shifts", label: "シフト管理", icon: Clock },
   { href: "/ai", label: "AIアシスタント", icon: Bot },
   { href: "/settings", label: "設定", icon: Settings },
 ];
