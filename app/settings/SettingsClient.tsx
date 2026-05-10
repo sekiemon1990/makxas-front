@@ -33,7 +33,7 @@ import type {
   Store,
 } from "@/types/database";
 
-type Tab = "brands" | "stores" | "line" | "email" | "comparison" | "staff" | "templates" | "goals" | "ai" | "feedback";
+type Tab = "brands" | "stores" | "line" | "email" | "comparison" | "staff" | "templates" | "goals" | "business_hours" | "ai" | "feedback";
 
 type BrandRef = Pick<Brand, "id" | "name" | "brand_code">;
 type StoreRef = Pick<Store, "id" | "name">;
@@ -48,6 +48,7 @@ const tabs: Array<{ value: Tab; label: string }> = [
   { value: "staff", label: "スタッフ管理" },
   { value: "templates", label: "返信テンプレート" },
   { value: "goals", label: "目標設定" },
+  { value: "business_hours", label: "営業時間" },
   { value: "ai", label: "AI設定" },
   { value: "feedback", label: "フィードバック" },
 ];
@@ -168,7 +169,7 @@ export function SettingsClient({
             </p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight">設定</h1>
           </div>
-          {activeTab !== "ai" && activeTab !== "feedback" && activeTab !== "goals" ? (
+          {activeTab !== "ai" && activeTab !== "feedback" && activeTab !== "goals" && activeTab !== "business_hours" ? (
             <Button onClick={() => setOpen(true)} type="button">
               <Plus className="size-4" aria-hidden="true" />
               追加
@@ -235,6 +236,7 @@ export function SettingsClient({
             />
           ) : null}
           {activeTab === "goals" ? <GoalsSection /> : null}
+          {activeTab === "business_hours" ? <BusinessHoursSection /> : null}
           {activeTab === "ai" ? <AiConfigSection /> : null}
           {activeTab === "feedback" ? <FeedbackSection /> : null}
         </div>
@@ -1047,6 +1049,7 @@ function endpointFor(tab: Tab) {
     staff: "/api/settings/staff-brand-access",
     templates: "/api/settings/reply-templates",
     goals: "/api/settings/goals",
+    business_hours: "/api/settings/business-hours",
     ai: "/api/ai/config",
     feedback: "/api/ai/feedback",
   };
@@ -1131,6 +1134,128 @@ function siteLabel(site: ComparisonSiteAccount["site"]) {
   };
 
   return labels[site];
+}
+
+/* ── 営業時間設定セクション ──────────────────────────── */
+const DAY_OF_WEEK_LABELS = ["日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日"];
+
+type BusinessHourRow = {
+  id?: string;
+  day_of_week: number;
+  open_time: string;
+  close_time: string;
+  is_closed: boolean;
+};
+
+const DEFAULT_HOURS: BusinessHourRow[] = Array.from({ length: 7 }, (_, i) => ({
+  day_of_week: i,
+  open_time: "10:00",
+  close_time: "19:00",
+  is_closed: i === 0, // 日曜のみ定休
+}));
+
+function BusinessHoursSection() {
+  const [hours, setHours] = useState<BusinessHourRow[]>(DEFAULT_HOURS);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/settings/business-hours")
+      .then((r) => r.json())
+      .then((d: { business_hours?: BusinessHourRow[] }) => {
+        if (d.business_hours && d.business_hours.length > 0) {
+          // 7日分を揃える
+          const map = Object.fromEntries(d.business_hours.map((h) => [h.day_of_week, h]));
+          setHours(DEFAULT_HOURS.map((def) => map[def.day_of_week] ?? def));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const update = (dow: number, field: keyof BusinessHourRow, value: string | boolean) => {
+    setHours((prev) => prev.map((h) => h.day_of_week === dow ? { ...h, [field]: value } : h));
+    setSaved(false);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setSaved(false);
+    await fetch("/api/settings/business-hours", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hours }),
+    });
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-zinc-400">
+        <Loader2 className="size-4 animate-spin" />読み込み中...
+      </div>
+    );
+  }
+
+  return (
+    <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
+      <CardHeader>
+        <CardTitle>営業時間設定</CardTitle>
+        <CardDescription>反響受付・シフト管理で使用します（デフォルト: 月〜土 10:00〜19:00）</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-col divide-y divide-zinc-100">
+          {hours.map((h) => (
+            <div key={h.day_of_week} className="flex flex-wrap items-center gap-3 py-3">
+              <span className={`w-16 text-sm font-medium ${h.day_of_week === 0 ? "text-red-600" : h.day_of_week === 6 ? "text-blue-600" : "text-zinc-900"}`}>
+                {DAY_OF_WEEK_LABELS[h.day_of_week]}
+              </span>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={h.is_closed}
+                  onChange={(e) => update(h.day_of_week, "is_closed", e.target.checked)}
+                  className="rounded"
+                />
+                <span className="text-zinc-500">定休日</span>
+              </label>
+              {!h.is_closed ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="time"
+                      value={h.open_time}
+                      onChange={(e) => update(h.day_of_week, "open_time", e.target.value)}
+                      className="h-8 rounded-md border border-zinc-200 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-950"
+                    />
+                    <span className="text-zinc-400">〜</span>
+                    <input
+                      type="time"
+                      value={h.close_time}
+                      onChange={(e) => update(h.day_of_week, "close_time", e.target.value)}
+                      className="h-8 rounded-md border border-zinc-200 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-950"
+                    />
+                  </div>
+                </>
+              ) : (
+                <span className="text-sm text-zinc-400">—</span>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 flex items-center gap-3">
+          <Button onClick={() => void save()} disabled={saving}>
+            {saving ? <Loader2 className="size-4 animate-spin" /> : null}
+            保存
+          </Button>
+          {saved ? <span className="flex items-center gap-1 text-sm text-emerald-600"><Check className="size-4" />保存しました</span> : null}
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 /* ── 目標設定セクション ──────────────────────────────── */
