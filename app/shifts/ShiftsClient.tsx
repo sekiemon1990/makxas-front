@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Clock, Plus, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Plus, X, BarChart2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -163,6 +164,13 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
             <h1 className="mt-2 text-3xl font-semibold tracking-tight">シフト管理</h1>
           </div>
           <div className="flex items-center gap-2">
+            <Link
+              href="/shifts/report"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
+            >
+              <BarChart2 className="size-4" />
+              月次レポート
+            </Link>
             <select
               value={filterStaffId}
               onChange={(e) => setFilterStaffId(e.target.value)}

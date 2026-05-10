@@ -15,6 +15,7 @@ import {
 
 import { AppShell } from "@/components/app-shell";
 import { ChannelBadge, StatusBadge } from "@/components/badges";
+import { ApptTrendChart } from "@/components/dashboard/ApptTrendChart";
 import {
   Card,
   CardContent,
@@ -44,6 +45,7 @@ export default async function DashboardPage() {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
 
   const [
     { count: newCount },
@@ -65,6 +67,8 @@ export default async function DashboardPage() {
     { count: prevMonthApptCount },
     // リード×アポ（平均仕入点数用）
     { data: leadApptRows },
+    // 過去6ヶ月アポ（トレンドチャート）
+    { data: trendApptRows },
   ] = await Promise.all([
     supabase.from("inquiries").select("id", { count: "exact", head: true }).eq("status", "new"),
     supabase.from("inquiries").select("id", { count: "exact", head: true }).eq("status", "in_progress"),
@@ -122,6 +126,12 @@ export default async function DashboardPage() {
     supabase
       .from("appointments")
       .select("lead_id")
+      .neq("status", "cancelled"),
+    // 過去6ヶ月のアポ（トレンドチャート用）
+    supabase
+      .from("appointments")
+      .select("scheduled_at")
+      .gte("scheduled_at", sixMonthsAgo.toISOString())
       .neq("status", "cancelled"),
   ]);
 
@@ -207,6 +217,25 @@ export default async function DashboardPage() {
     appointments: thisMonthApptCount,
     inquiries: monthlyInquiries.length,
   };
+
+  // --- 6ヶ月アポ推移データ ---
+  const trendData = (() => {
+    const countMap: Record<string, number> = {};
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      countMap[key] = 0;
+    }
+    for (const row of (trendApptRows ?? [])) {
+      const d = new Date(row.scheduled_at as string);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      if (key in countMap) countMap[key] = (countMap[key] ?? 0) + 1;
+    }
+    return Object.entries(countMap).map(([key, count]) => {
+      const [y, m] = key.split("-");
+      return { month: `${Number(m)}月`, count };
+    });
+  })();
 
   // --- 生産性計算（シフトデータあり時のみ） ---
   const shiftWorkHours = (s: Shift) => {
@@ -454,6 +483,27 @@ export default async function DashboardPage() {
                     </div>
                   ) : null}
                 </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* アポ推移グラフ */}
+          <div className="mt-6">
+            <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
+              <CardHeader className="flex-row items-center justify-between">
+                <div>
+                  <CardTitle>アポ数推移</CardTitle>
+                  <CardDescription>過去6ヶ月のアポ取得件数</CardDescription>
+                </div>
+                <Link
+                  href="/shifts/report"
+                  className="text-xs text-zinc-400 hover:text-zinc-600"
+                >
+                  稼働レポート →
+                </Link>
+              </CardHeader>
+              <CardContent>
+                <ApptTrendChart data={trendData} />
               </CardContent>
             </Card>
           </div>
