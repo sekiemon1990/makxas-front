@@ -835,6 +835,27 @@ export type InquiryChannel = Database["public"]["Enums"]["inquiry_channel"];
 export type InquiryStatus = Database["public"]["Enums"]["inquiry_status"];
 export type MessageDirection = Database["public"]["Enums"]["message_direction"];
 
+// shifts / business_hours は migration 008 で追加（generated types 未反映のため手動定義）
+export type Shift = {
+  id: string;
+  staff_id: string;
+  shift_date: string;   // "YYYY-MM-DD"
+  start_time: string;   // "HH:MM"
+  end_time: string;     // "HH:MM"
+  break_minutes: number;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BusinessHour = {
+  id: string;
+  day_of_week: number;  // 0=日, 1=月 ... 6=土
+  open_time: string;    // "HH:MM"
+  close_time: string;   // "HH:MM"
+  is_closed: boolean;
+};
+
 export type InquiryWithLead = Inquiry & {
   leads: Lead | null;
   staff: Pick<Staff, "id" | "name" | "email"> | null;
