@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, CalendarCheck } from "lucide-react";
+import { CalendarCheck, Search, SlidersHorizontal, X } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
 import { ChannelBadge } from "@/components/badges";
 import { cn } from "@/lib/utils";
+import { channelMeta } from "@/lib/inquiry-options";
+import type { InquiryChannel } from "@/types/database";
 
 type LeadRow = {
   id: string;
@@ -28,12 +30,37 @@ type AppointmentSummary = {
   lead_id: string;
 };
 
+type SortKey = "created_at" | "last_contact" | "inquiry_count";
+
+const CHANNEL_FILTERS: InquiryChannel[] = [
+  "line",
+  "web_form",
+  "email",
+  "oikura",
+  "uridoki",
+  "hikakaku",
+  "phone",
+];
+
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "created_at", label: "登録日（新しい順）" },
+  { value: "last_contact", label: "最終接触（新しい順）" },
+  { value: "inquiry_count", label: "反響数（多い順）" },
+];
+
 export default function LeadsPage() {
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [inquiries, setInquiries] = useState<InquirySummary[]>([]);
   const [appointments, setAppointments] = useState<AppointmentSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [channelFilter, setChannelFilter] = useState<InquiryChannel | "all">("all");
+  const [apptFilter, setApptFilter] = useState<"all" | "yes" | "no">("all");
+  const [sortBy, setSortBy] = useState<SortKey>("created_at");
+  const [showFilters, setShowFilters] = useState(false);
+  // Date.now() はマウント時に一度だけ評価（最終接触の経過日数計算用）
+  // eslint-disable-next-line react-hooks/purity
+  const nowMs = useMemo(() => Date.now(), []);
 
   useEffect(() => {
     Promise.all([
@@ -72,38 +99,205 @@ export default function LeadsPage() {
   }, [appointments]);
 
   const filteredLeads = useMemo(() => {
-    if (!search.trim()) return leads;
-    const q = search.toLowerCase();
-    return leads.filter(
-      (l) =>
-        (l.display_name ?? "").toLowerCase().includes(q) ||
-        (l.phone ?? "").includes(q) ||
-        (l.email ?? "").toLowerCase().includes(q),
-    );
-  }, [leads, search]);
+    let result = leads;
+
+    // テキスト検索
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (l) =>
+          (l.display_name ?? "").toLowerCase().includes(q) ||
+          (l.phone ?? "").includes(q) ||
+          (l.email ?? "").toLowerCase().includes(q),
+      );
+    }
+
+    // チャネルフィルター（そのリードの反響チャネルに含まれるか）
+    if (channelFilter !== "all") {
+      result = result.filter((l) => {
+        const info = countMap.get(l.id);
+        return info?.channels.includes(channelFilter) ?? false;
+      });
+    }
+
+    // アポ有無フィルター
+    if (apptFilter === "yes") {
+      result = result.filter((l) => (apptMap.get(l.id) ?? 0) > 0);
+    } else if (apptFilter === "no") {
+      result = result.filter((l) => (apptMap.get(l.id) ?? 0) === 0);
+    }
+
+    // ソート
+    result = [...result].sort((a, b) => {
+      if (sortBy === "created_at") {
+        return b.created_at.localeCompare(a.created_at);
+      }
+      if (sortBy === "last_contact") {
+        const ac = countMap.get(a.id)?.lastContact ?? a.created_at;
+        const bc = countMap.get(b.id)?.lastContact ?? b.created_at;
+        return bc.localeCompare(ac);
+      }
+      if (sortBy === "inquiry_count") {
+        return (countMap.get(b.id)?.total ?? 0) - (countMap.get(a.id)?.total ?? 0);
+      }
+      return 0;
+    });
+
+    return result;
+  }, [leads, search, channelFilter, apptFilter, sortBy, countMap, apptMap]);
+
+  const activeFilterCount = [
+    channelFilter !== "all",
+    apptFilter !== "all",
+    sortBy !== "created_at",
+  ].filter(Boolean).length;
+
+  const resetFilters = () => {
+    setChannelFilter("all");
+    setApptFilter("all");
+    setSortBy("created_at");
+    setSearch("");
+  };
 
   return (
     <AppShell>
       <div className="mx-auto max-w-5xl px-6 py-8">
+        {/* ヘッダー */}
         <div className="flex items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">リード一覧</h1>
             <p className="mt-1 text-sm text-zinc-500">
-              全 {leads.length} 件{search ? ` / 検索結果 ${filteredLeads.length} 件` : ""}
+              全 {leads.length} 件{filteredLeads.length !== leads.length ? ` / 表示中 ${filteredLeads.length} 件` : ""}
             </p>
           </div>
-          <div className="relative w-64">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
-            <input
-              className="h-9 w-full rounded-lg border border-zinc-200 bg-white pl-9 pr-3 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300"
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="氏名・電話・メールで検索"
-              type="search"
-              value={search}
-            />
+          <div className="flex items-center gap-2">
+            {/* テキスト検索 */}
+            <div className="relative w-56">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+              <input
+                className="h-9 w-full rounded-lg border border-zinc-200 bg-white pl-9 pr-3 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300"
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="氏名・電話・メールで検索"
+                type="search"
+                value={search}
+              />
+            </div>
+            {/* フィルタートグル */}
+            <button
+              type="button"
+              onClick={() => setShowFilters((v) => !v)}
+              className={cn(
+                "flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors",
+                showFilters
+                  ? "border-zinc-900 bg-zinc-900 text-white"
+                  : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50",
+              )}
+            >
+              <SlidersHorizontal className="size-4" />
+              絞り込み
+              {activeFilterCount > 0 && (
+                <span className={cn(
+                  "flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold",
+                  showFilters ? "bg-white/20 text-white" : "bg-zinc-900 text-white",
+                )}>
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            {activeFilterCount > 0 && (
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="flex h-9 items-center gap-1 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-500 hover:bg-zinc-50"
+              >
+                <X className="size-3.5" />
+                リセット
+              </button>
+            )}
           </div>
         </div>
 
+        {/* フィルターパネル */}
+        {showFilters && (
+          <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-4">
+            <div className="flex flex-wrap gap-6">
+              {/* チャネルフィルター */}
+              <div>
+                <p className="mb-2 text-xs font-semibold text-zinc-500">チャネル</p>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setChannelFilter("all")}
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                      channelFilter === "all"
+                        ? "border-zinc-900 bg-zinc-900 text-white"
+                        : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50",
+                    )}
+                  >
+                    全て
+                  </button>
+                  {CHANNEL_FILTERS.map((ch) => {
+                    const meta = channelMeta[ch];
+                    return (
+                      <button
+                        key={ch}
+                        type="button"
+                        onClick={() => setChannelFilter(ch === channelFilter ? "all" : ch)}
+                        className={cn(
+                          "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                          channelFilter === ch
+                            ? "border-zinc-900 bg-zinc-900 text-white"
+                            : `${meta.className} border`,
+                        )}
+                      >
+                        {meta.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* アポ有無 */}
+              <div>
+                <p className="mb-2 text-xs font-semibold text-zinc-500">アポ</p>
+                <div className="flex gap-1.5">
+                  {(["all", "yes", "no"] as const).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setApptFilter(v)}
+                      className={cn(
+                        "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                        apptFilter === v
+                          ? "border-zinc-900 bg-zinc-900 text-white"
+                          : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50",
+                      )}
+                    >
+                      {v === "all" ? "全て" : v === "yes" ? "あり" : "なし"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* ソート */}
+              <div>
+                <p className="mb-2 text-xs font-semibold text-zinc-500">並び順</p>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortKey)}
+                  className="h-8 rounded-lg border border-zinc-200 bg-white px-3 text-xs text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-300"
+                >
+                  {SORT_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* テーブル */}
         <div className="mt-6 overflow-hidden rounded-xl border border-zinc-200 bg-white">
           {loading ? (
             <div className="p-12 text-center text-sm text-zinc-400">読み込み中...</div>
@@ -127,7 +321,7 @@ export default function LeadsPage() {
                   const apptCount = apptMap.get(lead.id) ?? 0;
                   const lastContact = info?.lastContact ?? null;
                   const daysSince = lastContact
-                    ? Math.floor((Date.now() - new Date(lastContact).getTime()) / 86400000)
+                    ? Math.floor((nowMs - new Date(lastContact).getTime()) / 86400000)
                     : null;
                   const isStale = daysSince !== null && daysSince >= 7;
 
@@ -189,7 +383,9 @@ export default function LeadsPage() {
           )}
           {!loading && filteredLeads.length === 0 ? (
             <div className="p-12 text-center text-sm text-zinc-500">
-              {search ? `"${search}" に一致するリードがいません。` : "リードがまだいません。"}
+              {search || activeFilterCount > 0
+                ? "条件に一致するリードがいません。"
+                : "リードがまだいません。"}
             </div>
           ) : null}
         </div>
