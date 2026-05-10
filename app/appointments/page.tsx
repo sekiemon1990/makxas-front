@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Calendar, ChevronLeft, ChevronRight, Download, List } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Download, List, SlidersHorizontal, X } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -35,14 +35,24 @@ const STATUS_COLOR: Record<string, string> = {
   completed: "bg-zinc-100 text-zinc-700",
 };
 
+const STATUS_ALL = ["confirmed", "cancelled", "completed"] as const;
+type StatusKey = typeof STATUS_ALL[number];
+
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"list" | "calendar">("list");
+  const [view, setView] = useState<"list" | "calendar">("calendar");
   const [calMonth, setCalMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
+
+  // フィルター状態
+  const [showFilters, setShowFilters] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<StatusKey | "all">("all");
+  const [methodFilter, setMethodFilter] = useState<"all" | "visit" | "delivery">("all");
+  const [staffFilter, setStaffFilter] = useState<string>("all");
+  const [monthOnly, setMonthOnly] = useState(false); // カレンダー表示月と連動するか
 
   useEffect(() => {
     fetch("/api/appointments/list")
@@ -52,20 +62,68 @@ export default function AppointmentsPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // スタッフ一覧（フィルター用）
+  const staffOptions = useMemo(() => {
+    const names = new Set<string>();
+    for (const a of appointments) {
+      if (a.staff?.name) names.add(a.staff.name);
+    }
+    return [...names].sort();
+  }, [appointments]);
+
+  const activeFilterCount = [
+    statusFilter !== "all",
+    methodFilter !== "all",
+    staffFilter !== "all",
+    monthOnly,
+  ].filter(Boolean).length;
+
+  const resetFilters = () => {
+    setStatusFilter("all");
+    setMethodFilter("all");
+    setStaffFilter("all");
+    setMonthOnly(false);
+  };
+
+  // フィルター適用
+  const filteredAppointments = useMemo(() => {
+    let result = appointments;
+
+    if (statusFilter !== "all") {
+      result = result.filter((a) => a.status === statusFilter);
+    }
+    if (methodFilter !== "all") {
+      result = result.filter((a) => a.preferred_method === methodFilter);
+    }
+    if (staffFilter !== "all") {
+      result = result.filter((a) => a.staff?.name === staffFilter);
+    }
+    if (monthOnly) {
+      const y = calMonth.getFullYear();
+      const m = calMonth.getMonth();
+      result = result.filter((a) => {
+        const d = new Date(a.scheduled_at);
+        return d.getFullYear() === y && d.getMonth() === m;
+      });
+    }
+
+    return result;
+  }, [appointments, statusFilter, methodFilter, staffFilter, monthOnly, calMonth]);
+
   const handleExport = () => {
     window.location.href = "/api/appointments/export";
   };
 
-  // カレンダー用: その月の日付ごとにアポをグループ化
+  // カレンダー用: その月の日付ごとにアポをグループ化（フィルター適用後）
   const calendarData = useMemo(() => {
     const map: Record<string, Appointment[]> = {};
-    for (const appt of appointments) {
+    for (const appt of filteredAppointments) {
       const d = new Date(appt.scheduled_at);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       (map[key] ??= []).push(appt);
     }
     return map;
-  }, [appointments]);
+  }, [filteredAppointments]);
 
   const calDays = useMemo(() => {
     const year = calMonth.getFullYear();
@@ -89,18 +147,24 @@ export default function AppointmentsPage() {
   return (
     <AppShell>
       <div className="flex h-full flex-col">
+        {/* ヘッダー */}
         <div className="border-b border-zinc-200 px-8 py-5">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">アポ一覧</h1>
-              <p className="mt-1 text-sm text-zinc-500">全 {appointments.length} 件</p>
+              <p className="mt-1 text-sm text-zinc-500">
+                全 {appointments.length} 件
+                {filteredAppointments.length !== appointments.length ? ` / 表示中 ${filteredAppointments.length} 件` : ""}
+              </p>
             </div>
             <div className="flex items-center gap-2">
+              {/* リスト/カレンダー切替 */}
               <div className="flex rounded-md border border-zinc-200 bg-white">
                 <button
                   className={cn("flex h-8 w-8 items-center justify-center rounded-l-md text-zinc-500 hover:bg-zinc-50", view === "list" && "bg-zinc-950 text-white hover:bg-zinc-900")}
                   onClick={() => setView("list")}
                   type="button"
+                  title="リスト表示"
                 >
                   <List className="size-4" />
                 </button>
@@ -108,24 +172,153 @@ export default function AppointmentsPage() {
                   className={cn("flex h-8 w-8 items-center justify-center rounded-r-md border-l border-zinc-200 text-zinc-500 hover:bg-zinc-50", view === "calendar" && "bg-zinc-950 text-white hover:bg-zinc-900")}
                   onClick={() => setView("calendar")}
                   type="button"
+                  title="カレンダー表示"
                 >
                   <Calendar className="size-4" />
                 </button>
               </div>
+
+              {/* 絞り込みボタン */}
+              <button
+                type="button"
+                onClick={() => setShowFilters((v) => !v)}
+                className={cn(
+                  "flex h-8 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors",
+                  showFilters
+                    ? "border-zinc-900 bg-zinc-900 text-white"
+                    : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50",
+                )}
+              >
+                <SlidersHorizontal className="size-4" />
+                絞り込み
+                {activeFilterCount > 0 && (
+                  <span className={cn(
+                    "flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold",
+                    showFilters ? "bg-white/20 text-white" : "bg-zinc-900 text-white",
+                  )}>
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+              {activeFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="flex h-8 items-center gap-1 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-500 hover:bg-zinc-50"
+                >
+                  <X className="size-3.5" />
+                  リセット
+                </button>
+              )}
+
               <Button onClick={handleExport} size="sm" variant="outline">
                 <Download className="size-4" />
                 CSV出力
               </Button>
             </div>
           </div>
+
+          {/* フィルターパネル */}
+          {showFilters && (
+            <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+              <div className="flex flex-wrap gap-6">
+                {/* ステータス */}
+                <div>
+                  <p className="mb-2 text-xs font-semibold text-zinc-500">ステータス</p>
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setStatusFilter("all")}
+                      className={cn(
+                        "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                        statusFilter === "all"
+                          ? "border-zinc-900 bg-zinc-900 text-white"
+                          : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50",
+                      )}
+                    >
+                      全て
+                    </button>
+                    {STATUS_ALL.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setStatusFilter(statusFilter === s ? "all" : s)}
+                        className={cn(
+                          "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                          statusFilter === s
+                            ? "border-zinc-900 bg-zinc-900 text-white"
+                            : `${STATUS_COLOR[s]} border`,
+                        )}
+                      >
+                        {STATUS_LABEL[s]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 方法 */}
+                <div>
+                  <p className="mb-2 text-xs font-semibold text-zinc-500">方法</p>
+                  <div className="flex gap-1.5">
+                    {(["all", "visit", "delivery"] as const).map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setMethodFilter(v)}
+                        className={cn(
+                          "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                          methodFilter === v
+                            ? "border-zinc-900 bg-zinc-900 text-white"
+                            : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50",
+                        )}
+                      >
+                        {v === "all" ? "全て" : v === "visit" ? "訪問" : "宅配"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 担当者 */}
+                {staffOptions.length > 0 && (
+                  <div>
+                    <p className="mb-2 text-xs font-semibold text-zinc-500">担当者</p>
+                    <select
+                      value={staffFilter}
+                      onChange={(e) => setStaffFilter(e.target.value)}
+                      className="h-8 rounded-lg border border-zinc-200 bg-white px-3 text-xs text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-300"
+                    >
+                      <option value="all">全員</option>
+                      {staffOptions.map((name) => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* 期間（カレンダー月と連動） */}
+                <div>
+                  <p className="mb-2 text-xs font-semibold text-zinc-500">表示期間</p>
+                  <label className="flex cursor-pointer items-center gap-2 text-xs text-zinc-700">
+                    <input
+                      type="checkbox"
+                      checked={monthOnly}
+                      onChange={(e) => setMonthOnly(e.target.checked)}
+                      className="rounded"
+                    />
+                    {calMonth.getFullYear()}年{calMonth.getMonth() + 1}月のみ
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-8">
           {loading ? (
             <div className="flex h-40 items-center justify-center text-sm text-zinc-500">読み込み中...</div>
-          ) : appointments.length === 0 ? (
+          ) : filteredAppointments.length === 0 ? (
             <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-zinc-300 text-sm text-zinc-500">
-              アポイントメントがまだありません。
+              {activeFilterCount > 0 ? "条件に一致するアポイントメントがありません。" : "アポイントメントがまだありません。"}
             </div>
           ) : view === "list" ? (
             <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
@@ -143,12 +336,12 @@ export default function AppointmentsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
-                  {appointments.map((appt) => {
+                  {filteredAppointments.map((appt) => {
                     const isUnassigned = !appt.staff?.name;
                     return (
                     <tr
                       key={appt.id}
-                      className={cn("transition-colors", appt.inquiry_id ? "cursor-pointer hover:bg-zinc-50" : "hover:bg-zinc-50")}
+                      className="cursor-pointer transition-colors hover:bg-zinc-50"
                       onClick={() => { if (appt.inquiry_id) window.location.href = `/inbox?id=${appt.inquiry_id}`; }}
                     >
                       <td className="px-4 py-3 font-medium">{fmt(appt.scheduled_at)}</td>
@@ -234,8 +427,15 @@ export default function AppointmentsPage() {
                           <button
                             key={appt.id}
                             type="button"
-                            className="w-full truncate rounded bg-zinc-950 px-1.5 py-0.5 text-left text-[10px] font-medium text-white hover:bg-zinc-700 transition-colors"
-                            title={`${appt.leads?.display_name ?? "顧客"} ${appt.item_category ?? ""}`}
+                            className={cn(
+                              "w-full truncate rounded px-1.5 py-0.5 text-left text-[10px] font-medium transition-colors",
+                              appt.status === "cancelled"
+                                ? "bg-red-200 text-red-900 hover:bg-red-300"
+                                : appt.status === "completed"
+                                  ? "bg-zinc-200 text-zinc-700 hover:bg-zinc-300"
+                                  : "bg-zinc-950 text-white hover:bg-zinc-700",
+                            )}
+                            title={`${appt.leads?.display_name ?? "顧客"} ${appt.item_category ?? ""}${appt.staff?.name ? ` / ${appt.staff.name}` : ""}`}
                             onClick={() => { if (appt.inquiry_id) window.location.href = `/inbox?id=${appt.inquiry_id}`; }}
                           >
                             {new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" }).format(new Date(appt.scheduled_at))} {appt.leads?.display_name ?? "—"}
