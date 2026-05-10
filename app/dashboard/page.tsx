@@ -7,7 +7,10 @@ import {
   CalendarCheck,
   CircleDot,
   Inbox,
+  Target,
   TrendingUp,
+  Trophy,
+  Users,
 } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
@@ -29,7 +32,8 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   const supabase = createServiceClient();
 
-  const todayStart = new Date();
+  const now = new Date();
+  const todayStart = new Date(now);
   todayStart.setHours(0, 0, 0, 0);
   const tomorrowStart = new Date(todayStart);
   tomorrowStart.setDate(tomorrowStart.getDate() + 1);
@@ -37,6 +41,9 @@ export default async function DashboardPage() {
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
   const fourteenDaysAgo = new Date(todayStart);
   fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 13);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
   const [
     { count: newCount },
@@ -50,48 +57,36 @@ export default async function DashboardPage() {
     { data: lostTagRows },
     { count: prevNewCount },
     { count: prevInProgressCount },
+    // 今月の新規アポ（担当者・品目カテゴリ付き）
+    { data: monthlyApptRows },
+    // 今月の反響（チャネル別アポ率計算用）
+    { data: monthlyInquiryRows },
+    // 先月のアポ数
+    { count: prevMonthApptCount },
+    // リード×アポ（平均仕入点数用）
+    { data: leadApptRows },
   ] = await Promise.all([
-    supabase
-      .from("inquiries")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "new"),
-    supabase
-      .from("inquiries")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "in_progress"),
+    supabase.from("inquiries").select("id", { count: "exact", head: true }).eq("status", "new"),
+    supabase.from("inquiries").select("id", { count: "exact", head: true }).eq("status", "in_progress"),
     supabase
       .from("appointments")
       .select("id", { count: "exact", head: true })
       .gte("scheduled_at", todayStart.toISOString())
       .lt("scheduled_at", tomorrowStart.toISOString()),
+    supabase.from("inquiries").select("id", { count: "exact", head: true }).not("status", "in", '("lost","closed")'),
+    supabase.from("inquiries").select("id", { count: "exact", head: true }).eq("status", "appointment_set"),
     supabase
       .from("inquiries")
-      .select("id", { count: "exact", head: true })
-      .not("status", "in", '("lost","closed")'),
-    supabase
-      .from("inquiries")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "appointment_set"),
-    supabase
-      .from("inquiries")
-      .select(
-        "*, leads(*), staff:assigned_to(id,name,email), inquiry_tags(tag)",
-      )
+      .select("*, leads(*), staff:assigned_to(id,name,email), inquiry_tags(tag)")
       .order("updated_at", { ascending: false })
       .limit(5),
-    supabase
-      .from("inquiries")
-      .select("channel", { count: "exact" })
-      .not("status", "in", '("lost","closed")'),
+    supabase.from("inquiries").select("channel", { count: "exact" }).not("status", "in", '("lost","closed")'),
     supabase
       .from("inquiries")
       .select("created_at")
       .gte("created_at", sevenDaysAgo.toISOString())
       .order("created_at", { ascending: true }),
-    supabase
-      .from("inquiry_tags")
-      .select("tag, inquiries!inner(status)")
-      .eq("inquiries.status", "lost"),
+    supabase.from("inquiry_tags").select("tag, inquiries!inner(status)").eq("inquiries.status", "lost"),
     supabase
       .from("inquiries")
       .select("id", { count: "exact", head: true })
@@ -104,31 +99,114 @@ export default async function DashboardPage() {
       .eq("status", "in_progress")
       .lt("created_at", sevenDaysAgo.toISOString())
       .gte("created_at", fourteenDaysAgo.toISOString()),
+    // 今月確定アポ
+    supabase
+      .from("appointments")
+      .select("id, item_category, staff:staff_id(name), lead_id")
+      .gte("scheduled_at", monthStart.toISOString())
+      .lt("scheduled_at", monthEnd.toISOString())
+      .neq("status", "cancelled"),
+    // 今月の反響（チャネル別）
+    supabase
+      .from("inquiries")
+      .select("id, channel, status")
+      .gte("created_at", monthStart.toISOString()),
+    // 先月のアポ数
+    supabase
+      .from("appointments")
+      .select("id", { count: "exact", head: true })
+      .gte("scheduled_at", prevMonthStart.toISOString())
+      .lt("scheduled_at", monthStart.toISOString())
+      .neq("status", "cancelled"),
+    // アポが入っているリードの一覧（重複なし）
+    supabase
+      .from("appointments")
+      .select("lead_id")
+      .neq("status", "cancelled"),
   ]);
 
+  // --- 今月のアポ集計 ---
+  type ApptRow = { id: string; item_category: string | null; staff: { name: string | null } | null; lead_id: string | null };
+  const appts = (monthlyApptRows ?? []) as ApptRow[];
+  const thisMonthApptCount = appts.length;
+
+  // 担当者別アポ数ランキング
+  const staffApptMap: Record<string, number> = {};
+  for (const a of appts) {
+    const name = a.staff?.name ?? "未割当";
+    staffApptMap[name] = (staffApptMap[name] ?? 0) + 1;
+  }
+  const staffRanking = Object.entries(staffApptMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+
+  // 品目カテゴリ別ランキング
+  const categoryMap: Record<string, number> = {};
+  for (const a of appts) {
+    const cat = a.item_category ?? "未分類";
+    categoryMap[cat] = (categoryMap[cat] ?? 0) + 1;
+  }
+  const categoryRanking = Object.entries(categoryMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6);
+
+  // 平均仕入点数（アポがある一意のリード数 vs 今月アポ総数）
+  const uniqueLeadsWithAppt = new Set((leadApptRows ?? []).map((r) => r.lead_id)).size;
+  const avgApptPerLead = uniqueLeadsWithAppt > 0
+    ? (((leadApptRows ?? []).length) / uniqueLeadsWithAppt).toFixed(1)
+    : "—";
+
+  // チャネル別アポ率（今月）
+  type InqRow = { id: string; channel: string; status: string };
+  const monthlyInquiries = (monthlyInquiryRows ?? []) as InqRow[];
+  const channelApptRate: Record<string, { total: number; appt: number }> = {};
+  for (const inq of monthlyInquiries) {
+    if (!channelApptRate[inq.channel]) channelApptRate[inq.channel] = { total: 0, appt: 0 };
+    channelApptRate[inq.channel].total++;
+    if (inq.status === "appointment_set" || inq.status === "transferred") {
+      channelApptRate[inq.channel].appt++;
+    }
+  }
+
+  // 今月 vs 先月のアポ数トレンド
+  const apptTrend = (prevMonthApptCount ?? 0) > 0
+    ? Math.round(((thisMonthApptCount - (prevMonthApptCount ?? 0)) / (prevMonthApptCount ?? 1)) * 100)
+    : null;
+
+  // 月次目標（monthly_goals テーブルが存在しない場合は空）
+  type GoalRow = { id: string; month: string; goal_type: string; target: number; label: string | null };
+  let goals: GoalRow[] = [];
+  try {
+    const { data: goalRows } = await supabase
+      .from("monthly_goals")
+      .select("*")
+      .eq("month", `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`);
+    goals = (goalRows ?? []) as GoalRow[];
+  } catch {
+    // テーブル未作成の場合はスキップ
+  }
+
+  // 目標進捗の実績値マッピング
+  const goalActuals: Record<string, number> = {
+    appointments: thisMonthApptCount,
+    inquiries: monthlyInquiries.length,
+  };
+
+  // --- 既存集計 ---
   const recentInquiries = (recentRows ?? []) as unknown as InquiryWithLead[];
-  const appointmentRate =
-    (totalInquiries ?? 0) > 0
-      ? Math.round(((appointmentSetCount ?? 0) / (totalInquiries ?? 1)) * 100)
-      : 0;
-
-  const channelCounts = channelFilters.reduce<Record<string, number>>(
-    (acc, ch) => {
-      acc[ch] = (channelRows ?? []).filter((r) => r.channel === ch).length;
-      return acc;
-    },
-    {},
-  );
-
+  const appointmentRate = (totalInquiries ?? 0) > 0
+    ? Math.round(((appointmentSetCount ?? 0) / (totalInquiries ?? 1)) * 100)
+    : 0;
+  const channelCounts = channelFilters.reduce<Record<string, number>>((acc, ch) => {
+    acc[ch] = (channelRows ?? []).filter((r) => r.channel === ch).length;
+    return acc;
+  }, {});
   const weeklyData = buildWeeklyData(weeklyRows ?? [], sevenDaysAgo);
-
   const lostTagCounts = (lostTagRows ?? []).reduce<Record<string, number>>((acc, r) => {
     acc[r.tag] = (acc[r.tag] ?? 0) + 1;
     return acc;
   }, {});
-  const topLostTags = Object.entries(lostTagCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8);
+  const topLostTags = Object.entries(lostTagCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
 
   const trend = (cur: number, prev: number) => {
     if (prev === 0) return null;
@@ -144,15 +222,19 @@ export default async function DashboardPage() {
     { title: "アポ取得率（累計）", value: `${appointmentRate}%`, icon: TrendingUp, trend: null },
   ];
 
+  const monthLabel = `${now.getMonth() + 1}月`;
+
   return (
     <AppShell>
       <div className="min-h-screen bg-zinc-50 p-8">
         <div className="mx-auto max-w-6xl">
+          {/* ヘッダー */}
           <div className="flex items-end justify-between">
             <div>
-              <h1 className="text-3xl font-semibold tracking-tight">
-                ダッシュボード
-              </h1>
+              <h1 className="text-3xl font-semibold tracking-tight">ダッシュボード</h1>
+              <p className="mt-1 text-sm text-zinc-500">
+                {now.getFullYear()}年{now.getMonth() + 1}月{now.getDate()}日 時点
+              </p>
             </div>
             <Link
               href="/inbox"
@@ -163,15 +245,13 @@ export default async function DashboardPage() {
             </Link>
           </div>
 
+          {/* サマリーカード */}
           <div className="mt-8 grid grid-cols-4 gap-4">
             {summaryCards.map((card) => {
               const Icon = card.icon;
               const t = card.trend;
               return (
-                <Card
-                  key={card.title}
-                  className="rounded-lg border-zinc-200 bg-white shadow-sm"
-                >
+                <Card key={card.title} className="rounded-lg border-zinc-200 bg-white shadow-sm">
                   <CardHeader className="flex-row items-center justify-between pb-2">
                     <CardDescription>{card.title}</CardDescription>
                     <div className="flex size-9 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700">
@@ -179,9 +259,7 @@ export default async function DashboardPage() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-3xl font-semibold tracking-tight">
-                      {card.value}
-                    </p>
+                    <p className="text-3xl font-semibold tracking-tight">{card.value}</p>
                     {t ? (
                       <div className={`mt-1.5 flex items-center gap-1 text-xs font-medium ${t.diff > 0 ? "text-red-500" : t.diff < 0 ? "text-green-600" : "text-zinc-400"}`}>
                         {t.diff > 0 ? <ArrowUpRight className="size-3.5" /> : t.diff < 0 ? <ArrowDownRight className="size-3.5" /> : <Minus className="size-3.5" />}
@@ -195,14 +273,62 @@ export default async function DashboardPage() {
             })}
           </div>
 
+          {/* 月次目標進捗（goals が設定されている場合のみ） */}
+          {goals.length > 0 ? (
+            <div className="mt-6">
+              <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
+                <CardHeader className="flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Target className="size-4" />
+                      {monthLabel}の目標進捗
+                    </CardTitle>
+                    <CardDescription>設定した月次目標に対する達成状況</CardDescription>
+                  </div>
+                  <Link
+                    href="/settings?tab=goals"
+                    className="text-xs text-zinc-400 hover:text-zinc-600"
+                  >
+                    目標を編集
+                  </Link>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-6">
+                    {goals.map((goal) => {
+                      const actual = goalActuals[goal.goal_type] ?? 0;
+                      const pct = Math.min(100, Math.round((actual / goal.target) * 100));
+                      const goalLabel = goal.label ?? (goal.goal_type === "appointments" ? "アポ取得数" : goal.goal_type === "inquiries" ? "反響受付数" : goal.goal_type);
+                      return (
+                        <div key={goal.id} className="space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="font-medium text-zinc-700">{goalLabel}</span>
+                            <span className={`font-semibold ${pct >= 100 ? "text-green-600" : pct >= 70 ? "text-amber-600" : "text-zinc-700"}`}>
+                              {actual} / {goal.target}
+                            </span>
+                          </div>
+                          <div className="h-3 w-full overflow-hidden rounded-full bg-zinc-100">
+                            <div
+                              className={`h-3 rounded-full transition-all ${pct >= 100 ? "bg-green-500" : pct >= 70 ? "bg-amber-400" : "bg-zinc-800"}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <p className="text-right text-xs font-semibold text-zinc-500">{pct}%</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
+
+          {/* チャネル別 + トレンド */}
           <div className="mt-6 grid grid-cols-[360px_1fr] gap-6">
             <div className="space-y-6">
               <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
                 <CardHeader>
                   <CardTitle>チャネル別件数</CardTitle>
-                  <CardDescription>
-                    対応中・アクティブな反響の内訳
-                  </CardDescription>
+                  <CardDescription>対応中・アクティブな反響の内訳</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {channelFilters.map((channel) => (
@@ -224,19 +350,11 @@ export default async function DashboardPage() {
                 <CardContent>
                   <div className="flex items-end gap-2 h-32">
                     {weeklyData.map(({ label, count: cnt, max }) => (
-                      <div
-                        key={label}
-                        className="flex flex-1 flex-col items-center gap-1.5"
-                      >
-                        <span className="text-xs font-semibold text-zinc-700">
-                          {cnt > 0 ? cnt : ""}
-                        </span>
+                      <div key={label} className="flex flex-1 flex-col items-center gap-1.5">
+                        <span className="text-xs font-semibold text-zinc-700">{cnt > 0 ? cnt : ""}</span>
                         <div
                           className="w-full rounded-t bg-zinc-800 transition-all"
-                          style={{
-                            height: max > 0 ? `${Math.max(6, (cnt / max) * 80)}px` : "6px",
-                            opacity: cnt === 0 ? 0.2 : 1,
-                          }}
+                          style={{ height: max > 0 ? `${Math.max(6, (cnt / max) * 80)}px` : "6px", opacity: cnt === 0 ? 0.2 : 1 }}
                         />
                         <span className="text-[10px] text-zinc-500">{label}</span>
                       </div>
@@ -261,23 +379,15 @@ export default async function DashboardPage() {
                       >
                         <ChannelBadge channel={item.channel} />
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">
-                            {getCustomerName(item)}
-                          </p>
-                          <p className="mt-1 truncate text-sm text-zinc-500">
-                            {item.subject ?? "件名なし"}
-                          </p>
+                          <p className="truncate text-sm font-medium">{getCustomerName(item)}</p>
+                          <p className="mt-1 truncate text-sm text-zinc-500">{item.subject ?? "件名なし"}</p>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="text-xs text-zinc-500">
-                            {formatDateTime(item.created_at)}
-                          </span>
+                          <span className="text-xs text-zinc-500">{formatDateTime(item.created_at)}</span>
                           <StatusBadge status={item.status} />
                         </div>
                       </Link>
-                      {index < Math.min(recentInquiries.length, 5) - 1 ? (
-                        <Separator />
-                      ) : null}
+                      {index < Math.min(recentInquiries.length, 5) - 1 ? <Separator /> : null}
                     </div>
                   ))}
                   {recentInquiries.length === 0 ? (
@@ -290,6 +400,141 @@ export default async function DashboardPage() {
             </Card>
           </div>
 
+          {/* 今月のアポ分析 3カラム */}
+          <div className="mt-6 grid grid-cols-3 gap-6">
+            {/* 今月のアポ件数カード */}
+            <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
+              <CardHeader className="pb-2">
+                <CardDescription>{monthLabel}のアポ件数</CardDescription>
+                <div className="flex size-9 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700 absolute right-6 top-4">
+                  <CalendarCheck className="size-4" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-4xl font-semibold tracking-tight">{thisMonthApptCount}</p>
+                {apptTrend !== null ? (
+                  <div className={`mt-1.5 flex items-center gap-1 text-xs font-medium ${apptTrend > 0 ? "text-green-600" : apptTrend < 0 ? "text-red-500" : "text-zinc-400"}`}>
+                    {apptTrend > 0 ? <ArrowUpRight className="size-3.5" /> : apptTrend < 0 ? <ArrowDownRight className="size-3.5" /> : <Minus className="size-3.5" />}
+                    <span>{apptTrend > 0 ? "+" : ""}{apptTrend}%</span>
+                    <span className="text-zinc-400 font-normal">先月比</span>
+                  </div>
+                ) : null}
+                <div className="mt-3 border-t border-zinc-100 pt-3">
+                  <p className="text-xs text-zinc-500">平均仕入点数</p>
+                  <p className="mt-0.5 text-lg font-semibold">{avgApptPerLead} <span className="text-sm font-normal text-zinc-500">件/リード</span></p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 担当者別アポランキング */}
+            <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-1.5">
+                  <Trophy className="size-4 text-amber-500" />
+                  担当者別アポ数
+                </CardTitle>
+                <CardDescription>{monthLabel}の担当者別取得件数</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {staffRanking.length === 0 ? (
+                  <p className="text-sm text-zinc-400">今月のアポデータがありません</p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {staffRanking.map(([name, cnt], i) => {
+                      const max = staffRanking[0]?.[1] ?? 1;
+                      const pct = Math.round((cnt / max) * 100);
+                      return (
+                        <div key={name} className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className={`flex size-5 items-center justify-center rounded-full text-[10px] font-bold ${i === 0 ? "bg-amber-100 text-amber-700" : i === 1 ? "bg-zinc-200 text-zinc-600" : i === 2 ? "bg-orange-100 text-orange-700" : "bg-zinc-100 text-zinc-500"}`}>
+                                {i + 1}
+                              </span>
+                              <span className="font-medium text-zinc-700">{name}</span>
+                            </div>
+                            <span className="font-semibold">{cnt}件</span>
+                          </div>
+                          <div className="h-1.5 w-full rounded-full bg-zinc-100">
+                            <div className="h-1.5 rounded-full bg-zinc-800 transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 品目カテゴリ別ランキング */}
+            <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-1.5">
+                  <Users className="size-4 text-zinc-500" />
+                  商品カテゴリ別
+                </CardTitle>
+                <CardDescription>{monthLabel}のアポ品目内訳</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {categoryRanking.length === 0 ? (
+                  <p className="text-sm text-zinc-400">今月のアポデータがありません</p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {categoryRanking.map(([cat, cnt]) => {
+                      const max = categoryRanking[0]?.[1] ?? 1;
+                      const pct = Math.round((cnt / max) * 100);
+                      const totalCat = categoryRanking.reduce((s, [, c]) => s + c, 0);
+                      const share = totalCat > 0 ? Math.round((cnt / totalCat) * 100) : 0;
+                      return (
+                        <div key={cat} className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="font-medium text-zinc-700">{cat}</span>
+                            <span className="text-zinc-500">{cnt}件 <span className="text-xs text-zinc-400">({share}%)</span></span>
+                          </div>
+                          <div className="h-1.5 w-full rounded-full bg-zinc-100">
+                            <div className="h-1.5 rounded-full bg-zinc-600 transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* チャネル別アポ率（今月） */}
+          {Object.keys(channelApptRate).length > 0 ? (
+            <div className="mt-6">
+              <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
+                <CardHeader>
+                  <CardTitle>チャネル別アポ率</CardTitle>
+                  <CardDescription>{monthLabel}：チャネルごとのアポ取得率（アポ取得済 + 引継完了 / 総反響数）</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-4 md:grid-cols-6">
+                    {channelFilters.map((ch) => {
+                      const data = channelApptRate[ch];
+                      if (!data || data.total === 0) return null;
+                      const rate = Math.round((data.appt / data.total) * 100);
+                      const meta = channelMeta[ch];
+                      return (
+                        <div key={ch} className="flex flex-col items-center gap-2 rounded-lg border border-zinc-100 p-3">
+                          <ChannelBadge channel={ch} />
+                          <div className="text-center">
+                            <p className="text-2xl font-bold">{rate}%</p>
+                            <p className="text-xs text-zinc-400">{data.appt}/{data.total}</p>
+                          </div>
+                          <p className="text-xs font-medium text-zinc-600">{meta.label}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
+
+          {/* 失注タグ分析 */}
           {topLostTags.length > 0 ? (
             <div className="mt-6">
               <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
@@ -319,6 +564,30 @@ export default async function DashboardPage() {
               </Card>
             </div>
           ) : null}
+
+          {/* 目標未設定の場合のCTA */}
+          {goals.length === 0 ? (
+            <div className="mt-6">
+              <div className="flex items-center justify-between rounded-xl border border-dashed border-zinc-300 bg-white p-5">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-10 items-center justify-center rounded-full bg-zinc-100">
+                    <Target className="size-5 text-zinc-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-zinc-700">{monthLabel}の目標がまだ設定されていません</p>
+                    <p className="text-xs text-zinc-500">アポ取得数・反響件数の目標を設定すると、ここで進捗が確認できます</p>
+                  </div>
+                </div>
+                <Link
+                  href="/settings?tab=goals"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-zinc-950 px-3 text-xs font-medium text-white hover:bg-zinc-800"
+                >
+                  <Target className="size-3.5" />
+                  目標を設定する
+                </Link>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </AppShell>
@@ -344,33 +613,19 @@ function buildWeeklyData(rows: { created_at: string }[], from: Date) {
   }));
 }
 
-function ChannelCountRow({
-  channel,
-  count,
-  total,
-}: {
-  channel: InquiryChannel;
-  count: number;
-  total: number;
-}) {
+function ChannelCountRow({ channel, count, total }: { channel: InquiryChannel; count: number; total: number }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
         <ChannelBadge channel={channel} showLabel />
         <span className="text-sm font-semibold">
           {count}
-          <span className="ml-1 text-xs font-normal text-zinc-500">
-            ({pct}%)
-          </span>
+          <span className="ml-1 text-xs font-normal text-zinc-500">({pct}%)</span>
         </span>
       </div>
       <div className="h-1.5 w-full rounded-full bg-zinc-100">
-        <div
-          className="h-1.5 rounded-full bg-zinc-900 transition-all"
-          style={{ width: `${pct}%` }}
-        />
+        <div className="h-1.5 rounded-full bg-zinc-900 transition-all" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );

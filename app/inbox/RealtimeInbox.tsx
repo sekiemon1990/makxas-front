@@ -900,10 +900,14 @@ export function RealtimeInbox({
               <div
                 key={item.id}
                 className={cn(
-                  "group relative rounded-lg border bg-white shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50",
+                  "group relative rounded-lg border shadow-sm transition",
                   item.id === selectedInquiry?.id
-                    ? "border-zinc-950 ring-2 ring-zinc-950/10"
-                    : "border-zinc-200",
+                    ? "border-zinc-950 bg-white ring-2 ring-zinc-950/10"
+                    : getStaleLevel(item) === "urgent"
+                      ? "border-red-200 bg-red-50 hover:border-red-300"
+                      : getStaleLevel(item) === "warning"
+                        ? "border-orange-200 bg-orange-50 hover:border-orange-300"
+                        : "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50",
                 )}
                 onTouchEnd={(e) => handleTouchEnd(e, item.id)}
                 onTouchStart={handleTouchStart}
@@ -953,7 +957,19 @@ export function RealtimeInbox({
                     <StatusBadge status={item.status} />
                   </div>
                   <div className="mt-4 flex items-center justify-between text-xs text-zinc-500">
-                    <span>{formatElapsed(item.created_at)}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span>{formatElapsed(item.created_at)}</span>
+                      {getStaleLevel(item) !== "none" ? (
+                        <span className={cn(
+                          "rounded-full px-1.5 py-0.5 font-semibold",
+                          getStaleLevel(item) === "urgent"
+                            ? "bg-red-100 text-red-700"
+                            : "bg-orange-100 text-orange-700",
+                        )}>
+                          ⚠ 未返信 {getStaleHours(item)}h
+                        </span>
+                      ) : null}
+                    </div>
                     <span>
                       {item.stores?.name ?? "店舗未設定"} / {item.staff?.name ?? "未アサイン"}
                     </span>
@@ -1494,4 +1510,26 @@ function formatElapsed(value: string) {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}時間前`;
   return `${Math.floor(hours / 24)}日前`;
+}
+
+/** 未返信経過時間を時間単位で返す（updated_at ベース） */
+function getStaleHours(item: { status: string; updated_at: string }): number {
+  return Math.floor((Date.now() - new Date(item.updated_at).getTime()) / 3600000);
+}
+
+/**
+ * 未返信の深刻度を返す
+ * - 'none'    : 問題なし
+ * - 'warning' : 新着 or 対応中 で更新から 1〜3h
+ * - 'urgent'  : 新着 or 対応中 で更新から 3h 超
+ */
+function getStaleLevel(item: { status: string; updated_at: string }): "none" | "warning" | "urgent" {
+  if (item.status === "pending" || item.status === "appointment_set" ||
+      item.status === "transferred" || item.status === "lost" || item.status === "closed") {
+    return "none";
+  }
+  const hours = getStaleHours(item);
+  if (hours >= 3) return "urgent";
+  if (hours >= 1) return "warning";
+  return "none";
 }
