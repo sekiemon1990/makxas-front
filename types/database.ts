@@ -484,6 +484,7 @@ export type Database = {
           body: string | null;
           media_urls: string[] | null;
           line_msg_id: string | null;
+          email_msg_id: string | null;
           sent_by: string | null;
           is_auto: boolean;
           created_at: string;
@@ -495,6 +496,7 @@ export type Database = {
           body?: string | null;
           media_urls?: string[] | null;
           line_msg_id?: string | null;
+          email_msg_id?: string | null;
           sent_by?: string | null;
           is_auto?: boolean;
           created_at?: string;
@@ -506,6 +508,7 @@ export type Database = {
           body?: string | null;
           media_urls?: string[] | null;
           line_msg_id?: string | null;
+          email_msg_id?: string | null;
           sent_by?: string | null;
           is_auto?: boolean;
           created_at?: string;

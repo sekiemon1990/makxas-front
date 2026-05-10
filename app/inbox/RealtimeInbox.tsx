@@ -12,6 +12,7 @@ import {
   FileText,
   Image as ImageIcon,
   Keyboard,
+  Mail,
   Menu,
   Send,
   Tag,
@@ -137,6 +138,7 @@ export function RealtimeInbox({
   const [messages, setMessages] = useState(initialMessages);
   const [selectedId, setSelectedId] = useState(initialSelectedId);
   const [replyBody, setReplyBody] = useState("");
+  const [replySubject, setReplySubject] = useState("");
   const [appointmentOpen, setAppointmentOpen] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const [allTags, setAllTags] = useState<string[]>([]);
@@ -603,15 +605,23 @@ export function RealtimeInbox({
   // ④ 返信後ステータス自動変更
   const handleSendMessage = async () => {
     if (!selectedInquiry || !replyBody.trim()) return;
+    const isEmailChannel = ["email", "web_form", "hikakaku", "uridoki", "oikura"].includes(
+      selectedInquiry.channel ?? "",
+    );
     const response = await fetch("/api/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inquiry_id: selectedInquiry.id, body: replyBody }),
+      body: JSON.stringify({
+        inquiry_id: selectedInquiry.id,
+        body: replyBody,
+        ...(isEmailChannel && replySubject.trim() ? { subject: replySubject.trim() } : {}),
+      }),
     });
     if (response.ok) {
       const payload = (await response.json()) as { message: Message };
       setMessages((current) => [...current, payload.message]);
       setReplyBody("");
+      setReplySubject("");
       // ④ 新着→対応中に自動変更
       if (selectedInquiry.status === "new") {
         const statusRes = await fetch(`/api/inquiries/${selectedInquiry.id}/status`, {
@@ -1182,6 +1192,21 @@ export function RealtimeInbox({
                         ))}
                       </div>
                     ) : null}
+                    {/* メール返信時は件名フィールドを表示 */}
+                    {["email", "web_form", "hikakaku", "uridoki", "oikura"].includes(
+                      selectedInquiry.channel ?? "",
+                    ) ? (
+                      <div className="flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-2">
+                        <span className="shrink-0 text-xs font-medium text-zinc-500">件名</span>
+                        <input
+                          className="flex-1 bg-transparent text-sm outline-none placeholder:text-zinc-400"
+                          onChange={(e) => setReplySubject(e.target.value)}
+                          placeholder={selectedInquiry.subject ?? "Re: お問い合わせ"}
+                          type="text"
+                          value={replySubject}
+                        />
+                      </div>
+                    ) : null}
                     <div className="relative">
                       <Textarea
                         ref={replyRef}
@@ -1282,7 +1307,13 @@ export function RealtimeInbox({
                           </Button>
                         ) : null}
                         <Button onClick={handleSendMessage} type="button" disabled={!replyBody.trim()}>
-                          <Send className="size-4" aria-hidden="true" />
+                          {["email", "web_form", "hikakaku", "uridoki", "oikura"].includes(
+                            selectedInquiry.channel ?? "",
+                          ) ? (
+                            <Mail className="size-4" aria-hidden="true" />
+                          ) : (
+                            <Send className="size-4" aria-hidden="true" />
+                          )}
                           送信
                         </Button>
                       </div>
