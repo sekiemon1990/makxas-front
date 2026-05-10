@@ -1,5 +1,6 @@
 import * as line from "@line/bot-sdk";
 import { NextResponse, type NextRequest } from "next/server";
+import { Resend } from "resend";
 
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -8,6 +9,7 @@ export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => null)) as {
     inquiry_id?: string;
     body?: string;
+    subject?: string;
   } | null;
 
   if (!body?.inquiry_id || !body.body?.trim()) {
@@ -40,7 +42,7 @@ export async function POST(request: NextRequest) {
   // 反響とリード情報を取得
   const { data: inquiry } = await supabase
     .from("inquiries")
-    .select("*, leads(line_user_id), line_accounts(channel_access_token)")
+    .select("*, leads(line_user_id, email, display_name), line_accounts(channel_access_token)")
     .eq("id", body.inquiry_id)
     .maybeSingle();
 
@@ -100,6 +102,62 @@ export async function POST(request: NextRequest) {
     } catch (lineError) {
       // LINE送信失敗してもDB保存は成功として返す（ログのみ）
       console.error("LINE push failed:", lineError);
+    }
+  }
+
+  // メールチャンネルの場合はResendで送信
+  const isEmailChannel = ["email", "web_form", "hikakaku", "uridoki", "oikura"].includes(
+    inquiry.channel ?? "",
+  );
+  if (isEmailChannel) {
+    const leadEmail = (
+      inquiry.leads as { email: string | null } | null
+    )?.email;
+
+    if (leadEmail && process.env.RESEND_API_KEY) {
+      try {
+        // 返信用メールアカウントを取得（brand_id or store_id でマッチ、purpose=reply）
+        const { data: replyAccount } = await supabase
+          .from("email_accounts")
+          .select("id, email, display_name")
+          .eq("purpose", "reply")
+          .eq("is_active", true)
+          .or(
+            [
+              inquiry.brand_id ? `brand_id.eq.${inquiry.brand_id}` : null,
+              inquiry.store_id ? `store_id.eq.${inquiry.store_id}` : null,
+            ]
+              .filter(Boolean)
+              .join(",") || "is_active.eq.true",
+          )
+          .limit(1)
+          .maybeSingle();
+
+        const fromEmail = replyAccount?.email ?? process.env.RESEND_FROM_EMAIL ?? "noreply@makxas.com";
+        const fromName = replyAccount?.display_name ?? "買取マクサス";
+        const emailSubject = body.subject?.trim() || inquiry.subject || "お問い合わせへのご返信";
+
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        const { data: resendData, error: resendError } = await resend.emails.send({
+          from: `${fromName} <${fromEmail}>`,
+          to: [leadEmail],
+          subject: emailSubject,
+          text: body.body.trim(),
+        });
+
+        if (resendError) {
+          console.error("Resend email failed:", resendError);
+        } else if (resendData?.id) {
+          // email_msg_id を更新
+          await supabase
+            .from("messages")
+            .update({ email_msg_id: resendData.id })
+            .eq("id", message.id);
+          message.email_msg_id = resendData.id;
+        }
+      } catch (emailError) {
+        console.error("Email send error:", emailError);
+      }
     }
   }
 
