@@ -869,3 +869,23 @@ export type InquiryWithLead = Inquiry & {
   > | null;
   inquiry_tags?: InquiryTag[];
 };
+
+export type TagMaster = {
+  id: string;
+  name: string;
+  color: string;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+};
+
+export type AssignmentRule = {
+  id: string;
+  name: string;
+  channel: string | null;
+  keyword: string | null;
+  assigned_staff_id: string | null;
+  priority: number;
+  is_active: boolean;
+  created_at: string;
+};
