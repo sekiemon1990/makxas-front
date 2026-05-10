@@ -33,7 +33,7 @@ import type {
   Store,
 } from "@/types/database";
 
-type Tab = "brands" | "stores" | "line" | "email" | "comparison" | "staff" | "templates" | "ai" | "feedback";
+type Tab = "brands" | "stores" | "line" | "email" | "comparison" | "staff" | "templates" | "goals" | "ai" | "feedback";
 
 type BrandRef = Pick<Brand, "id" | "name" | "brand_code">;
 type StoreRef = Pick<Store, "id" | "name">;
@@ -47,6 +47,7 @@ const tabs: Array<{ value: Tab; label: string }> = [
   { value: "comparison", label: "比較サイト" },
   { value: "staff", label: "スタッフ管理" },
   { value: "templates", label: "返信テンプレート" },
+  { value: "goals", label: "目標設定" },
   { value: "ai", label: "AI設定" },
   { value: "feedback", label: "フィードバック" },
 ];
@@ -167,7 +168,7 @@ export function SettingsClient({
             </p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight">設定</h1>
           </div>
-          {activeTab !== "ai" && activeTab !== "feedback" ? (
+          {activeTab !== "ai" && activeTab !== "feedback" && activeTab !== "goals" ? (
             <Button onClick={() => setOpen(true)} type="button">
               <Plus className="size-4" aria-hidden="true" />
               追加
@@ -218,8 +219,22 @@ export function SettingsClient({
                 });
                 setTemplateList((prev) => prev.filter((t) => t.id !== id));
               }}
+              onEdit={async (id, data) => {
+                const res = await fetch(`/api/settings/reply-templates/${id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(data),
+                });
+                const d = (await res.json()) as { template?: ReplyTemplate };
+                if (d.template) {
+                  setTemplateList((prev) =>
+                    prev.map((t) => (t.id === id ? d.template! : t)),
+                  );
+                }
+              }}
             />
           ) : null}
+          {activeTab === "goals" ? <GoalsSection /> : null}
           {activeTab === "ai" ? <AiConfigSection /> : null}
           {activeTab === "feedback" ? <FeedbackSection /> : null}
         </div>
@@ -772,13 +787,61 @@ function Row({ children }: { children: React.ReactNode }) {
   );
 }
 
+// 変数プレースホルダー一覧
+const TEMPLATE_VARIABLES = [
+  { label: "お名前", value: "{{お名前}}" },
+  { label: "品目", value: "{{品目}}" },
+  { label: "査定日時", value: "{{査定日時}}" },
+  { label: "担当者名", value: "{{担当者名}}" },
+  { label: "店舗名", value: "{{店舗名}}" },
+];
+
 function TemplatesList({
   templates,
   onDelete,
+  onEdit,
 }: {
   templates: ReplyTemplate[];
   onDelete: (id: string) => void;
+  onEdit: (id: string, data: { name: string; body: string }) => Promise<void>;
 }) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editBody, setEditBody] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+
+  const startEdit = (t: ReplyTemplate) => {
+    setEditingId(t.id);
+    setEditName(t.name);
+    setEditBody(t.body);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditName("");
+    setEditBody("");
+  };
+
+  const saveEdit = async () => {
+    if (!editingId || !editName.trim() || !editBody.trim()) return;
+    setSaving(true);
+    await onEdit(editingId, { name: editName.trim(), body: editBody.trim() });
+    setSaving(false);
+    setEditingId(null);
+  };
+
+  const insertVariable = (v: string) => {
+    const el = bodyRef.current;
+    if (!el) { setEditBody((prev) => prev + v); return; }
+    const start = el.selectionStart ?? editBody.length;
+    const end = el.selectionEnd ?? editBody.length;
+    const next = editBody.slice(0, start) + v + editBody.slice(end);
+    setEditBody(next);
+    setTimeout(() => { el.focus(); el.setSelectionRange(start + v.length, start + v.length); }, 0);
+  };
+
   if (templates.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center text-sm text-zinc-500">
@@ -791,19 +854,95 @@ function TemplatesList({
       {templates.map((t) => (
         <div
           key={t.id}
-          className="flex items-start justify-between gap-4 rounded-lg border border-zinc-200 px-4 py-3"
+          className="rounded-lg border border-zinc-200 px-4 py-3"
         >
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-zinc-900">{t.name}</p>
-            <p className="mt-1 truncate text-sm text-zinc-500">{t.body}</p>
-          </div>
-          <button
-            className="shrink-0 text-xs text-zinc-400 hover:text-red-500"
-            onClick={() => onDelete(t.id)}
-            type="button"
-          >
-            削除
-          </button>
+          {editingId === t.id ? (
+            /* 編集モード */
+            <div className="space-y-3">
+              <input
+                className="h-9 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm focus:outline-none focus:ring-1 focus:ring-zinc-300"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="テンプレート名"
+              />
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap gap-1">
+                  {TEMPLATE_VARIABLES.map((v) => (
+                    <button
+                      key={v.value}
+                      type="button"
+                      onClick={() => insertVariable(v.value)}
+                      className="rounded border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[11px] text-zinc-600 hover:bg-zinc-100"
+                    >
+                      {v.label}を挿入
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  ref={bodyRef}
+                  className="min-h-28 w-full resize-none rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-zinc-300"
+                  value={editBody}
+                  onChange={(e) => setEditBody(e.target.value)}
+                  placeholder="本文"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Button size="sm" disabled={saving} onClick={saveEdit} type="button">
+                  {saving ? "保存中..." : "保存"}
+                </Button>
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  className="text-xs text-zinc-500 hover:text-zinc-800"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* 表示モード */
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-zinc-900">{t.name}</p>
+                <p
+                  className={`mt-1 text-sm text-zinc-500 ${expanded.has(t.id) ? "whitespace-pre-wrap" : "line-clamp-2"}`}
+                >
+                  {t.body}
+                </p>
+                {t.body.length > 80 ? (
+                  <button
+                    type="button"
+                    className="mt-1 text-xs text-zinc-400 hover:text-zinc-600"
+                    onClick={() =>
+                      setExpanded((prev) => {
+                        const next = new Set(prev);
+                        next.has(t.id) ? next.delete(t.id) : next.add(t.id);
+                        return next;
+                      })
+                    }
+                  >
+                    {expanded.has(t.id) ? "▲ 折りたたむ" : "▼ 全文を見る"}
+                  </button>
+                ) : null}
+              </div>
+              <div className="flex shrink-0 items-center gap-3">
+                <button
+                  className="text-xs text-zinc-400 hover:text-zinc-700"
+                  onClick={() => startEdit(t)}
+                  type="button"
+                >
+                  編集
+                </button>
+                <button
+                  className="text-xs text-zinc-400 hover:text-red-500"
+                  onClick={() => onDelete(t.id)}
+                  type="button"
+                >
+                  削除
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -821,6 +960,18 @@ function TemplateForm({
   onNameChange: (v: string) => void;
   onBodyChange: (v: string) => void;
 }) {
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+
+  const insertVariable = (v: string) => {
+    const el = bodyRef.current;
+    if (!el) { onBodyChange(body + v); return; }
+    const start = el.selectionStart ?? body.length;
+    const end = el.selectionEnd ?? body.length;
+    const next = body.slice(0, start) + v + body.slice(end);
+    onBodyChange(next);
+    setTimeout(() => { el.focus(); el.setSelectionRange(start + v.length, start + v.length); }, 0);
+  };
+
   return (
     <>
       <div className="space-y-1.5">
@@ -835,13 +986,29 @@ function TemplateForm({
       </div>
       <div className="space-y-1.5">
         <label className="text-sm font-medium">本文</label>
+        <div className="mb-1.5 flex flex-wrap gap-1">
+          {TEMPLATE_VARIABLES.map((v) => (
+            <button
+              key={v.value}
+              type="button"
+              onClick={() => insertVariable(v.value)}
+              className="rounded border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[11px] text-zinc-600 hover:bg-zinc-100"
+            >
+              {v.label}を挿入
+            </button>
+          ))}
+        </div>
         <textarea
+          ref={bodyRef}
           className="min-h-32 w-full resize-none rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-zinc-300"
           onChange={(e) => onBodyChange(e.target.value)}
-          placeholder="返信テンプレートの本文を入力"
+          placeholder={`例: {{お名前}} 様\n\nこの度はお問い合わせいただきありがとうございます。\n担当の{{担当者名}}でございます。`}
           required
           value={body}
         />
+        <p className="text-xs text-zinc-400">
+          {'{{お名前}} などの変数は送信時に自動的に置き換えられます'}
+        </p>
       </div>
     </>
   );
@@ -879,6 +1046,7 @@ function endpointFor(tab: Tab) {
     comparison: "/api/settings/comparison-accounts",
     staff: "/api/settings/staff-brand-access",
     templates: "/api/settings/reply-templates",
+    goals: "/api/settings/goals",
     ai: "/api/ai/config",
     feedback: "/api/ai/feedback",
   };
@@ -963,6 +1131,199 @@ function siteLabel(site: ComparisonSiteAccount["site"]) {
   };
 
   return labels[site];
+}
+
+/* ── 目標設定セクション ──────────────────────────────── */
+type MonthlyGoal = {
+  id: string;
+  month: string;       // "YYYY-MM-01"
+  goal_type: string;
+  target: number;
+  label: string | null;
+};
+
+const GOAL_TYPE_OPTIONS = [
+  { value: "appointments", label: "アポ件数" },
+  { value: "inquiries", label: "反響件数" },
+  { value: "conversion_rate", label: "アポ率（%）" },
+  { value: "avg_items", label: "平均仕入点数" },
+];
+
+function goalTypeLabel(type: string) {
+  return GOAL_TYPE_OPTIONS.find((o) => o.value === type)?.label ?? type;
+}
+
+function GoalsSection() {
+  const [goals, setGoals] = useState<MonthlyGoal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // form state
+  const [month, setMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [goalType, setGoalType] = useState("appointments");
+  const [target, setTarget] = useState("");
+  const [label, setLabel] = useState("");
+
+  const load = () => {
+    setLoading(true);
+    fetch("/api/settings/goals")
+      .then((r) => r.json())
+      .then((d: { goals?: MonthlyGoal[] }) => setGoals(d.goals ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { load(); }, []);
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!month || !goalType || !target) return;
+    setSaving(true);
+    setError(null);
+    const res = await fetch("/api/settings/goals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ month, goal_type: goalType, target: Number(target), label: label || undefined }),
+    });
+    const d = (await res.json()) as { goal?: MonthlyGoal; error?: string };
+    setSaving(false);
+    if (d.error) { setError(d.error); return; }
+    if (d.goal) {
+      setGoals((prev) => {
+        const idx = prev.findIndex((g) => g.id === d.goal!.id);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = d.goal!;
+          return next;
+        }
+        return [d.goal!, ...prev];
+      });
+      setTarget("");
+      setLabel("");
+    }
+  };
+
+  const remove = async (id: string) => {
+    await fetch("/api/settings/goals", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    setGoals((prev) => prev.filter((g) => g.id !== id));
+  };
+
+  // group by month
+  const grouped = goals.reduce<Record<string, MonthlyGoal[]>>((acc, g) => {
+    const key = g.month.slice(0, 7); // "YYYY-MM"
+    (acc[key] ??= []).push(g);
+    return acc;
+  }, {});
+  const sortedMonths = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
+        <CardHeader>
+          <CardTitle>月次目標を追加・更新</CardTitle>
+          <CardDescription>同じ月・目標タイプを再登録すると上書き更新されます</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={(e) => void save(e)} className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-zinc-600">月</label>
+              <Input
+                type="month"
+                value={month}
+                onChange={(e) => setMonth(e.target.value)}
+                required
+                className="w-36"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-zinc-600">目標タイプ</label>
+              <select
+                value={goalType}
+                onChange={(e) => setGoalType(e.target.value)}
+                className="h-9 rounded-md border border-zinc-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-950"
+              >
+                {GOAL_TYPE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-zinc-600">目標値</label>
+              <Input
+                type="number"
+                min={1}
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+                placeholder="例: 20"
+                required
+                className="w-28"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-zinc-600">ラベル（任意）</label>
+              <Input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="例: 今月の目標"
+                className="w-40"
+              />
+            </div>
+            <Button type="submit" disabled={saving}>
+              {saving ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+              保存
+            </Button>
+          </form>
+          {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
+        </CardContent>
+      </Card>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-zinc-500">
+          <Loader2 className="size-4 animate-spin" />読み込み中...
+        </div>
+      ) : sortedMonths.length === 0 ? (
+        <p className="text-sm text-zinc-400">まだ目標が設定されていません</p>
+      ) : (
+        sortedMonths.map((m) => (
+          <Card key={m} className="rounded-lg border-zinc-200 bg-white shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">{m.replace("-", "年")}月</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col divide-y divide-zinc-100">
+                {(grouped[m] ?? []).map((g) => (
+                  <div key={g.id} className="flex items-center justify-between gap-4 py-2.5">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-zinc-900">{goalTypeLabel(g.goal_type)}</span>
+                      <span className="text-sm text-zinc-500">目標: <strong>{g.target.toLocaleString()}</strong></span>
+                      {g.label ? <span className="text-xs text-zinc-400">{g.label}</span> : null}
+                    </div>
+                    <button
+                      className="shrink-0 rounded-lg border border-zinc-200 p-1.5 text-zinc-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                      onClick={() => void remove(g.id)}
+                      title="削除"
+                      type="button"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ))
+      )}
+    </div>
+  );
 }
 
 /* ── AI設定セクション ─────────────────────────────────── */
