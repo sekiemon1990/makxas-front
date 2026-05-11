@@ -8,6 +8,8 @@ import {
   CalendarPlus,
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Download,
   FileText,
   Image as ImageIcon,
@@ -15,6 +17,8 @@ import {
   Mail,
   Menu,
   MessageCircle,
+  PanelRightClose,
+  PanelRightOpen,
   Send,
   Sparkles,
   Tag,
@@ -192,6 +196,9 @@ export function RealtimeInbox({
   const [aiPanelDraft, setAiPanelDraft] = useState<string | null>(null);
   const [aiPanelDraftKey, setAiPanelDraftKey] = useState(0);
   const [aiPanelThemeName, setAiPanelThemeName] = useState<string | null>(null);
+  // レイアウト折りたたみ
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
   // ⑬ モバイルスワイプ
   const swipeStartX = useRef<number | null>(null);
   const swipeStartY = useRef<number | null>(null);
@@ -847,9 +854,14 @@ export function RealtimeInbox({
         </span>
       </div>
 
-      <div className="flex min-h-0 flex-1 overflow-hidden md:grid md:grid-cols-[260px_minmax(360px,480px)_minmax(460px,1fr)]">
+      <div className={cn(
+        "flex min-h-0 flex-1 overflow-hidden",
+        sidebarCollapsed
+          ? "md:grid md:grid-cols-[minmax(280px,380px)_minmax(360px,1fr)]"
+          : "md:grid md:grid-cols-[220px_minmax(280px,380px)_minmax(360px,1fr)]"
+      )}>
         {/* サイドバー */}
-        <aside className={cn("overflow-y-auto border-r border-zinc-200 bg-white", mobilePanel !== "sidebar" && "hidden md:block")}>
+        <aside className={cn("overflow-y-auto border-r border-zinc-200 bg-white", (mobilePanel !== "sidebar" || sidebarCollapsed) && "hidden md:block", sidebarCollapsed && "md:hidden")}>
           <div className="border-b border-zinc-200 px-4 py-3">
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-400">Inbox</span>
@@ -926,6 +938,15 @@ export function RealtimeInbox({
           <div className="sticky top-0 z-10 border-b border-zinc-200 bg-zinc-50/95 px-4 py-3 backdrop-blur">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
+                {/* サイドバー折りたたみボタン（デスクトップのみ） */}
+                <button
+                  className="hidden md:flex items-center justify-center size-6 rounded text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700 transition"
+                  onClick={() => setSidebarCollapsed(v => !v)}
+                  title={sidebarCollapsed ? "フィルターを表示" : "フィルターを非表示"}
+                  type="button"
+                >
+                  {sidebarCollapsed ? <ChevronsRight className="size-3.5" /> : <ChevronsLeft className="size-3.5" />}
+                </button>
                 <h2 className="text-sm font-semibold text-zinc-900">反響一覧</h2>
                 <span className="text-xs text-zinc-400">
                   {totalCount}件
@@ -1272,8 +1293,8 @@ export function RealtimeInbox({
               </div>
 
               {/* 返信・操作エリア */}
-              <div className="border-t border-zinc-200 bg-zinc-50/80 px-5 py-4">
-                <div className="grid grid-cols-[1fr_260px] gap-4">
+              <div className="border-t border-zinc-200 bg-zinc-50/80 px-4 py-3">
+                <div className={cn("grid gap-4", rightPanelOpen ? "grid-cols-[1fr_220px]" : "grid-cols-[1fr]")}>
                   <div className="space-y-3">
                     {/* ⑪ 送信待ち画像プレビュー */}
                     {imageFiles.length > 0 ? (
@@ -1564,6 +1585,20 @@ export function RealtimeInbox({
                         ) : null}
                       </div>
                       <div className="flex items-center gap-2">
+                        {/* 右パネル（ステータス等）トグルボタン */}
+                        <button
+                          className={cn(
+                            "hidden md:flex items-center justify-center size-8 rounded border transition",
+                            rightPanelOpen
+                              ? "border-zinc-300 bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                              : "border-zinc-200 bg-white text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600",
+                          )}
+                          onClick={() => setRightPanelOpen(v => !v)}
+                          title={rightPanelOpen ? "ステータス・タグ・メモを非表示" : "ステータス・タグ・メモを表示"}
+                          type="button"
+                        >
+                          {rightPanelOpen ? <PanelRightClose className="size-3.5" /> : <PanelRightOpen className="size-3.5" />}
+                        </button>
                         {/* ⑪ 画像送信ボタン */}
                         {imageFiles.length > 0 ? (
                           <Button
@@ -1593,7 +1628,7 @@ export function RealtimeInbox({
                   </div>
 
                   {/* 右サイドパネル（ステータス・タグ・メモ・リマインダー） */}
-                  <div className="space-y-3">
+                  {rightPanelOpen ? <div className="space-y-3 min-w-0">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-2">
                         <label className="text-xs font-medium text-zinc-500">ステータス変更</label>
@@ -1741,7 +1776,7 @@ export function RealtimeInbox({
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </div> : null}
                 </div>
               </div>
             </>
