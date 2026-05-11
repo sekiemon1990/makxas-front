@@ -12,7 +12,7 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { ChannelBadge, StatusBadge } from "@/components/badges";
 import { createServiceClient } from "@/lib/supabase/service";
-import type { InquiryWithLead, Message } from "@/types/database";
+import type { InquiryItem, InquiryItemCondition, InquiryWithLead, Message } from "@/types/database";
 import type { InquiryChannel } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -97,6 +97,25 @@ export default async function LeadDetailPage({
       : { data: [] };
 
   const messages = (messageRows ?? []) as Message[];
+
+  // inquiry_items（商品情報）をリード全反響分取得
+  const { data: inquiryItemRows } =
+    inquiryIds.length > 0
+      ? await supabase
+          .from("inquiry_items")
+          .select("*")
+          .in("inquiry_id", inquiryIds)
+          .order("created_at", { ascending: true })
+      : { data: [] };
+
+  const inquiryItems = (inquiryItemRows ?? []) as InquiryItem[];
+  // 反響IDでグループ化
+  const itemsByInquiry = new Map<string, InquiryItem[]>();
+  for (const item of inquiryItems) {
+    const arr = itemsByInquiry.get(item.inquiry_id) ?? [];
+    arr.push(item);
+    itemsByInquiry.set(item.inquiry_id, arr);
+  }
 
   // ── タイムライン構築 ──────────────────────────────────────────────────────────
   const inquiryMap = new Map(inquiries.map((i) => [i.id, i]));
@@ -212,7 +231,7 @@ export default async function LeadDetailPage({
           ) : null}
 
           {/* 統計 */}
-          <div className="mt-5 grid grid-cols-3 gap-3 border-t border-zinc-100 pt-5">
+          <div className="mt-5 grid grid-cols-4 gap-3 border-t border-zinc-100 pt-5">
             <div className="rounded-lg bg-zinc-50 px-4 py-3 text-center">
               <div className="flex items-center justify-center gap-1.5 text-zinc-500 text-xs mb-1">
                 <MessageSquare className="size-3.5" />
@@ -232,6 +251,15 @@ export default async function LeadDetailPage({
               </p>
             </div>
             <div className="rounded-lg bg-zinc-50 px-4 py-3 text-center">
+              <div className="flex items-center justify-center gap-1.5 text-zinc-500 text-xs mb-1">
+                <Hash className="size-3.5" />
+                査定商品
+              </div>
+              <p className="text-2xl font-semibold text-zinc-900">
+                {inquiryItems.length}
+              </p>
+            </div>
+            <div className="rounded-lg bg-zinc-50 px-4 py-3 text-center">
               <div className="text-zinc-500 text-xs mb-1">最終接触</div>
               <p className="text-sm font-medium text-zinc-900">
                 {lastContact ? formatDate(lastContact) : "—"}
@@ -239,6 +267,59 @@ export default async function LeadDetailPage({
             </div>
           </div>
         </div>
+
+        {/* ── 査定商品履歴 ──────────────────────────────────────────────────── */}
+        {inquiryItems.length > 0 && (
+          <div className="mt-6">
+            <h2 className="mb-3 text-lg font-semibold">
+              査定商品履歴
+              <span className="ml-2 text-sm font-normal text-zinc-500">{inquiryItems.length} 件</span>
+            </h2>
+            <div className="rounded-xl border border-zinc-200 bg-white divide-y divide-zinc-100">
+              {inquiryItems.map((item) => {
+                const inq = inquiries.find((i) => i.id === item.inquiry_id);
+                return (
+                  <div key={item.id} className="flex items-start gap-3 px-5 py-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-zinc-800">{item.item_name}</span>
+                        {item.condition && (
+                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${conditionColor(item.condition)}`}>
+                            {item.condition}
+                          </span>
+                        )}
+                        {item.ai_extracted && (
+                          <span className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-600">AI抽出</span>
+                        )}
+                      </div>
+                      <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-zinc-500">
+                        {item.brand && <span>ブランド: {item.brand}</span>}
+                        {item.model_number && <span>型番: {item.model_number}</span>}
+                        {item.accessories && <span>付属: {item.accessories}</span>}
+                        {inq && (
+                          <Link
+                            href={`/inbox?id=${inq.id}`}
+                            className="text-violet-600 hover:underline"
+                          >
+                            → 反響を見る
+                          </Link>
+                        )}
+                      </div>
+                      {(item.quote_type ?? item.quote_price_min != null) && (
+                        <p className="mt-0.5 text-xs font-medium text-emerald-700">
+                          {formatQuoteServer(item)}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-zinc-400 shrink-0 pt-0.5">
+                      {formatDate(item.created_at)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* ── 統合タイムライン ──────────────────────────────────────────────── */}
         <h2 className="mt-8 mb-4 text-lg font-semibold">
@@ -450,4 +531,35 @@ function formatDateTime(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+// 状態ラベルの色クラス
+function conditionColor(c: InquiryItemCondition): string {
+  const map: Record<InquiryItemCondition, string> = {
+    N: "bg-emerald-100 text-emerald-800",
+    S: "bg-green-100 text-green-800",
+    A: "bg-sky-100 text-sky-800",
+    B: "bg-blue-100 text-blue-800",
+    C: "bg-amber-100 text-amber-800",
+    D: "bg-orange-100 text-orange-800",
+    J: "bg-red-100 text-red-800",
+    不明: "bg-zinc-100 text-zinc-600",
+    その他: "bg-zinc-100 text-zinc-600",
+  };
+  return map[c] ?? "bg-zinc-100 text-zinc-600";
+}
+
+// 事前査定金額の文字列化（サーバー側）
+function formatQuoteServer(item: InquiryItem): string {
+  if (!item.quote_type || item.quote_price_min == null) return "";
+  const fmt = (n: number) => n.toLocaleString("ja-JP");
+  switch (item.quote_type) {
+    case "upper": return `事前査定: 最大 ¥${fmt(item.quote_price_min)}`;
+    case "around": return `事前査定: ¥${fmt(item.quote_price_min)} 前後`;
+    case "exact": return `事前査定: ¥${fmt(item.quote_price_min)}`;
+    case "range":
+      return item.quote_price_max != null
+        ? `事前査定: ¥${fmt(item.quote_price_min)}〜¥${fmt(item.quote_price_max)}`
+        : `事前査定: ¥${fmt(item.quote_price_min)}〜`;
+  }
 }
