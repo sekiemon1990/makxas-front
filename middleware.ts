@@ -10,6 +10,7 @@ const PUBLIC_PREFIXES = [
   "/api/auth/google",
   "/api/webhooks",
   "/api/cron",
+  "/api/ai/learning/run",
 ];
 
 export async function middleware(request: NextRequest) {
