@@ -26,6 +26,7 @@ export function FeedbackForm() {
 
   useEffect(() => {
     const saved = localStorage.getItem(AUTHOR_KEY);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (saved) setAuthor(saved);
   }, []);
 

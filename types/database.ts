@@ -261,6 +261,7 @@ export type Database = {
           internal_note: string | null;
           first_response_at: string | null;
           ai_suggested_reply: string | null;
+          msg_category: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -283,6 +284,7 @@ export type Database = {
           internal_note?: string | null;
           first_response_at?: string | null;
           ai_suggested_reply?: string | null;
+          msg_category?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -305,6 +307,7 @@ export type Database = {
           internal_note?: string | null;
           first_response_at?: string | null;
           ai_suggested_reply?: string | null;
+          msg_category?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -488,6 +491,13 @@ export type Database = {
           sent_by: string | null;
           is_auto: boolean;
           created_at: string;
+          // AI返信ログ
+          ai_suggested: boolean;
+          ai_theme: string | null;
+          ai_theme_changed: boolean | null;
+          final_theme: string | null;
+          ai_edited: boolean | null;
+          ai_original_body: string | null;
         };
         Insert: {
           id?: string;
@@ -500,6 +510,13 @@ export type Database = {
           sent_by?: string | null;
           is_auto?: boolean;
           created_at?: string;
+          // AI返信ログ
+          ai_suggested?: boolean;
+          ai_theme?: string | null;
+          ai_theme_changed?: boolean | null;
+          final_theme?: string | null;
+          ai_edited?: boolean | null;
+          ai_original_body?: string | null;
         };
         Update: {
           id?: string;
@@ -512,6 +529,13 @@ export type Database = {
           sent_by?: string | null;
           is_auto?: boolean;
           created_at?: string;
+          // AI返信ログ
+          ai_suggested?: boolean;
+          ai_theme?: string | null;
+          ai_theme_changed?: boolean | null;
+          final_theme?: string | null;
+          ai_edited?: boolean | null;
+          ai_original_body?: string | null;
         };
         Relationships: [
           {
