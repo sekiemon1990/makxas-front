@@ -170,12 +170,7 @@ export function RealtimeInbox({
   const replyRef = useRef<HTMLTextAreaElement>(null);
   const [toast, setToast] = useState<{ title: string; description?: string } | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false); // ⑥ ショートカットヘルプ
-  const [notifPermission, setNotifPermission] = useState<NotificationPermission>(() => {
-    if (typeof window !== "undefined" && "Notification" in window) {
-      return Notification.permission;
-    }
-    return "default";
-  }); // ⑦
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>("default"); // ⑦
   // ⑪ 画像アップロード
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [sendingImages, setSendingImages] = useState(false);
@@ -210,6 +205,13 @@ export function RealtimeInbox({
     if (typeof window === "undefined") return;
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+  }, []);
+
+  // 初回マウント時に実際の通知権限を同期（SSRではdefaultで初期化→Hydration後に更新）
+  useEffect(() => {
+    if ("Notification" in window) {
+      setNotifPermission(Notification.permission);
     }
   }, []);
 
