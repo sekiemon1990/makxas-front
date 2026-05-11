@@ -1299,7 +1299,7 @@ export function RealtimeInbox({
                                     body: JSON.stringify({ inquiry_id: selectedInquiry.id, force_theme: t.key }),
                                   });
                                   const data = await res.json() as import("@/app/api/ai/suggest/route").AiSuggestResult;
-                                  if (data.body) { setReplyBody(data.body); setAiOriginalBody(data.body); }
+                                  if (data.body) { setReplyBody(data.body); setAiOriginalBody(data.body); setAiSuggest(data); }
                                 } finally { setAiLoading(false); }
                               }}
                               type="button"
@@ -1336,7 +1336,7 @@ export function RealtimeInbox({
                                     body: JSON.stringify({ inquiry_id: selectedInquiry.id, force_theme: t.key }),
                                   });
                                   const data = await res.json() as import("@/app/api/ai/suggest/route").AiSuggestResult;
-                                  if (data.body) { setReplyBody(data.body); setAiOriginalBody(data.body); }
+                                  if (data.body) { setReplyBody(data.body); setAiOriginalBody(data.body); setAiSuggest(data); }
                                 } finally { setAiLoading(false); }
                               }}
                               type="button"
