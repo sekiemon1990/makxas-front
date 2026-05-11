@@ -14,8 +14,8 @@ import {
   Keyboard,
   Mail,
   Menu,
+  MessageCircle,
   Send,
-  Sparkles,
   Tag,
   X,
 } from "lucide-react";
@@ -674,7 +674,7 @@ export function RealtimeInbox({
       if (isAiSuggested && isEdited && payload.message?.id) {
         setLastSentMsgId(payload.message.id as string);
         setShowEditReasonPrompt(true);
-        setTimeout(() => setShowEditReasonPrompt(false), 5000);
+        setTimeout(() => setShowEditReasonPrompt(false), 10000);
       }
       // AI state をリセット（次の受信まで提案なし）
       setAiOriginalBody(null);
@@ -1253,8 +1253,12 @@ export function RealtimeInbox({
                     {/* ── AI返信提案エリア ── */}
                     {aiLoading ? (
                       <div className="flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-600">
-                        <span className="size-1.5 rounded-full bg-violet-400 animate-pulse" />
-                        AIが返信文を準備中...
+                        <svg className="size-3.5 animate-spin text-violet-500 shrink-0" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        <span className="font-medium">AIが返信文を生成中...</span>
+                        <span className="text-violet-400">しばらくお待ちください</span>
                       </div>
                     ) : aiSuggest?.mode === "auto" && aiOriginalBody ? (
                       <>
@@ -1310,40 +1314,47 @@ export function RealtimeInbox({
                         </div>
                       </>
                     ) : aiSuggest?.mode === "themes" ? (
-                      /* 迷うケース：テーマチップ */
-                      <div className="space-y-1.5">
+                      /* 迷うケース：テーマチップ（confidence順で優先表示） */
+                      <div className="space-y-2">
                         <div className="flex items-center gap-1.5 text-[11px] text-violet-600 font-medium">
-                          <span className="size-1.5 rounded-full bg-violet-500 animate-pulse" />
-                          ✦ AIが返信パターンを提案 — ワンタップで下書きを作成
+                          <span className="size-1.5 rounded-full bg-violet-500 animate-pulse shrink-0" />
+                          ✦ どのパターンで返信しますか？ — タップで下書きを作成
                         </div>
                         <div className="flex flex-wrap gap-1.5">
-                          {aiSuggest.themes.map((t) => (
-                            <button
-                              key={t.key}
-                              className={cn(
-                                "rounded-full border px-3 py-1 text-xs font-medium transition",
-                                aiCurrentTheme === t.key
-                                  ? "border-violet-400 bg-violet-100 text-violet-800"
-                                  : "border-violet-200 bg-white text-violet-700 hover:bg-violet-50",
-                              )}
-                              onClick={async () => {
-                                setAiCurrentTheme(t.key);
-                                setAiLoading(true);
-                                try {
-                                  const res = await fetch("/api/ai/suggest", {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ inquiry_id: selectedInquiry.id, force_theme: t.key }),
-                                  });
-                                  const data = await res.json() as import("@/app/api/ai/suggest/route").AiSuggestResult;
-                                  if (data.body) { setReplyBody(data.body); setAiOriginalBody(data.body); setAiSuggest(data); }
-                                } finally { setAiLoading(false); }
-                              }}
-                              type="button"
-                            >
-                              {t.label}
-                            </button>
-                          ))}
+                          {[...aiSuggest.themes].sort((a, b) => b.confidence - a.confidence).map((t, i) => {
+                            const isTop = i === 0;
+                            const isSelected = aiCurrentTheme === t.key;
+                            return (
+                              <button
+                                key={t.key}
+                                className={cn(
+                                  "rounded-full border font-medium transition",
+                                  isTop && !isSelected
+                                    ? "border-violet-400 bg-violet-100 text-violet-800 px-3.5 py-1.5 text-xs hover:bg-violet-200"
+                                    : isSelected
+                                    ? "border-violet-500 bg-violet-500 text-white px-3 py-1 text-xs"
+                                    : "border-zinc-200 bg-white text-zinc-500 px-2.5 py-1 text-[11px] hover:border-violet-300 hover:text-violet-600",
+                                )}
+                                onClick={async () => {
+                                  setAiCurrentTheme(t.key);
+                                  setAiLoading(true);
+                                  try {
+                                    const res = await fetch("/api/ai/suggest", {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ inquiry_id: selectedInquiry.id, force_theme: t.key }),
+                                    });
+                                    const data = await res.json() as import("@/app/api/ai/suggest/route").AiSuggestResult;
+                                    if (data.body) { setReplyBody(data.body); setAiOriginalBody(data.body); setAiSuggest(data); }
+                                  } finally { setAiLoading(false); }
+                                }}
+                                type="button"
+                              >
+                                {isTop && <span className="mr-1 text-[10px] opacity-70">おすすめ</span>}
+                                {t.label}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     ) : null}
@@ -1432,21 +1443,22 @@ export function RealtimeInbox({
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        {/* ✦ AIに相談ボタン */}
+                        {/* ✦ AI自由相談ボタン（テーマチップでは対応できない複雑なケース向け） */}
                         <Button
                           className={cn(
                             "h-7 gap-1 px-2.5 text-xs",
                             aiPanelOpen
                               ? "border-violet-400 text-violet-700 bg-violet-50"
-                              : "bg-gradient-to-r from-indigo-500 to-violet-500 text-white hover:opacity-90",
+                              : "border-violet-300 text-violet-600 hover:bg-violet-50",
                           )}
                           onClick={() => setAiPanelOpen((v) => !v)}
                           size="sm"
+                          title="テーマチップにない複雑なケースをAIに自由相談"
                           type="button"
-                          variant={aiPanelOpen ? "outline" : "default"}
+                          variant="outline"
                         >
-                          <Sparkles className="size-3" />
-                          {aiPanelOpen ? "AI相談中" : "AIに相談"}
+                          <MessageCircle className="size-3" />
+                          {aiPanelOpen ? "相談中…" : "AIに質問"}
                         </Button>
                         {templates.length > 0 ? (
                           <Button className="h-7 gap-1 px-2 text-xs" onClick={() => setShowTemplates((v) => !v)} size="sm" type="button" variant="outline">
