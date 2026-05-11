@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Send, Sparkles, X } from "lucide-react";
+import { CornerDownLeft, Send, Sparkles, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,12 +16,21 @@ export function AiSuggestPanel({
   inquiry,
   messages: threadMessages,
   onTranscribe,
+  initialDraft,
+  initialDraftKey,
+  initialThemeName,
 }: {
   open: boolean;
   onClose: () => void;
   inquiry: InquiryWithLead | null;
   messages: Message[];
   onTranscribe: (text: string) => void;
+  /** テーマチップや自動提案から渡される原案テキスト */
+  initialDraft?: string | null;
+  /** initialDraft が変わるたびにインクリメントされるキー。変化を検知して履歴をリセットする */
+  initialDraftKey?: number;
+  /** 表示用テーマ名（例: "価格の目安を伝える"） */
+  initialThemeName?: string | null;
 }) {
   // 反響IDごとにチャット履歴を保持（コンポーネント生存中はリセットしない）
   const historiesRef = useRef(new Map<string, ChatMessage[]>());
@@ -30,6 +39,8 @@ export function AiSuggestPanel({
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // 最後に適用した draftKey を記録（再適用防止）
+  const appliedDraftKeyRef = useRef<number | undefined>(undefined);
 
   // 反響を切り替えたら対応する履歴をロード
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -42,10 +53,29 @@ export function AiSuggestPanel({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inquiry?.id]);
 
-  // パネルを開いたら入力欄にフォーカス
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  // 新しい原案が届いたら履歴をリセットして原案を初期メッセージとして表示
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 200);
+    if (
+      initialDraft &&
+      initialDraftKey !== undefined &&
+      initialDraftKey !== appliedDraftKeyRef.current &&
+      inquiry
+    ) {
+      appliedDraftKeyRef.current = initialDraftKey;
+      const initial: ChatMessage[] = [{ role: "assistant", content: initialDraft }];
+      historiesRef.current.set(inquiry.id, initial);
+      setChatHistory(initial);
+      setTimeout(() => {
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+        inputRef.current?.focus();
+      }, 200);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialDraftKey]);
+
+  // パネルを開いたら入力欄にフォーカス（原案なし時）
+  useEffect(() => {
+    if (open && !initialDraft) setTimeout(() => inputRef.current?.focus(), 200);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -117,14 +147,23 @@ export function AiSuggestPanel({
   const brandName = (inquiry?.brands as { name: string } | null)?.name;
   const storeName = (inquiry?.stores as { name: string } | null)?.name;
 
-  // 返信欄への転記（---...\n---ブロックを抽出）
+  // 返信欄への転記（本文をそのまま使う。---ブロックがあれば抽出）
   const handleTranscribe = (content: string) => {
     const m = content.match(/---\n?([\s\S]+?)\n?---/);
     const extracted = m ? m[1].trim() : content.trim();
     onTranscribe(extracted);
   };
 
-  const quickPrompts = ["返信文を作って", "買取相場を教えて", "アポ取得の返信を作って"];
+  // 原案がある場合の修正クイックプロンプト / ない場合は汎用プロンプト
+  const hasDraft = chatHistory.length > 0 && chatHistory[0].role === "assistant";
+  const quickPrompts = hasDraft
+    ? [
+        "もっと短くして",
+        "もっとフレンドリーな文体に",
+        "絵文字を外して",
+        "価格をより具体的に",
+      ]
+    : ["返信文を作って", "買取相場を教えて", "アポ取得の返信を作って"];
 
   return (
     <div
@@ -139,9 +178,15 @@ export function AiSuggestPanel({
         <div className="flex items-center gap-2">
           <Sparkles className="size-3.5" aria-hidden="true" />
           <span className="text-sm font-semibold">AI返信アシスト</span>
-          <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold tracking-wide">
-            Claude
-          </span>
+          {initialThemeName ? (
+            <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold">
+              {initialThemeName}
+            </span>
+          ) : (
+            <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold tracking-wide">
+              Claude
+            </span>
+          )}
         </div>
         <button
           className="rounded p-1 text-white/80 hover:bg-white/20 hover:text-white"
@@ -174,6 +219,16 @@ export function AiSuggestPanel({
               🏪 {storeName}
             </span>
           ) : null}
+        </div>
+      ) : null}
+
+      {/* 原案あり時のヒント */}
+      {hasDraft ? (
+        <div className="shrink-0 border-b border-violet-100 bg-violet-50/60 px-3 py-1.5">
+          <p className="text-[10px] text-violet-600">
+            ✦ AI原案を確認してください。修正したい場合は下の入力欄でお伝えください。
+            問題なければ「返信欄に転記」で送信準備ができます。
+          </p>
         </div>
       ) : null}
 
@@ -213,18 +268,35 @@ export function AiSuggestPanel({
               >
                 <p className="whitespace-pre-wrap">{msg.content}</p>
               </div>
-              {/* 返信欄への転記ボタン（アシスタントの返答に ---ブロック がある場合） */}
-              {msg.role === "assistant" && msg.content.includes("---") ? (
+              {/* 返信欄への転記ボタン（アシスタントの返答すべてに表示） */}
+              {msg.role === "assistant" ? (
                 <button
-                  className="mt-1 flex items-center gap-1 rounded border border-indigo-300 bg-white px-2 py-0.5 text-[11px] font-medium text-indigo-600 transition hover:bg-indigo-50"
+                  className="mt-1 flex items-center gap-1 rounded border border-indigo-300 bg-white px-2.5 py-1 text-[11px] font-medium text-indigo-600 transition hover:bg-indigo-50 active:bg-indigo-100"
                   onClick={() => handleTranscribe(msg.content)}
                   type="button"
                 >
-                  ↩ 返信欄に転記
+                  <CornerDownLeft className="size-3" />
+                  返信欄に転記
                 </button>
               ) : null}
             </div>
           ))}
+
+          {/* クイック修正ボタン（最後のアシスタントメッセージの後） */}
+          {hasDraft && !loading && chatHistory[chatHistory.length - 1]?.role === "assistant" ? (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {quickPrompts.map((s) => (
+                <button
+                  key={s}
+                  className="rounded-full border border-zinc-200 bg-white px-2.5 py-0.5 text-[10px] text-zinc-500 transition hover:border-violet-300 hover:text-violet-700"
+                  onClick={() => void sendMessage(s)}
+                  type="button"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           {loading ? (
             <div className="flex items-start">
@@ -254,7 +326,7 @@ export function AiSuggestPanel({
                 void sendMessage(input);
               }
             }}
-            placeholder="AIに質問する（Enter で送信）"
+            placeholder={hasDraft ? "修正指示を入力（例: もっと短く）Enter で送信" : "AIに質問する（Enter で送信）"}
             value={input}
           />
           <Button
