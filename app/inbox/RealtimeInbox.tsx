@@ -433,27 +433,7 @@ export function RealtimeInbox({
     setAiPanelThemeName(null);
     setReplyBody("");
 
-    if (!selectedInquiry?.id) return;
-    setAiLoading(true);
-    fetch("/api/ai/suggest", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inquiry_id: selectedInquiry.id }),
-    })
-      .then((r) => r.json())
-      .then((data: import("@/app/api/ai/suggest/route").AiSuggestResult) => {
-        setAiSuggest(data);
-        if (data.mode === "auto" && data.body) {
-          // 返信欄には直接入れず、パネルに原案として渡す
-          setAiCurrentTheme(data.theme);
-          setAiPanelDraft(data.body);
-          setAiPanelThemeName(data.themes.find(t => t.key === data.theme)?.label ?? null);
-          setAiPanelDraftKey(k => k + 1);
-          setAiPanelOpen(true);
-        }
-      })
-      .catch(() => { /* AI提案失敗は無視 */ })
-      .finally(() => setAiLoading(false));
+    // AI提案は自動実行しない。ユーザーが「AI下書きを生成」ボタンを押した時のみ実行する。
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedInquiry?.id]);
 
@@ -1317,82 +1297,22 @@ export function RealtimeInbox({
                         ))}
                       </div>
                     ) : null}
-                    {/* ── AI返信提案エリア ── */}
+                    {/* ── AI返信提案エリア（ユーザー操作後のみ表示） ── */}
                     {aiLoading ? (
-                      <div className="flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-600">
-                        <svg className="size-3.5 animate-spin text-violet-500 shrink-0" fill="none" viewBox="0 0 24 24">
+                      /* テーマ取得中スピナー（ボタン押下後のみ表示） */
+                      <div className="flex items-center gap-2 rounded-lg border border-violet-100 bg-violet-50/60 px-3 py-2 text-xs text-violet-500">
+                        <svg className="size-3 animate-spin text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                         </svg>
-                        <span className="font-medium">AIが返信文を生成中...</span>
-                        <span className="text-violet-400">しばらくお待ちください</span>
-
+                        <span>AIが分析中...</span>
                       </div>
-                    ) : aiSuggest?.mode === "auto" && aiCurrentTheme ? (
-                      <>
-                        {/* 明確ケース：パネルで確認済みバナー */}
-                        <div className="flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-700">
-                          <span className="size-1.5 rounded-full bg-violet-500 animate-pulse shrink-0" />
-                          <span className="font-medium flex-1">
-                            ✦ AI原案を確認中
-                            {aiCurrentTheme ? (
-                              <span className="ml-2 rounded-full bg-violet-200 px-2 py-0.5 text-[10px]">
-                                {aiSuggest.themes.find((t) => t.key === aiCurrentTheme)?.label ?? aiCurrentTheme}
-                              </span>
-                            ) : null}
-                          </span>
-                          <button
-                            className="text-violet-400 hover:text-violet-600 text-[11px]"
-                            onClick={() => setAiPanelOpen(true)}
-                            type="button"
-                          >
-                            パネルを開く →
-                          </button>
-                        </div>
-                        {/* サブテーマ切り替え */}
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="text-[10px] text-zinc-400 shrink-0">別のパターン：</span>
-                          {aiSuggest.themes.map((t) => (
-                            <button
-                              key={t.key}
-                              className={cn(
-                                "rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition",
-                                aiCurrentTheme === t.key
-                                  ? "border-violet-400 bg-violet-100 text-violet-800"
-                                  : "border-zinc-200 bg-white text-zinc-600 hover:border-violet-300 hover:text-violet-700",
-                              )}
-                              onClick={async () => {
-                                setAiCurrentTheme(t.key);
-                                setAiLoading(true);
-                                try {
-                                  const res = await fetch("/api/ai/suggest", {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ inquiry_id: selectedInquiry.id, force_theme: t.key }),
-                                  });
-                                  const data = await res.json() as import("@/app/api/ai/suggest/route").AiSuggestResult;
-                                  if (data.body) {
-                                    setAiSuggest(data);
-                                    setAiPanelDraft(data.body);
-                                    setAiPanelThemeName(t.label);
-                                    setAiPanelDraftKey(k => k + 1);
-                                    setAiPanelOpen(true);
-                                  }
-                                } finally { setAiLoading(false); }
-                              }}
-                              type="button"
-                            >
-                              {t.label}
-                            </button>
-                          ))}
-                        </div>
-                      </>
-                    ) : aiSuggest?.mode === "themes" ? (
-                      /* 迷うケース：テーマチップ（confidence順で優先表示） */
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-1.5 text-[11px] text-violet-600 font-medium">
-                          <span className="size-1.5 rounded-full bg-violet-500 animate-pulse shrink-0" />
-                          ✦ AI下書きを生成 — パターンを選択
+                    ) : aiSuggest && (aiSuggest.mode === "themes" || aiSuggest.mode === "auto") ? (
+                      /* テーマチップ（ボタン押下後に表示） */
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-[10px] text-violet-500 font-medium">
+                          <Sparkles className="size-3 shrink-0" />
+                          パターンを選択してください
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                           {[...aiSuggest.themes].sort((a, b) => b.confidence - a.confidence).map((t, i) => {
@@ -1403,11 +1323,11 @@ export function RealtimeInbox({
                                 key={t.key}
                                 className={cn(
                                   "rounded-full border font-medium transition",
-                                  isTop && !isSelected
-                                    ? "border-violet-400 bg-violet-100 text-violet-800 px-3.5 py-1.5 text-xs hover:bg-violet-200"
-                                    : isSelected
+                                  isSelected
                                     ? "border-violet-500 bg-violet-500 text-white px-3 py-1 text-xs"
-                                    : "border-zinc-200 bg-white text-zinc-500 px-2.5 py-1 text-[11px] hover:border-violet-300 hover:text-violet-600",
+                                    : isTop
+                                    ? "border-violet-400 bg-violet-50 text-violet-700 px-3 py-1 text-xs hover:bg-violet-100"
+                                    : "border-zinc-200 bg-white text-zinc-500 px-2.5 py-0.5 text-[11px] hover:border-violet-300 hover:text-violet-600",
                                 )}
                                 onClick={async () => {
                                   setAiCurrentTheme(t.key);
@@ -1430,12 +1350,11 @@ export function RealtimeInbox({
                                 }}
                                 type="button"
                               >
-                                {isTop && <span className="mr-1 text-[10px] opacity-70">おすすめ</span>}
+                                {isTop && !isSelected && <span className="mr-1 text-[10px] opacity-60">おすすめ</span>}
                                 {t.label}
                               </button>
                             );
                           })}
-
                         </div>
                       </div>
                     ) : null}
@@ -1524,13 +1443,52 @@ export function RealtimeInbox({
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
+                        {/* ✦ AI下書き生成ボタン（押した時だけフェッチ） */}
+                        <Button
+                          className={cn(
+                            "h-8 gap-1 px-2.5 text-xs",
+                            aiSuggest
+                              ? "border-violet-400 bg-violet-50 text-violet-700"
+                              : "border-violet-300 text-violet-600 hover:bg-violet-50",
+                          )}
+                          disabled={aiLoading}
+                          onClick={async () => {
+                            if (aiSuggest) {
+                              // すでに取得済みならリセット（トグル）
+                              setAiSuggest(null);
+                              setAiCurrentTheme(null);
+                              return;
+                            }
+                            setAiLoading(true);
+                            try {
+                              const res = await fetch("/api/ai/suggest", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ inquiry_id: selectedInquiry.id }),
+                              });
+                              const data = await res.json() as import("@/app/api/ai/suggest/route").AiSuggestResult;
+                              setAiSuggest(data);
+                            } catch {
+                              // 失敗は無視
+                            } finally {
+                              setAiLoading(false);
+                            }
+                          }}
+                          size="sm"
+                          title="AIが返信パターンを分析してテーマチップを表示"
+                          type="button"
+                          variant="outline"
+                        >
+                          <Sparkles className="size-3.5" />
+                          {aiLoading ? "分析中..." : aiSuggest ? "AI生成済み ✕" : "AI下書き"}
+                        </Button>
                         {/* ✦ AI自由相談ボタン */}
                         <Button
                           className={cn(
                             "h-8 gap-1 px-2.5 text-xs",
                             aiPanelOpen
                               ? "border-violet-400 text-violet-700 bg-violet-50"
-                              : "border-violet-300 text-violet-600 hover:bg-violet-50",
+                              : "border-zinc-200 text-zinc-600 hover:bg-zinc-50",
                           )}
                           onClick={() => setAiPanelOpen((v) => !v)}
                           size="sm"
