@@ -66,6 +66,59 @@ export async function POST(req: NextRequest) {
   if (!run) return NextResponse.json({ error: "Failed to create run" }, { status: 500 });
 
   try {
+    // ── ステップ0: 編集理由が未分析のメッセージをバッチ補完 ──────────────────
+    if (process.env.ANTHROPIC_API_KEY) {
+      const { data: unanalyzed } = await supabase
+        .from("messages")
+        .select("id, body, ai_original_body, inquiries!inner(msg_category)")
+        .eq("ai_suggested", true)
+        .eq("ai_edited", true)
+        .eq("direction", "outbound")
+        .is("ai_edit_reason", null)
+        .not("ai_original_body", "is", null)
+        .limit(20); // 1回のジョブで最大20件補完（APIコスト抑制）
+
+      const anthropic = new Anthropic();
+      for (const m of (unanalyzed ?? []) as { id: string; body: string | null; ai_original_body: string | null; inquiries: { msg_category: string | null } | null }[]) {
+        if (!m.body || !m.ai_original_body) continue;
+        try {
+          const prompt = `あなたはAI返信品質分析の専門家です。買取店のカスタマーサポートAIが提案した返信と、スタッフが実際に送った返信を比較して「なぜスタッフが修正したか」を分析してください。
+
+カテゴリ: ${m.inquiries?.msg_category ?? "不明"}
+
+【AIが提案した文章】
+${m.ai_original_body.slice(0, 500)}
+
+【スタッフが実際に送った文章】
+${m.body.slice(0, 500)}
+
+差分を分析し、以下のJSONのみ返してください（説明文・コードブロック不要）:
+{"label":"修正理由を表す短いラベル（5〜15文字の日本語、自由に命名可）","detail":"具体的に何を修正したか（50文字以内）","severity":"minor または major"}`;
+
+          const res = await anthropic.messages.create({
+            model: "claude-haiku-4-5",
+            max_tokens: 256,
+            messages: [{ role: "user", content: prompt }],
+          });
+          const text = res.content[0]?.type === "text" ? res.content[0].text.trim() : "";
+          const match = text.match(/\{[\s\S]+?\}/);
+          if (match) {
+            const parsed = JSON.parse(match[0]) as { label?: string; detail?: string; severity?: string };
+            await supabase.from("messages").update({
+              ai_edit_reason: JSON.stringify({
+                label: parsed.label ?? "不明",
+                detail: parsed.detail ?? "",
+                severity: parsed.severity === "major" ? "major" : "minor",
+              }),
+            }).eq("id", m.id);
+          }
+        } catch {
+          // 1件失敗しても続行
+        }
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const { data: rawMessages } = await supabase
       .from("messages")
       .select("id, inquiry_id, body, ai_original_body, ai_suggested, ai_edited, ai_theme, ai_edit_reason, ai_auto_sent, created_at, inquiries!inner(msg_category)")
@@ -179,11 +232,36 @@ export async function POST(req: NextRequest) {
       // 修正例が5件以上あればプロンプト改善
       if (edited.length >= 5 && process.env.ANTHROPIC_API_KEY) {
         const client = new Anthropic();
-        const editPatterns = edited.slice(0, 10).map(m => ({
-          original: (m.ai_original_body ?? "").slice(0, 300),
-          final: (m.body ?? "").slice(0, 300),
-          reason: m.ai_edit_reason ?? "unknown",
-        }));
+
+        // ai_edit_reason ラベルを集計（上位パターンを抽出）
+        const labelCounts: Record<string, number> = {};
+        for (const m of edited) {
+          if (!m.ai_edit_reason) continue;
+          try {
+            const parsed = JSON.parse(m.ai_edit_reason) as { label?: string };
+            const label = parsed.label ?? "不明";
+            labelCounts[label] = (labelCounts[label] ?? 0) + 1;
+          } catch { /* JSON以外（旧形式のテキスト）はスキップ */ }
+        }
+        const topLabels = Object.entries(labelCounts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5)
+          .map(([label, count]) => `「${label}」${count}件`);
+
+        const editPatterns = edited.slice(0, 10).map(m => {
+          let reasonText = "不明";
+          if (m.ai_edit_reason) {
+            try {
+              const parsed = JSON.parse(m.ai_edit_reason) as { label?: string; detail?: string };
+              reasonText = parsed.label ? `${parsed.label}${parsed.detail ? `（${parsed.detail}）` : ""}` : m.ai_edit_reason;
+            } catch { reasonText = m.ai_edit_reason; }
+          }
+          return {
+            original: (m.ai_original_body ?? "").slice(0, 300),
+            final: (m.body ?? "").slice(0, 300),
+            reason: reasonText,
+          };
+        });
 
         const { data: currentPromptData } = await supabase
           .from("prompt_versions")
@@ -198,10 +276,10 @@ export async function POST(req: NextRequest) {
 買取店のLINE返信AIの品質を改善してください。
 
 カテゴリ: ${category} / テーマ: ${theme}
-サンプル数: ${groupMsgs.length}件（修正あり: ${edited.length}件）
-
+サンプル数: ${groupMsgs.length}件（修正あり: ${edited.length}件、修正率: ${Math.round(edited.length / groupMsgs.length * 100)}%）
+${topLabels.length > 0 ? `\n頻出修正ラベル TOP${topLabels.length}:\n${topLabels.join("\n")}\n` : ""}
 修正パターン（最大10件）:
-${editPatterns.map((p, i) => `[${i + 1}] 理由:${p.reason}\nAI案: ${p.original}\n実際: ${p.final}`).join("\n---\n")}
+${editPatterns.map((p, i) => `[${i + 1}] 理由: ${p.reason}\nAI案: ${p.original}\n実際: ${p.final}`).join("\n---\n")}
 
 現在のシステムプロンプト:
 ${currentPrompt?.content ?? "（初期プロンプト使用中）"}
