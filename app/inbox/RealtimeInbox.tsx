@@ -24,6 +24,7 @@ import {
 import { ChannelBadge, StatusBadge } from "@/components/badges";
 import { AiSuggestPanel } from "@/components/inbox/AiSuggestPanel";
 import { AppointmentModal } from "@/components/inbox/AppointmentModal";
+import { InquiryItemsPanel } from "@/components/inbox/InquiryItemsPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -1289,6 +1290,14 @@ export function RealtimeInbox({
                     </div>
                   ) : null}
                 </div>
+              </div>
+
+              {/* 商品情報パネル */}
+              <div className="border-t border-zinc-200 px-4 pt-3">
+                <InquiryItemsPanel
+                  inquiryId={selectedInquiry.id}
+                  leadId={selectedInquiry.lead_id}
+                />
               </div>
 
               {/* 返信・操作エリア */}
