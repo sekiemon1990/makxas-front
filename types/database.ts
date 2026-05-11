@@ -817,6 +817,69 @@ export type Database = {
         };
         Relationships: [];
       };
+      inquiry_items: {
+        Row: {
+          id: string;
+          inquiry_id: string;
+          lead_id: string | null;
+          item_name: string;
+          brand: string | null;
+          model_number: string | null;
+          condition: 'N' | 'S' | 'A' | 'B' | 'C' | 'D' | 'J' | '不明' | 'その他' | null;
+          accessories: string | null;
+          estimated_price_min: number | null;
+          estimated_price_max: number | null;
+          quote_type: 'upper' | 'around' | 'exact' | 'range' | null;
+          quote_price_min: number | null;
+          quote_price_max: number | null;
+          notes: string | null;
+          ai_extracted: boolean;
+          source_message_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          inquiry_id: string;
+          lead_id?: string | null;
+          item_name: string;
+          brand?: string | null;
+          model_number?: string | null;
+          condition?: 'N' | 'S' | 'A' | 'B' | 'C' | 'D' | 'J' | '不明' | 'その他' | null;
+          accessories?: string | null;
+          estimated_price_min?: number | null;
+          estimated_price_max?: number | null;
+          quote_type?: 'upper' | 'around' | 'exact' | 'range' | null;
+          quote_price_min?: number | null;
+          quote_price_max?: number | null;
+          notes?: string | null;
+          ai_extracted?: boolean;
+          source_message_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          inquiry_id?: string;
+          lead_id?: string | null;
+          item_name?: string;
+          brand?: string | null;
+          model_number?: string | null;
+          condition?: 'N' | 'S' | 'A' | 'B' | 'C' | 'D' | 'J' | '不明' | 'その他' | null;
+          accessories?: string | null;
+          estimated_price_min?: number | null;
+          estimated_price_max?: number | null;
+          quote_type?: 'upper' | 'around' | 'exact' | 'range' | null;
+          quote_price_min?: number | null;
+          quote_price_max?: number | null;
+          notes?: string | null;
+          ai_extracted?: boolean;
+          source_message_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -959,4 +1022,28 @@ export type AutoSendRule = {
   review_delay_minutes: number; channel: string | null;
   current_edit_rate: number | null; current_sample_count: number | null;
   last_evaluated_at: string | null; updated_at: string;
+};
+
+export type InquiryItemCondition = 'N' | 'S' | 'A' | 'B' | 'C' | 'D' | 'J' | '不明' | 'その他';
+export type InquiryItemQuoteType = 'upper' | 'around' | 'exact' | 'range';
+
+export type InquiryItem = {
+  id: string;
+  inquiry_id: string;
+  lead_id: string | null;
+  item_name: string;
+  brand: string | null;
+  model_number: string | null;
+  condition: InquiryItemCondition | null;
+  accessories: string | null;
+  estimated_price_min: number | null;
+  estimated_price_max: number | null;
+  quote_type: InquiryItemQuoteType | null;
+  quote_price_min: number | null;
+  quote_price_max: number | null;
+  notes: string | null;
+  ai_extracted: boolean;
+  source_message_id: string | null;
+  created_at: string;
+  updated_at: string;
 };

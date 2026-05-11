@@ -1042,6 +1042,15 @@ export function RealtimeInbox({
                           <span className="truncate">{item.staff.name}</span>
                         </>
                       ) : null}
+                      {item.lead_id ? (
+                        <a
+                          href={`/leads/${item.lead_id}`}
+                          className="ml-auto text-[10px] text-zinc-400 hover:text-violet-600 transition-colors shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          リード→
+                        </a>
+                      ) : null}
                     </span>
                   </div>
                 </button>
@@ -1097,7 +1106,17 @@ export function RealtimeInbox({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <ChannelBadge channel={selectedInquiry.channel} showLabel />
+                    {selectedInquiry.lead_id ? (
+                      <a
+                        href={`/leads/${selectedInquiry.lead_id}`}
+                        className="text-xs font-medium text-zinc-700 hover:text-violet-600 hover:underline transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {getCustomerName(selectedInquiry)}
+                      </a>
+                    ) : (
                       <span className="text-xs font-medium text-zinc-700">{getCustomerName(selectedInquiry)}</span>
+                    )}
                       {(selectedInquiry.brands?.name ?? selectedInquiry.stores?.name) ? (
                         <span className="text-xs text-zinc-400">{selectedInquiry.brands?.name ?? selectedInquiry.stores?.name}</span>
                       ) : null}
