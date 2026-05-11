@@ -478,6 +478,18 @@ function ItemForm({
         />
       </div>
 
+      {/* 見込金額 */}
+      <div>
+        <label className="text-[10px] text-zinc-500 font-medium">見込金額（スタッフ見込）</label>
+        <Input
+          className="h-7 text-xs mt-0.5"
+          type="number"
+          value={form.estimated_price_min}
+          onChange={(e) => set("estimated_price_min", e.target.value)}
+          placeholder="例: 30000"
+        />
+      </div>
+
       {/* 事前査定金額 */}
       <div>
         <label className="text-[10px] text-zinc-500 font-medium">事前査定金額</label>
