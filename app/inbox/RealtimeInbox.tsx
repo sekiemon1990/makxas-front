@@ -788,7 +788,7 @@ export function RealtimeInbox({
   );
 
   return (
-    <>
+    <div className="flex h-full flex-col overflow-hidden">
       {/* ⑥ キーボードショートカットヘルプモーダル */}
       {showShortcuts ? (
         <div
@@ -1720,7 +1720,7 @@ export function RealtimeInbox({
       {toast ? (
         <Toast description={toast.description} onClose={() => setToast(null)} title={toast.title} />
       ) : null}
-    </>
+    </div>
   );
 }
 
