@@ -10,6 +10,13 @@ export async function POST(request: NextRequest) {
     inquiry_id?: string;
     body?: string;
     subject?: string;
+    // AI返信ログ
+    ai_suggested?: boolean;
+    ai_theme?: string | null;
+    ai_theme_changed?: boolean | null;
+    final_theme?: string | null;
+    ai_edited?: boolean | null;
+    ai_original_body?: string | null;
   } | null;
 
   if (!body?.inquiry_id || !body.body?.trim()) {
@@ -58,6 +65,13 @@ export async function POST(request: NextRequest) {
       direction: "outbound",
       body: body.body.trim(),
       sent_by: sentByStaffId,
+      // AI返信ログ
+      ai_suggested: body.ai_suggested ?? false,
+      ai_theme: body.ai_theme ?? null,
+      ai_theme_changed: body.ai_theme_changed ?? null,
+      final_theme: body.final_theme ?? null,
+      ai_edited: body.ai_edited ?? null,
+      ai_original_body: body.ai_original_body ?? null,
     })
     .select("*")
     .single();
