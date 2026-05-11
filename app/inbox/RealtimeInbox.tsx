@@ -162,6 +162,7 @@ export function RealtimeInbox({
   const [relatedInquiries, setRelatedInquiries] = useState<RelatedInquiry[]>([]);
   const [showRelatedHistory, setShowRelatedHistory] = useState(false); // ⑧ 折りたたみ
   const [duplicateLeads, setDuplicateLeads] = useState<{ id: string; display_name: string | null; phone: string | null; first_channel: string | null }[]>([]);
+  const [showDuplicates, setShowDuplicates] = useState(false);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionStart, setMentionStart] = useState(0);
   const noteRef = useRef<HTMLTextAreaElement>(null);
@@ -422,6 +423,7 @@ export function RealtimeInbox({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setInternalNote(selectedInquiry?.internal_note ?? "");
     setShowRelatedHistory(false); // ⑧ パネル切り替え時にリセット
+    setShowDuplicates(false);
     setImageFiles([]); // ⑪
     // AI提案リセット
     setAiSuggest(null);
@@ -985,9 +987,9 @@ export function RealtimeInbox({
               <div
                 key={item.id}
                 className={cn(
-                  "group relative rounded-lg border shadow-sm transition",
+                  "group flex rounded-lg border shadow-sm transition",
                   item.id === selectedInquiry?.id
-                    ? "border-zinc-950 bg-white ring-2 ring-zinc-950/10"
+                    ? "border-violet-300 bg-white ring-2 ring-violet-100"
                     : getStaleLevel(item) === "urgent"
                       ? "border-red-200 bg-red-50 hover:border-red-300"
                       : getStaleLevel(item) === "warning"
@@ -997,23 +999,29 @@ export function RealtimeInbox({
                 onTouchEnd={(e) => handleTouchEnd(e, item.id)}
                 onTouchStart={handleTouchStart}
               >
-                <input
-                  type="checkbox"
-                  checked={selectedIds.has(item.id)}
-                  onChange={(e) => {
-                    setSelectedIds((prev) => {
-                      const next = new Set(prev);
-                      if (e.target.checked) next.add(item.id);
-                      else next.delete(item.id);
-                      return next;
-                    });
-                  }}
-                  className="absolute left-3 top-4 size-3.5 cursor-pointer accent-zinc-950 opacity-0 group-hover:opacity-100 data-[checked]:opacity-100"
-                  data-checked={selectedIds.has(item.id) ? "" : undefined}
-                  onClick={(e) => e.stopPropagation()}
-                />
+                {/* ── チェックボックス列（チャンネルバッジと重ならない専用スペース） ── */}
+                <label className="flex w-8 shrink-0 cursor-pointer items-start justify-center pt-[14px]">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(item.id)}
+                    onChange={(e) => {
+                      setSelectedIds((prev) => {
+                        const next = new Set(prev);
+                        if (e.target.checked) next.add(item.id);
+                        else next.delete(item.id);
+                        return next;
+                      });
+                    }}
+                    className={cn(
+                      "size-3.5 cursor-pointer rounded accent-violet-600 transition-opacity",
+                      selectedIds.has(item.id) ? "opacity-100" : "opacity-0 group-hover:opacity-60",
+                    )}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </label>
+                {/* ── カード本体 ── */}
                 <button
-                  className="w-full px-4 py-3 text-left"
+                  className="min-w-0 flex-1 py-3 pr-4 text-left"
                   onClick={() => {
                     setSelectedId(item.id);
                     setMobilePanel("detail");
@@ -1022,8 +1030,8 @@ export function RealtimeInbox({
                   }}
                   type="button"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-start gap-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 items-start gap-2">
                       <div className="relative shrink-0">
                         <ChannelBadge channel={item.channel} />
                         {!readIds.has(item.id) ? (
@@ -1061,7 +1069,7 @@ export function RealtimeInbox({
                       ) : null}
                       {item.staff?.name ? (
                         <>
-                          {(item.brands?.name ?? item.stores?.name) ? <span className="text-zinc-300">·</span> : null}
+                          {(item.brands?.name ?? item.stores?.name) ? <span className="text-zinc-200">·</span> : null}
                           <span className="truncate">{item.staff.name}</span>
                         </>
                       ) : null}
@@ -1188,69 +1196,95 @@ export function RealtimeInbox({
               ) : null}
 
               {duplicateLeads.length > 0 ? (
-                <div className="border-b border-red-200 bg-red-50 px-6 py-3">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-red-800">
-                    <AlertTriangle className="size-3.5 shrink-0" aria-hidden="true" />
-                    同一電話/メールの別リードが {duplicateLeads.length} 件あります（重複の可能性）
-                  </div>
-                  <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
-                    {duplicateLeads.map((d) => (
-                      <span key={d.id} className="text-xs text-red-700">
-                        {d.display_name ?? "名前なし"} ({d.first_channel ?? "—"}) {d.phone ?? ""}
-                      </span>
-                    ))}
-                  </div>
+                <div className="border-b border-red-200 bg-red-50">
+                  <button
+                    className="flex w-full items-center gap-2 px-5 py-2.5 text-left"
+                    onClick={() => setShowDuplicates((v) => !v)}
+                    type="button"
+                  >
+                    <AlertTriangle className="size-3.5 shrink-0 text-red-500" aria-hidden="true" />
+                    <span className="flex-1 text-xs font-semibold text-red-800">
+                      同一電話/メールの別リードが {duplicateLeads.length} 件（重複の可能性）
+                    </span>
+                    {showDuplicates
+                      ? <ChevronLeft className="size-3.5 rotate-90 text-red-400" />
+                      : <ChevronRight className="size-3.5 -rotate-90 text-red-400" />}
+                  </button>
+                  {showDuplicates ? (
+                    <div className="border-t border-red-100 px-5 pb-2.5">
+                      {duplicateLeads.map((d) => (
+                        <p key={d.id} className="py-1 text-xs text-red-700">
+                          {d.display_name ?? "名前なし"} ({d.first_channel ?? "—"}) {d.phone ?? ""}
+                        </p>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 
               {/* メッセージスレッド */}
-              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-                <div className="space-y-4">
-                  {messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={cn(
-                        "flex",
-                        message.direction === "outbound" ? "justify-end" : "justify-start",
-                      )}
-                    >
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+                <div className="space-y-3">
+                  {messages.map((message) => {
+                    const isOut = message.direction === "outbound";
+                    const senderName = isOut
+                      ? (staff.find((s) => s.id === message.sent_by)?.name ?? "スタッフ")
+                      : getCustomerName(selectedInquiry);
+                    const initial = senderName.charAt(0);
+                    return (
                       <div
-                        className={cn(
-                          "max-w-[72%] rounded-lg px-4 py-3 text-sm leading-6",
-                          message.direction === "outbound"
-                            ? "bg-zinc-950 text-white"
-                            : "border border-zinc-200 bg-zinc-50 text-zinc-900",
-                        )}
+                        key={message.id}
+                        className={cn("flex items-end gap-2", isOut ? "flex-row-reverse" : "flex-row")}
                       >
-                        {/* ⑪ 受信画像表示 */}
-                        {message.media_urls && message.media_urls.length > 0 ? (
-                          <div className="flex flex-wrap gap-2">
-                            {message.media_urls.map((url, i) => (
-                              <a key={i} href={url} target="_blank" rel="noopener noreferrer">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={url}
-                                  alt={`画像 ${i + 1}`}
-                                  className="max-h-48 max-w-full rounded object-contain"
-                                />
-                              </a>
-                            ))}
+                        {/* アバター（受信のみ） */}
+                        {!isOut ? (
+                          <div className="size-7 shrink-0 rounded-full bg-emerald-100 flex items-center justify-center text-[11px] font-bold text-emerald-700 self-end mb-5">
+                            {initial}
                           </div>
                         ) : null}
-                        {message.body ? (
-                          <p className="whitespace-pre-wrap">{message.body}</p>
-                        ) : null}
-                        <p className={cn("mt-2 text-xs", message.direction === "outbound" ? "text-zinc-300" : "text-zinc-500")}>
-                          {message.direction === "outbound" && message.sent_by
-                            ? `${staff.find((s) => s.id === message.sent_by)?.name ?? "スタッフ"} · `
-                            : ""}
-                          {formatDateTime(message.created_at)}
-                        </p>
+                        <div className={cn("flex max-w-[76%] flex-col", isOut ? "items-end" : "items-start")}>
+                          {/* 送信者名（送信のみ） */}
+                          {isOut ? (
+                            <p className="mb-1 pr-1 text-[10px] text-zinc-400">{senderName}</p>
+                          ) : null}
+                          {/* バブル本体 */}
+                          <div
+                            className={cn(
+                              "rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
+                              isOut
+                                ? "rounded-br-sm bg-zinc-900 text-white shadow-sm"
+                                : "rounded-bl-sm bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-100",
+                            )}
+                          >
+                            {/* ⑪ 受信画像表示 */}
+                            {message.media_urls && message.media_urls.length > 0 ? (
+                              <div className="flex flex-wrap gap-2">
+                                {message.media_urls.map((url, i) => (
+                                  <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                      src={url}
+                                      alt={`画像 ${i + 1}`}
+                                      className="max-h-48 max-w-full rounded-lg object-contain"
+                                    />
+                                  </a>
+                                ))}
+                              </div>
+                            ) : null}
+                            {message.body ? (
+                              <p className="whitespace-pre-wrap">{message.body}</p>
+                            ) : null}
+                          </div>
+                          {/* タイムスタンプ（バブル外） */}
+                          <p className={cn("mt-1 text-[10px] text-zinc-400", isOut ? "pr-1" : "pl-1")}>
+                            {formatDateTime(message.created_at)}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {messages.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50 p-6 text-center text-sm text-zinc-500">
+                    <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 p-6 text-center text-sm text-zinc-400">
                       この反響のメッセージはまだありません。
                     </div>
                   ) : null}
@@ -1489,12 +1523,11 @@ export function RealtimeInbox({
                       ) : null}
                     </div>
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {/* ✦ AI自由相談ボタン（テーマチップでは対応できない複雑なケース向け） */}
-
+                      <div className="flex items-center gap-1.5">
+                        {/* ✦ AI自由相談ボタン */}
                         <Button
                           className={cn(
-                            "h-7 gap-1 px-2.5 text-xs",
+                            "h-8 gap-1 px-2.5 text-xs",
                             aiPanelOpen
                               ? "border-violet-400 text-violet-700 bg-violet-50"
                               : "border-violet-300 text-violet-600 hover:bg-violet-50",
@@ -1505,13 +1538,12 @@ export function RealtimeInbox({
                           type="button"
                           variant="outline"
                         >
-                          <MessageCircle className="size-3" />
+                          <MessageCircle className="size-3.5" />
                           {aiPanelOpen ? "相談中…" : "AIに質問"}
-
                         </Button>
                         {templates.length > 0 ? (
-                          <Button className="h-7 gap-1 px-2 text-xs" onClick={() => setShowTemplates((v) => !v)} size="sm" type="button" variant="outline">
-                            <FileText className="size-3" />
+                          <Button className="h-8 gap-1 px-2.5 text-xs" onClick={() => setShowTemplates((v) => !v)} size="sm" type="button" variant="outline">
+                            <FileText className="size-3.5" />
                             テンプレート
                           </Button>
                         ) : null}
@@ -1519,13 +1551,13 @@ export function RealtimeInbox({
                         {selectedInquiry.channel === "line" ? (
                           <>
                             <Button
-                              className="h-7 gap-1 px-2 text-xs"
+                              className="h-8 gap-1 px-2.5 text-xs"
                               onClick={() => imageInputRef.current?.click()}
                               size="sm"
                               type="button"
                               variant="outline"
                             >
-                              <ImageIcon className="size-3" />
+                              <ImageIcon className="size-3.5" />
                               画像
                             </Button>
                             <input
@@ -1545,53 +1577,56 @@ export function RealtimeInbox({
                         {/* ⑪ 受信画像一括ダウンロード */}
                         {inboundImageMessages.length > 0 ? (
                           <Button
-                            className="h-7 gap-1 px-2 text-xs"
+                            className="h-8 gap-1 px-2.5 text-xs"
                             onClick={handleDownloadImages}
                             size="sm"
                             type="button"
                             variant="outline"
                             title={`受信画像 ${inboundImageMessages.length} 枚を一括ダウンロード`}
                           >
-                            <Download className="size-3" />
-                            画像({inboundImageMessages.length})
+                            <Download className="size-3.5" />
+                            ({inboundImageMessages.length})
                           </Button>
                         ) : null}
                         {selectedInquiry.ai_suggested_reply ? (
-                          <button
-                            className="flex items-center gap-1 rounded-md border border-violet-300 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700 transition hover:bg-violet-100"
+                          <Button
+                            className="h-8 gap-1 border-violet-300 bg-violet-50 px-2.5 text-xs text-violet-700 hover:bg-violet-100"
                             onClick={() => {
                               setAiPanelDraft(selectedInquiry.ai_suggested_reply!);
                               setAiPanelThemeName(null);
                               setAiPanelDraftKey(k => k + 1);
                               setAiPanelOpen(true);
                             }}
+                            size="sm"
                             type="button"
+                            variant="outline"
                           >
                             ✦ AI原案を確認
-                          </button>
+                          </Button>
                         ) : null}
                       </div>
                       <div className="flex items-center gap-2">
                         {/* ⑪ 画像送信ボタン */}
                         {imageFiles.length > 0 ? (
                           <Button
-                            className="h-9 gap-1 text-sm"
+                            className="h-8 gap-1 text-xs"
                             disabled={sendingImages}
                             onClick={handleSendImages}
+                            size="sm"
                             type="button"
                             variant="outline"
                           >
-                            <ImageIcon className="size-4" aria-hidden="true" />
+                            <ImageIcon className="size-3.5" aria-hidden="true" />
                             {sendingImages ? "送信中..." : `画像送信 (${imageFiles.length}枚)`}
                           </Button>
                         ) : null}
-                        <Button onClick={handleSendMessage} type="button" disabled={!replyBody.trim()}>
+                        <Button className="h-8 gap-1.5 px-4 text-sm" onClick={handleSendMessage} size="sm" type="button" disabled={!replyBody.trim()}>
                           {["email", "web_form", "hikakaku", "uridoki", "oikura"].includes(
                             selectedInquiry.channel ?? "",
                           ) ? (
-                            <Mail className="size-4" aria-hidden="true" />
+                            <Mail className="size-3.5" aria-hidden="true" />
                           ) : (
-                            <Send className="size-4" aria-hidden="true" />
+                            <Send className="size-3.5" aria-hidden="true" />
                           )}
                           送信
                         </Button>
