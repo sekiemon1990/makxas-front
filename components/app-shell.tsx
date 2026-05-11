@@ -11,6 +11,7 @@ import {
   Gauge,
   Inbox,
   ListChecks,
+  Package,
   Settings,
   ShieldCheck,
 } from "lucide-react";
@@ -22,6 +23,7 @@ const navItems = [
   { href: "/dashboard", label: "ダッシュボード", icon: Gauge },
   { href: "/inbox", label: "インボックス", icon: Inbox, badge: "inbox" },
   { href: "/leads", label: "リード一覧", icon: ListChecks },
+  { href: "/items", label: "商品一覧", icon: Package },
   { href: "/appointments", label: "アポ一覧", icon: CalendarDays },
   { href: "/shifts", label: "シフト管理", icon: Clock },
   { href: "/ai", label: "AIアシスタント", icon: Bot },
