@@ -110,7 +110,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       <main className="flex min-w-0 flex-1 flex-col overflow-y-auto pb-16 md:pb-0">{children}</main>
-      <FloatingWidget />
+      {pathname !== "/ai" && <FloatingWidget />}
 
       {/* モバイルボトムナビ */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex border-t border-zinc-200 bg-white md:hidden">
