@@ -9,10 +9,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://makxas-front.vercel.app";
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://makxas-front.vercel.app";
   const res = await fetch(`${baseUrl}/api/ai/learning/run`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-cron-secret": process.env.CRON_SECRET ?? "",
+    },
     body: JSON.stringify({ trigger: "scheduled" }),
   });
   const data = await res.json() as unknown;
