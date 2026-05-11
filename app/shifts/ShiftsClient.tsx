@@ -110,8 +110,28 @@ function parseCsv(text: string, staff: Staff[]): ParsedRow[] {
   }).filter((r) => r.staff_name && r.shift_date && r.start_time && r.end_time);
 }
 
+type ViewMode = "week" | "month" | "list" | "staff";
+
+function getMonthStart(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+function getMonthEnd(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0);
+}
+function getDaysInMonth(d: Date) {
+  const start = getMonthStart(d);
+  const end = getMonthEnd(d);
+  const days: Date[] = [];
+  for (let cur = new Date(start); cur <= end; cur.setDate(cur.getDate() + 1)) {
+    days.push(new Date(cur));
+  }
+  return days;
+}
+
 export function ShiftsClient({ staff }: { staff: Staff[] }) {
+  const [viewMode, setViewMode] = useState<ViewMode>("week");
   const [weekStart, setWeekStart] = useState<Date>(() => getMondayOf(new Date()));
+  const [monthRef, setMonthRef] = useState<Date>(() => new Date());
   const [shifts, setShifts] = useState<ShiftWithStaff[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<AddModalState>(MODAL_INIT);
@@ -133,7 +153,7 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
-  const yearMonth = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, "0")}`;
+  const yearMonth = `${monthRef.getFullYear()}-${String(monthRef.getMonth() + 1).padStart(2, "0")}`;
 
   const resetImport = () => {
     setCsvText(""); setFreeText(""); setImageDataUrl(null); setImageFileName("");
@@ -146,15 +166,27 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
     [weekStart],
   );
 
+  const monthDays = useMemo(() => getDaysInMonth(monthRef), [monthRef]);
+
+  // 表示モードに応じてfetch範囲を決定
+  const { fetchFrom, fetchTo } = useMemo(() => {
+    if (viewMode === "month" || viewMode === "staff") {
+      return { fetchFrom: toYmd(getMonthStart(monthRef)), fetchTo: toYmd(getMonthEnd(monthRef)) };
+    }
+    if (viewMode === "list") {
+      // リストは2週間分表示
+      return { fetchFrom: toYmd(weekDays[0]!), fetchTo: toYmd(addDays(weekDays[0]!, 13)) };
+    }
+    return { fetchFrom: toYmd(weekDays[0]!), fetchTo: toYmd(weekDays[6]!) };
+  }, [viewMode, weekDays, monthRef]);
+
   const loadShifts = useCallback(async () => {
     setLoading(true);
-    const from = toYmd(weekDays[0]!);
-    const to   = toYmd(weekDays[6]!);
-    const res = await fetch(`/api/shifts?from=${from}&to=${to}`);
+    const res = await fetch(`/api/shifts?from=${fetchFrom}&to=${fetchTo}`);
     const d = (await res.json()) as { shifts?: ShiftWithStaff[] };
     setShifts(d.shifts ?? []);
     setLoading(false);
-  }, [weekDays]);
+  }, [fetchFrom, fetchTo]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void loadShifts(); }, [loadShifts]);
@@ -162,6 +194,9 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
   const prevWeek = () => setWeekStart((d) => addDays(d, -7));
   const nextWeek = () => setWeekStart((d) => addDays(d,  7));
   const thisWeek = () => setWeekStart(getMondayOf(new Date()));
+  const prevMonth = () => setMonthRef((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1));
+  const nextMonth = () => setMonthRef((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1));
+  const thisMonth = () => setMonthRef(new Date());
 
   const openModal = (staffId: string, date: string) => {
     setModal({ ...MODAL_INIT, open: true, staffId, date });
@@ -323,15 +358,47 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
           </div>
         </div>
 
-        {/* 週ナビゲーション */}
-        <div className="mb-4 flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={prevWeek}><ChevronLeft className="size-4" /></Button>
-          <span className="min-w-48 text-center text-sm font-medium">{weekLabel}</span>
-          <Button variant="outline" size="sm" onClick={nextWeek}><ChevronRight className="size-4" /></Button>
-          <Button variant="outline" size="sm" onClick={thisWeek}>今週</Button>
+        {/* 表示モード切替 */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex rounded-lg border border-zinc-200 bg-white p-0.5 text-sm shadow-sm">
+            {([
+              { id: "week" as ViewMode, label: "週" },
+              { id: "month" as ViewMode, label: "月" },
+              { id: "list" as ViewMode, label: "リスト" },
+              { id: "staff" as ViewMode, label: "個人" },
+            ] as const).map(({ id, label }) => (
+              <button
+                key={id}
+                onClick={() => setViewMode(id)}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${viewMode === id ? "bg-zinc-900 text-white" : "text-zinc-600 hover:text-zinc-900"}`}
+                type="button"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* ナビゲーション */}
+          {(viewMode === "week" || viewMode === "list") ? (
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={prevWeek}><ChevronLeft className="size-4" /></Button>
+              <span className="min-w-44 text-center text-sm font-medium">{weekLabel}</span>
+              <Button variant="outline" size="sm" onClick={nextWeek}><ChevronRight className="size-4" /></Button>
+              <Button variant="outline" size="sm" onClick={thisWeek}>今週</Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={prevMonth}><ChevronLeft className="size-4" /></Button>
+              <span className="min-w-32 text-center text-sm font-medium">
+                {monthRef.getFullYear()}年{monthRef.getMonth() + 1}月
+              </span>
+              <Button variant="outline" size="sm" onClick={nextMonth}><ChevronRight className="size-4" /></Button>
+              <Button variant="outline" size="sm" onClick={thisMonth}>今月</Button>
+            </div>
+          )}
         </div>
 
-        {/* カレンダーグリッド */}
+        {/* ローディング */}
         {loading ? (
           <div className="flex items-center gap-2 py-8 text-sm text-zinc-400">
             <Clock className="size-4 animate-spin" />読み込み中...
@@ -339,97 +406,221 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
         ) : filteredStaff.length === 0 ? (
           <p className="text-sm text-zinc-400">スタッフが登録されていません</p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-sm">
-            <table className="w-full min-w-[700px] border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-zinc-100">
-                  <th className="w-28 py-3 pl-4 text-left text-xs font-semibold text-zinc-500">スタッフ</th>
-                  {weekDays.map((d) => {
-                    const { label, today } = dateLabel(d);
-                    return (
-                      <th
-                        key={toYmd(d)}
-                        className={`px-1 py-3 text-center text-xs font-semibold ${today ? "text-blue-600" : d.getDay() === 0 ? "text-red-500" : d.getDay() === 6 ? "text-blue-500" : "text-zinc-500"}`}
-                      >
-                        {label}
-                      </th>
-                    );
-                  })}
-                  <th className="px-3 py-3 text-right text-xs font-semibold text-zinc-400">週計</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredStaff.map((s) => (
-                  <tr key={s.id} className="border-b border-zinc-50 last:border-0">
-                    <td className="py-2 pl-4">
-                      <span className="text-sm font-medium text-zinc-900">{s.name}</span>
-                    </td>
-                    {weekDays.map((d) => {
-                      const ymd = toYmd(d);
-                      const shift = shifts.find((sh) => sh.staff_id === s.id && sh.shift_date === ymd);
+          <>
+            {/* ===== 週表示 ===== */}
+            {viewMode === "week" ? (
+              <>
+                <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-sm">
+                  <table className="w-full min-w-[700px] border-collapse text-sm">
+                    <thead>
+                      <tr className="border-b border-zinc-100">
+                        <th className="w-28 py-3 pl-4 text-left text-xs font-semibold text-zinc-500">スタッフ</th>
+                        {weekDays.map((d) => {
+                          const { label, today } = dateLabel(d);
+                          return (
+                            <th key={toYmd(d)} className={`px-1 py-3 text-center text-xs font-semibold ${today ? "text-blue-600" : d.getDay() === 0 ? "text-red-500" : d.getDay() === 6 ? "text-blue-500" : "text-zinc-500"}`}>
+                              {label}
+                            </th>
+                          );
+                        })}
+                        <th className="px-3 py-3 text-right text-xs font-semibold text-zinc-400">週計</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredStaff.map((s) => (
+                        <tr key={s.id} className="border-b border-zinc-50 last:border-0">
+                          <td className="py-2 pl-4">
+                            <span className="text-sm font-medium text-zinc-900">{s.name}</span>
+                          </td>
+                          {weekDays.map((d) => {
+                            const ymd = toYmd(d);
+                            const shift = shifts.find((sh) => sh.staff_id === s.id && sh.shift_date === ymd);
+                            return (
+                              <td key={ymd} className="px-1 py-1 text-center align-top">
+                                {shift ? (
+                                  <div className="group relative mx-auto max-w-[100px] rounded-md bg-blue-50 px-1.5 py-1.5 text-xs">
+                                    <p className="font-semibold text-blue-700">{shift.start_time.slice(0, 5)}〜{shift.end_time.slice(0, 5)}</p>
+                                    <p className="text-[10px] text-blue-500">{formatHours(workHours(shift))}{shift.break_minutes > 0 ? ` (休${shift.break_minutes}m)` : ""}</p>
+                                    {shift.note ? <p className="mt-0.5 truncate text-[10px] text-zinc-400">{shift.note}</p> : null}
+                                    <button className="absolute right-0.5 top-0.5 hidden rounded p-0.5 text-zinc-400 hover:bg-red-100 hover:text-red-600 group-hover:flex" onClick={() => void deleteShift(shift.id)} title="削除" type="button"><X className="size-3" /></button>
+                                  </div>
+                                ) : (
+                                  <button className="mx-auto flex h-8 w-8 items-center justify-center rounded-md text-zinc-200 transition hover:bg-zinc-100 hover:text-zinc-500" onClick={() => openModal(s.id, ymd)} title="シフトを追加" type="button"><Plus className="size-4" /></button>
+                                )}
+                              </td>
+                            );
+                          })}
+                          <td className="px-3 py-2 text-right text-xs font-semibold text-zinc-600">{formatHours(staffWeeklyHours(s.id))}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {/* 週合計サマリー */}
+                {shifts.length > 0 ? (
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {filteredStaff.map((s) => {
+                      const h = staffWeeklyHours(s.id);
+                      if (h === 0) return null;
+                      const days = shifts.filter((sh) => sh.staff_id === s.id && weekDays.some((d) => toYmd(d) === sh.shift_date)).length;
                       return (
-                        <td key={ymd} className="px-1 py-1 text-center align-top">
-                          {shift ? (
-                            <div className="group relative mx-auto max-w-[100px] rounded-md bg-blue-50 px-1.5 py-1.5 text-xs">
-                              <p className="font-semibold text-blue-700">
-                                {shift.start_time.slice(0, 5)}〜{shift.end_time.slice(0, 5)}
-                              </p>
-                              <p className="text-[10px] text-blue-500">
-                                {formatHours(workHours(shift))}
-                                {shift.break_minutes > 0 ? ` (休${shift.break_minutes}m)` : ""}
-                              </p>
-                              {shift.note ? (
-                                <p className="mt-0.5 truncate text-[10px] text-zinc-400">{shift.note}</p>
-                              ) : null}
-                              <button
-                                className="absolute right-0.5 top-0.5 hidden rounded p-0.5 text-zinc-400 hover:bg-red-100 hover:text-red-600 group-hover:flex"
-                                onClick={() => void deleteShift(shift.id)}
-                                title="削除"
-                                type="button"
-                              >
-                                <X className="size-3" />
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              className="mx-auto flex h-8 w-8 items-center justify-center rounded-md text-zinc-200 transition hover:bg-zinc-100 hover:text-zinc-500"
-                              onClick={() => openModal(s.id, ymd)}
-                              title="シフトを追加"
-                              type="button"
-                            >
-                              <Plus className="size-4" />
-                            </button>
-                          )}
-                        </td>
+                        <div key={s.id} className="rounded-lg border border-zinc-200 bg-white px-4 py-2.5 shadow-sm">
+                          <p className="text-xs text-zinc-500">{s.name}</p>
+                          <p className="mt-0.5 text-base font-semibold text-zinc-900">{formatHours(h)}</p>
+                          <p className="text-[10px] text-zinc-400">{days}日出勤</p>
+                        </div>
                       );
                     })}
-                    <td className="px-3 py-2 text-right text-xs font-semibold text-zinc-600">
-                      {formatHours(staffWeeklyHours(s.id))}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                  </div>
+                ) : null}
+              </>
+            ) : null}
 
-        {/* 週合計サマリー */}
-        {!loading && shifts.length > 0 ? (
-          <div className="mt-4 flex flex-wrap gap-3">
-            {filteredStaff.map((s) => {
-              const h = staffWeeklyHours(s.id);
-              if (h === 0) return null;
-              const days = shifts.filter((sh) => sh.staff_id === s.id && weekDays.some((d) => toYmd(d) === sh.shift_date)).length;
+            {/* ===== 月間カレンダー表示 ===== */}
+            {viewMode === "month" ? (
+              <div>
+                {/* 曜日ヘッダー */}
+                <div className="grid grid-cols-7 rounded-t-xl border border-zinc-200 bg-white">
+                  {["日", "月", "火", "水", "木", "金", "土"].map((d, i) => (
+                    <div key={d} className={`py-2 text-center text-xs font-semibold ${i === 0 ? "text-red-500" : i === 6 ? "text-blue-500" : "text-zinc-500"}`}>{d}</div>
+                  ))}
+                </div>
+                {/* カレンダーグリッド */}
+                <div className="grid grid-cols-7 rounded-b-xl border-b border-l border-r border-zinc-200 bg-white">
+                  {/* 月初の空白 */}
+                  {Array.from({ length: monthDays[0]!.getDay() }, (_, i) => (
+                    <div key={`blank-${i}`} className="min-h-[80px] border-r border-t border-zinc-100 bg-zinc-50/50 last:border-r-0" />
+                  ))}
+                  {monthDays.map((d) => {
+                    const ymd = toYmd(d);
+                    const dayShifts = shifts.filter((sh) => sh.shift_date === ymd);
+                    const isToday = ymd === toYmd(new Date());
+                    const isSun = d.getDay() === 0;
+                    const isSat = d.getDay() === 6;
+                    const isLastCol = d.getDay() === 6;
+                    return (
+                      <div key={ymd} className={`min-h-[80px] border-r border-t border-zinc-100 p-1.5 ${isLastCol ? "border-r-0" : ""} ${isToday ? "bg-blue-50/40" : ""}`}>
+                        <p className={`mb-1 text-right text-xs font-semibold ${isToday ? "text-blue-600" : isSun ? "text-red-500" : isSat ? "text-blue-500" : "text-zinc-600"}`}>{d.getDate()}</p>
+                        <div className="flex flex-col gap-0.5">
+                          {dayShifts.map((sh) => {
+                            const sName = staff.find((s) => s.id === sh.staff_id)?.name ?? "?";
+                            return (
+                              <div key={sh.id} className="group relative flex items-center gap-1 rounded bg-blue-100 px-1 py-0.5 text-[10px] text-blue-800">
+                                <span className="truncate font-medium">{sName}</span>
+                                <span className="shrink-0 text-blue-500">{sh.start_time.slice(0, 5)}</span>
+                                <button className="absolute right-0 top-0 hidden rounded p-0.5 text-zinc-400 hover:bg-red-100 hover:text-red-600 group-hover:flex" onClick={() => void deleteShift(sh.id)} title="削除" type="button"><X className="size-2.5" /></button>
+                              </div>
+                            );
+                          })}
+                          <button className="mt-0.5 flex items-center justify-center rounded p-0.5 text-zinc-200 hover:bg-zinc-100 hover:text-zinc-500" onClick={() => openModal(filteredStaff[0]?.id ?? "", ymd)} title="シフトを追加" type="button"><Plus className="size-3" /></button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {/* 月末の空白 */}
+                  {Array.from({ length: (6 - (monthDays[monthDays.length - 1]?.getDay() ?? 6)) }, (_, i) => (
+                    <div key={`tail-${i}`} className="min-h-[80px] border-r border-t border-zinc-100 bg-zinc-50/50 last:border-r-0" />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {/* ===== リスト表示 ===== */}
+            {viewMode === "list" ? (() => {
+              const listDays = Array.from({ length: 14 }, (_, i) => addDays(weekDays[0]!, i));
               return (
-                <div key={s.id} className="rounded-lg border border-zinc-200 bg-white px-4 py-2.5 shadow-sm">
-                  <p className="text-xs text-zinc-500">{s.name}</p>
-                  <p className="mt-0.5 text-base font-semibold text-zinc-900">{formatHours(h)}</p>
-                  <p className="text-[10px] text-zinc-400">{days}日出勤</p>
+                <div className="flex flex-col gap-3">
+                  {listDays.map((d) => {
+                    const ymd = toYmd(d);
+                    const dayShifts = shifts.filter((sh) => sh.shift_date === ymd);
+                    const { today } = dateLabel(d);
+                    return (
+                      <div key={ymd} className={`rounded-xl border border-zinc-200 bg-white shadow-sm ${today ? "border-blue-300" : ""}`}>
+                        <div className={`flex items-center justify-between border-b border-zinc-100 px-4 py-2.5 ${today ? "bg-blue-50" : ""}`}>
+                          <p className={`text-sm font-semibold ${today ? "text-blue-700" : d.getDay() === 0 ? "text-red-600" : d.getDay() === 6 ? "text-blue-600" : "text-zinc-700"}`}>
+                            {d.getMonth() + 1}/{d.getDate()}（{DAY_LABELS[d.getDay()]}）{today ? " ← 今日" : ""}
+                          </p>
+                          <p className="text-xs text-zinc-400">{dayShifts.length > 0 ? `${dayShifts.length}名出勤` : "シフトなし"}</p>
+                        </div>
+                        {dayShifts.length > 0 ? (
+                          <div className="divide-y divide-zinc-50 px-4">
+                            {dayShifts.map((sh) => {
+                              const sName = staff.find((s) => s.id === sh.staff_id)?.name ?? "?";
+                              return (
+                                <div key={sh.id} className="flex items-center justify-between py-2.5">
+                                  <span className="text-sm font-medium text-zinc-900">{sName}</span>
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-sm text-zinc-700">{sh.start_time.slice(0, 5)} 〜 {sh.end_time.slice(0, 5)}</span>
+                                    <span className="text-xs text-zinc-400">{formatHours(workHours(sh))}</span>
+                                    {sh.note ? <span className="text-xs text-zinc-400">{sh.note}</span> : null}
+                                    <button className="rounded p-1 text-zinc-300 hover:bg-red-50 hover:text-red-500" onClick={() => void deleteShift(sh.id)} title="削除" type="button"><X className="size-3.5" /></button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 px-4 py-2.5">
+                            <button className="flex items-center gap-1 text-xs text-zinc-300 hover:text-zinc-500" onClick={() => openModal(filteredStaff[0]?.id ?? "", ymd)} type="button"><Plus className="size-3" />シフトを追加</button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               );
-            })}
-          </div>
-        ) : null}
+            })() : null}
+
+            {/* ===== 個人別表示 ===== */}
+            {viewMode === "staff" ? (
+              <div className="flex flex-col gap-6">
+                {filteredStaff.map((s) => {
+                  const sShifts = shifts.filter((sh) => sh.staff_id === s.id);
+                  const totalH = sShifts.reduce((acc, sh) => acc + workHours(sh), 0);
+                  return (
+                    <div key={s.id} className="rounded-xl border border-zinc-200 bg-white shadow-sm">
+                      <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
+                        <div>
+                          <p className="font-semibold text-zinc-900">{s.name}</p>
+                          <p className="text-xs text-zinc-500">{monthRef.getFullYear()}年{monthRef.getMonth() + 1}月 — {sShifts.length}日出勤 / {formatHours(totalH)}</p>
+                        </div>
+                      </div>
+                      {/* スタッフの月間シフトを曜日グリッドで */}
+                      <div className="grid grid-cols-7 border-b border-zinc-50">
+                        {["日", "月", "火", "水", "木", "金", "土"].map((day, i) => (
+                          <div key={day} className={`py-1.5 text-center text-[10px] font-semibold ${i === 0 ? "text-red-400" : i === 6 ? "text-blue-400" : "text-zinc-400"}`}>{day}</div>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-7 px-1 pb-2 pt-1">
+                        {Array.from({ length: monthDays[0]!.getDay() }, (_, i) => <div key={`b-${i}`} />)}
+                        {monthDays.map((d) => {
+                          const ymd = toYmd(d);
+                          const sh = sShifts.find((sh) => sh.shift_date === ymd);
+                          const isToday = ymd === toYmd(new Date());
+                          return (
+                            <div key={ymd} className="p-0.5">
+                              {sh ? (
+                                <div className={`group relative rounded-md p-1 text-center text-[10px] ${isToday ? "bg-blue-500 text-white" : "bg-blue-50 text-blue-700"}`}>
+                                  <p className="font-semibold">{d.getDate()}</p>
+                                  <p className={isToday ? "text-blue-100" : "text-blue-500"}>{sh.start_time.slice(0, 5)}</p>
+                                  <button className="absolute right-0 top-0 hidden rounded p-0.5 text-zinc-400 hover:bg-red-100 hover:text-red-600 group-hover:flex" onClick={() => void deleteShift(sh.id)} title="削除" type="button"><X className="size-2.5" /></button>
+                                </div>
+                              ) : (
+                                <button className="flex h-10 w-full flex-col items-center justify-center rounded-md text-zinc-200 hover:bg-zinc-100 hover:text-zinc-400" onClick={() => openModal(s.id, ymd)} title="シフトを追加" type="button">
+                                  <span className="text-[10px] text-zinc-300">{d.getDate()}</span>
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+          </>
+        )}
       </div>
 
       {/* シフト追加モーダル */}
