@@ -80,6 +80,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // AI提案を編集した場合 → バックグラウンドで差分分析（送信速度に影響しない）
+  if (body.ai_edited && body.ai_original_body && message?.id && process.env.ANTHROPIC_API_KEY) {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://makxas-front.vercel.app";
+    void fetch(`${baseUrl}/api/ai/analyze-edit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message_id: message.id,
+        original_body: body.ai_original_body,
+        edited_body: body.body.trim(),
+        msg_category: inquiry.msg_category ?? null,
+      }),
+    }).catch((e) => console.error("[analyze-edit] background call failed:", e));
+  }
+
   // first_response_at を更新
   await supabase
     .from("inquiries")

@@ -187,6 +187,10 @@ export function RealtimeInbox({
   const [aiLoading, setAiLoading] = useState(false);
   const [aiOriginalBody, setAiOriginalBody] = useState<string | null>(null);
   const [aiCurrentTheme, setAiCurrentTheme] = useState<string | null>(null);
+  // AIパネル原案（テーマチップ/自動提案 → パネルに渡す）
+  const [aiPanelDraft, setAiPanelDraft] = useState<string | null>(null);
+  const [aiPanelDraftKey, setAiPanelDraftKey] = useState(0);
+  const [aiPanelThemeName, setAiPanelThemeName] = useState<string | null>(null);
   // ⑬ モバイルスワイプ
   const swipeStartX = useRef<number | null>(null);
   const swipeStartY = useRef<number | null>(null);
@@ -307,10 +311,8 @@ export function RealtimeInbox({
     return items.find((item) => item.id === selectedId) ?? items[0] ?? null;
   }, [items, selectedId]);
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setReplyBody(selectedInquiry?.ai_suggested_reply ?? "");
-  }, [selectedInquiry?.id, selectedInquiry?.ai_suggested_reply]);
+  // ai_suggested_reply は返信欄には自動入力しない（パネル経由で確認）
+  // （このエフェクトは削除済み）
 
   const filteredItems = searchQuery.trim()
     ? items.filter((item) => {
@@ -425,6 +427,8 @@ export function RealtimeInbox({
     setAiSuggest(null);
     setAiOriginalBody(null);
     setAiCurrentTheme(null);
+    setAiPanelDraft(null);
+    setAiPanelThemeName(null);
     setReplyBody("");
 
     if (!selectedInquiry?.id) return;
@@ -438,9 +442,12 @@ export function RealtimeInbox({
       .then((data: import("@/app/api/ai/suggest/route").AiSuggestResult) => {
         setAiSuggest(data);
         if (data.mode === "auto" && data.body) {
-          setReplyBody(data.body);
-          setAiOriginalBody(data.body);
+          // 返信欄には直接入れず、パネルに原案として渡す
           setAiCurrentTheme(data.theme);
+          setAiPanelDraft(data.body);
+          setAiPanelThemeName(data.themes.find(t => t.key === data.theme)?.label ?? null);
+          setAiPanelDraftKey(k => k + 1);
+          setAiPanelOpen(true);
         }
       })
       .catch(() => { /* AI提案失敗は無視 */ })
@@ -681,6 +688,8 @@ export function RealtimeInbox({
       // AI state をリセット（次の受信まで提案なし）
       setAiOriginalBody(null);
       setAiCurrentTheme(null);
+      setAiPanelDraft(null);
+      setAiPanelThemeName(null);
       setAiSuggest(null);
       // ④ 新着→対応中に自動変更
       if (selectedInquiry.status === "new") {
@@ -1263,13 +1272,13 @@ export function RealtimeInbox({
                         <span className="text-violet-400">しばらくお待ちください</span>
 
                       </div>
-                    ) : aiSuggest?.mode === "auto" && aiOriginalBody ? (
+                    ) : aiSuggest?.mode === "auto" && aiCurrentTheme ? (
                       <>
-                        {/* 明確ケース：AI提案バナー */}
+                        {/* 明確ケース：パネルで確認済みバナー */}
                         <div className="flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-700">
                           <span className="size-1.5 rounded-full bg-violet-500 animate-pulse shrink-0" />
                           <span className="font-medium flex-1">
-                            ✦ AIが返信文を用意しました
+                            ✦ AI原案を確認中
                             {aiCurrentTheme ? (
                               <span className="ml-2 rounded-full bg-violet-200 px-2 py-0.5 text-[10px]">
                                 {aiSuggest.themes.find((t) => t.key === aiCurrentTheme)?.label ?? aiCurrentTheme}
@@ -1278,10 +1287,10 @@ export function RealtimeInbox({
                           </span>
                           <button
                             className="text-violet-400 hover:text-violet-600 text-[11px]"
-                            onClick={() => { setReplyBody(""); setAiOriginalBody(null); setAiCurrentTheme(null); }}
+                            onClick={() => setAiPanelOpen(true)}
                             type="button"
                           >
-                            クリア ✕
+                            パネルを開く →
                           </button>
                         </div>
                         {/* サブテーマ切り替え */}
@@ -1306,7 +1315,13 @@ export function RealtimeInbox({
                                     body: JSON.stringify({ inquiry_id: selectedInquiry.id, force_theme: t.key }),
                                   });
                                   const data = await res.json() as import("@/app/api/ai/suggest/route").AiSuggestResult;
-                                  if (data.body) { setReplyBody(data.body); setAiOriginalBody(data.body); setAiSuggest(data); }
+                                  if (data.body) {
+                                    setAiSuggest(data);
+                                    setAiPanelDraft(data.body);
+                                    setAiPanelThemeName(t.label);
+                                    setAiPanelDraftKey(k => k + 1);
+                                    setAiPanelOpen(true);
+                                  }
                                 } finally { setAiLoading(false); }
                               }}
                               type="button"
@@ -1348,7 +1363,13 @@ export function RealtimeInbox({
                                       body: JSON.stringify({ inquiry_id: selectedInquiry.id, force_theme: t.key }),
                                     });
                                     const data = await res.json() as import("@/app/api/ai/suggest/route").AiSuggestResult;
-                                    if (data.body) { setReplyBody(data.body); setAiOriginalBody(data.body); setAiSuggest(data); }
+                                    if (data.body) {
+                                      setAiSuggest(data);
+                                      setAiPanelDraft(data.body);
+                                      setAiPanelThemeName(t.label);
+                                      setAiPanelDraftKey(k => k + 1);
+                                      setAiPanelOpen(true);
+                                    }
                                   } finally { setAiLoading(false); }
                                 }}
                                 type="button"
@@ -1514,9 +1535,18 @@ export function RealtimeInbox({
                           </Button>
                         ) : null}
                         {selectedInquiry.ai_suggested_reply ? (
-                          <Badge variant="outline" className="rounded-md border-zinc-200 bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600">
-                            AI提案
-                          </Badge>
+                          <button
+                            className="flex items-center gap-1 rounded-md border border-violet-300 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700 transition hover:bg-violet-100"
+                            onClick={() => {
+                              setAiPanelDraft(selectedInquiry.ai_suggested_reply!);
+                              setAiPanelThemeName(null);
+                              setAiPanelDraftKey(k => k + 1);
+                              setAiPanelOpen(true);
+                            }}
+                            type="button"
+                          >
+                            ✦ AI原案を確認
+                          </button>
                         ) : null}
                       </div>
                       <div className="flex items-center gap-2">
@@ -1711,7 +1741,10 @@ export function RealtimeInbox({
             onClose={() => setAiPanelOpen(false)}
             inquiry={selectedInquiry}
             messages={messages}
-            onTranscribe={(text) => { setReplyBody(text); setAiOriginalBody(text); }}
+            onTranscribe={(text) => { setReplyBody(text); setAiOriginalBody(text); setAiPanelOpen(false); }}
+            initialDraft={aiPanelDraft}
+            initialDraftKey={aiPanelDraftKey}
+            initialThemeName={aiPanelThemeName}
           />
         </section>
       </div>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Bot,
+  BrainCircuit,
   CalendarDays,
   Clock,
   Gauge,
@@ -25,7 +26,8 @@ const navItems = [
   { href: "/shifts", label: "シフト管理", icon: Clock },
   { href: "/ai", label: "AIアシスタント", icon: Bot },
   { href: "/settings", label: "設定", icon: Settings },
-  { href: "/admin", label: "管理", icon: ShieldCheck, divider: true as const },
+  { href: "/admin", label: "管理", icon: ShieldCheck, divider: true as const, exactMatch: true as const },
+  { href: "/admin/ai", label: "AI学習・自動化", icon: BrainCircuit, indent: true as const },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -59,7 +61,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <nav className="flex flex-1 flex-col gap-1 p-3">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+            const active = item.exactMatch
+              ? pathname === item.href
+              : pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
             const count = item.badge === "inbox" ? newCount : 0;
 
             return (
@@ -71,6 +75,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   href={item.href}
                   className={cn(
                     "flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950",
+                    item.indent && "pl-6 text-[13px]",
                     active &&
                       "bg-zinc-950 text-white hover:bg-zinc-900 hover:text-white",
                   )}
@@ -105,7 +110,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       <main className="flex min-w-0 flex-1 flex-col overflow-y-auto pb-16 md:pb-0">{children}</main>
-      <FloatingWidget />
+      {pathname !== "/ai" && <FloatingWidget />}
 
       {/* モバイルボトムナビ */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex border-t border-zinc-200 bg-white md:hidden">
