@@ -26,10 +26,12 @@ export type AiSuggestResult = {
 };
 
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => null) as { inquiry_id?: string } | null;
+  const body = await req.json().catch(() => null) as { inquiry_id?: string; force_theme?: string } | null;
   if (!body?.inquiry_id) {
     return NextResponse.json({ error: "inquiry_id required" }, { status: 400 });
   }
+
+  const forceTheme = body.force_theme as ThemeKey | undefined;
 
   const supabase = createServiceClient();
 
@@ -53,6 +55,62 @@ export async function POST(req: NextRequest) {
 
   const messages = rawMessages ?? [];
   const lastInbound = [...messages].reverse().find((m) => m.direction === "inbound");
+
+  // force_theme が指定されている場合はそのテーマで直接返信文を生成
+  if (forceTheme && process.env.ANTHROPIC_API_KEY) {
+    const themeInfo = THEMES.find((t) => t.key === forceTheme);
+    const storeName  = (inquiry.stores  as { name: string } | null)?.name  ?? "未設定";
+    const brandName  = (inquiry.brands  as { name: string } | null)?.name  ?? "未設定";
+    const leadName   = (inquiry.leads   as { display_name?: string; phone?: string; email?: string } | null)?.display_name
+      ?? (inquiry.leads as { phone?: string } | null)?.phone
+      ?? (inquiry.leads as { email?: string } | null)?.email
+      ?? "不明";
+    const convHistory = messages
+      .map((m) => `[${m.direction === "inbound" ? "顧客" : "スタッフ"}] ${m.body ?? ""}`)
+      .join("\n");
+
+    const themeInstructions: Record<ThemeKey, string> = {
+      photo: "顧客に査定のために商品写真を送っていただくようお願いする返信文を書いてください。",
+      price: "顧客に商品の価格の目安・買取相場を案内する返信文を書いてください。",
+      appo:  "顧客に査定の予約（アポイント）を提案する返信文を書いてください。",
+      info:  "顧客に商品の詳細情報（状態・付属品・年式など）を確認する返信文を書いてください。",
+    };
+
+    const client = new Anthropic();
+    try {
+      const response = await client.messages.create({
+        model: MODEL,
+        max_tokens: 512,
+        system: `あなたは買取店のインサイドセールスAIアシスタントです。
+返信文のみを返してください（JSON不要・説明文不要）。
+返信文ルール:
+- 敬称は「〇〇様」
+- 落ち着いた・丁寧な文体
+- 感謝の言葉から始める
+- ブランド名（${brandName}）を明記する
+- 署名不要`,
+        messages: [{
+          role: "user",
+          content: `顧客名: ${leadName}\n\n会話履歴:\n${convHistory || "（なし）"}\n\n指示: ${themeInstructions[forceTheme as ThemeKey] ?? themeInstructions.info}`,
+        }],
+      });
+
+      const replyBody = response.content[0]?.type === "text" ? response.content[0].text.trim() : null;
+      return NextResponse.json({
+        mode: "auto",
+        msg_category: inquiry.msg_category ?? "initial_contact",
+        theme: forceTheme,
+        body: replyBody,
+        themes: THEMES.map((t) => ({ ...t, confidence: t.key === forceTheme ? 1 : 0.3 })),
+      } satisfies AiSuggestResult);
+    } catch (e) {
+      console.error("[ai/suggest force_theme] error:", e);
+      return NextResponse.json({
+        mode: "themes", msg_category: "initial_contact", theme: null, body: null,
+        themes: THEMES.map((t, i) => ({ ...t, confidence: 1 - i * 0.1 })),
+      } satisfies AiSuggestResult);
+    }
+  }
 
   // 受信メッセージがない場合はテーマ選択モードを返す
   if (!lastInbound?.body) {
