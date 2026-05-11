@@ -177,6 +177,9 @@ export function RealtimeInbox({
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [sendingImages, setSendingImages] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  // AI編集理由タグUI
+  const [showEditReasonPrompt, setShowEditReasonPrompt] = useState(false);
+  const [lastSentMsgId, setLastSentMsgId] = useState<string | null>(null);
   // AI返信アシスト
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [aiSuggest, setAiSuggest] = useState<import("@/app/api/ai/suggest/route").AiSuggestResult | null>(null);
@@ -667,6 +670,12 @@ export function RealtimeInbox({
       setMessages((current) => [...current, payload.message]);
       setReplyBody("");
       setReplySubject("");
+      // AI提案を編集して送信した場合、理由タグUIを5秒表示
+      if (isAiSuggested && isEdited && payload.message?.id) {
+        setLastSentMsgId(payload.message.id as string);
+        setShowEditReasonPrompt(true);
+        setTimeout(() => setShowEditReasonPrompt(false), 5000);
+      }
       // AI state をリセット（次の受信まで提案なし）
       setAiOriginalBody(null);
       setAiCurrentTheme(null);
@@ -1339,6 +1348,39 @@ export function RealtimeInbox({
                       </div>
                     ) : null}
                     {/* ── /AI返信提案エリア ── */}
+
+                    {/* AI編集理由タグUI */}
+                    {showEditReasonPrompt && (
+                      <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs">
+                        <span className="shrink-0 font-medium text-violet-700">修正理由（任意）：</span>
+                        {(["tone", "missing_info", "wrong_theme", "factual", "length", "other"] as const).map((r) => (
+                          <button
+                            key={r}
+                            className="rounded-full border border-violet-300 bg-white px-2 py-0.5 text-[10px] text-violet-700 hover:bg-violet-100"
+                            onClick={() => {
+                              if (lastSentMsgId) {
+                                void fetch(`/api/messages/${lastSentMsgId}/edit-reason`, {
+                                  method: "PATCH",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ ai_edit_reason: r }),
+                                });
+                              }
+                              setShowEditReasonPrompt(false);
+                            }}
+                            type="button"
+                          >
+                            {({ tone: "語調", missing_info: "情報不足", wrong_theme: "テーマ違い", factual: "事実誤り", length: "長さ", other: "その他" } as Record<string, string>)[r]}
+                          </button>
+                        ))}
+                        <button
+                          className="ml-auto text-zinc-400 hover:text-zinc-600"
+                          onClick={() => setShowEditReasonPrompt(false)}
+                          type="button"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
 
                     {/* メール返信時は件名フィールドを表示 */}
                     {["email", "web_form", "hikakaku", "uridoki", "oikura"].includes(
