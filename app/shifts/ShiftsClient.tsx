@@ -10,6 +10,17 @@ import type { Shift, Staff } from "@/types/database";
 
 type ShiftWithStaff = Shift & { staff?: Pick<Staff, "id" | "name"> | null };
 
+type CalendarEvent = {
+  id: string;
+  staff_id: string;
+  title: string | null;
+  start_at: string;
+  end_at: string;
+  all_day: boolean;
+  status: string;
+  staff?: Pick<Staff, "id" | "name"> | null;
+};
+
 const DAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
 
 function toYmd(d: Date) {
@@ -128,15 +139,20 @@ function getDaysInMonth(d: Date) {
   return days;
 }
 
+const fsStaffOf = (staff: Staff[]) => staff.filter((s) => (s as Staff & { team?: string }).team === "FS");
+const isStaffOf = (staff: Staff[]) => staff.filter((s) => (s as Staff & { team?: string }).team !== "FS");
+
 export function ShiftsClient({ staff }: { staff: Staff[] }) {
   const [viewMode, setViewMode] = useState<ViewMode>("week");
   const [weekStart, setWeekStart] = useState<Date>(() => getMondayOf(new Date()));
   const [monthRef, setMonthRef] = useState<Date>(() => new Date());
   const [shifts, setShifts] = useState<ShiftWithStaff[]>([]);
+  const [calEvents, setCalEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<AddModalState>(MODAL_INIT);
   const [saving, setSaving] = useState(false);
   const [filterStaffId, setFilterStaffId] = useState<string>("all");
+  const [showFsEvents, setShowFsEvents] = useState(true);
 
   // 一括インポート
   const [importOpen, setImportOpen] = useState(false);
@@ -182,9 +198,15 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
 
   const loadShifts = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/shifts?from=${fetchFrom}&to=${fetchTo}`);
-    const d = (await res.json()) as { shifts?: ShiftWithStaff[] };
-    setShifts(d.shifts ?? []);
+    // IS シフト + FS カレンダーイベントを並列取得
+    const [shiftsRes, calRes] = await Promise.all([
+      fetch(`/api/shifts?from=${fetchFrom}&to=${fetchTo}`),
+      fetch(`/api/calendar/events?from=${fetchFrom}&to=${fetchTo}`),
+    ]);
+    const shiftsData = (await shiftsRes.json()) as { shifts?: ShiftWithStaff[] };
+    const calData = (await calRes.json()) as { events?: CalendarEvent[] };
+    setShifts(shiftsData.shifts ?? []);
+    setCalEvents(calData.events ?? []);
     setLoading(false);
   }, [fetchFrom, fetchTo]);
 
@@ -304,7 +326,24 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
     }
   };
 
-  const filteredStaff = filterStaffId === "all" ? staff : staff.filter((s) => s.id === filterStaffId);
+  const isStaff = useMemo(() => isStaffOf(staff), [staff]);
+  const fsStaff = useMemo(() => fsStaffOf(staff), [staff]);
+
+  const filteredIsStaff = filterStaffId === "all" ? isStaff : isStaff.filter((s) => s.id === filterStaffId);
+  const filteredFsStaff = filterStaffId === "all" ? fsStaff : fsStaff.filter((s) => s.id === filterStaffId);
+
+  // FS カレンダーイベントを日付と staff_id で引く
+  const getFsEventsForDay = (staffId: string, ymd: string) =>
+    calEvents.filter((e) => {
+      const eventDate = e.start_at.slice(0, 10);
+      return e.staff_id === staffId && eventDate === ymd;
+    });
+
+  const getFsEventsForDateRange = (staffId: string, fromYmd: string, toYmd_: string) =>
+    calEvents.filter((e) => {
+      const d = e.start_at.slice(0, 10);
+      return e.staff_id === staffId && d >= fromYmd && d <= toYmd_;
+    });
 
   // 表示する曜日ラベル（月〜日）
   const dateLabel = (d: Date) => {
@@ -328,6 +367,10 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Shift</p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight">シフト管理</h1>
+            <div className="mt-2 flex items-center gap-3 text-xs text-zinc-500">
+              <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-blue-200" />IS（内勤）</span>
+              <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-green-200" />FS（外勤・Googleカレンダー連携）</span>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <Link
@@ -337,6 +380,14 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
               <BarChart2 className="size-4" />
               月次レポート
             </Link>
+            <button
+              onClick={() => setShowFsEvents((v) => !v)}
+              className={`inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium transition ${showFsEvents ? "border-green-300 bg-green-50 text-green-700" : "border-zinc-200 bg-white text-zinc-500"}`}
+              type="button"
+            >
+              <span className="inline-block h-2.5 w-2.5 rounded-sm bg-green-400" />
+              FSの稼働{showFsEvents ? "表示中" : "非表示"}
+            </button>
             <button
               onClick={() => { resetImport(); setImportOpen(true); }}
               className="inline-flex h-9 items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
@@ -403,7 +454,7 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
           <div className="flex items-center gap-2 py-8 text-sm text-zinc-400">
             <Clock className="size-4 animate-spin" />読み込み中...
           </div>
-        ) : filteredStaff.length === 0 ? (
+        ) : filteredIsStaff.length === 0 ? (
           <p className="text-sm text-zinc-400">スタッフが登録されていません</p>
         ) : (
           <>
@@ -427,10 +478,14 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredStaff.map((s) => (
+                      {/* IS スタッフ行（青）*/}
+                      {filteredIsStaff.map((s) => (
                         <tr key={s.id} className="border-b border-zinc-50 last:border-0">
                           <td className="py-2 pl-4">
-                            <span className="text-sm font-medium text-zinc-900">{s.name}</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-400" />
+                              <span className="text-sm font-medium text-zinc-900">{s.name}</span>
+                            </div>
                           </td>
                           {weekDays.map((d) => {
                             const ymd = toYmd(d);
@@ -453,13 +508,56 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
                           <td className="px-3 py-2 text-right text-xs font-semibold text-zinc-600">{formatHours(staffWeeklyHours(s.id))}</td>
                         </tr>
                       ))}
+                      {/* FS スタッフ行（緑・Googleカレンダー由来）*/}
+                      {showFsEvents && filteredFsStaff.map((s) => (
+                        <tr key={`fs-${s.id}`} className="border-b border-zinc-50 bg-green-50/30 last:border-0">
+                          <td className="py-2 pl-4">
+                            <div className="flex items-center gap-1.5">
+                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-400" />
+                              <span className="text-sm font-medium text-zinc-800">{s.name}</span>
+                              <span className="rounded bg-green-100 px-1 py-0.5 text-[9px] font-bold text-green-600">FS</span>
+                            </div>
+                          </td>
+                          {weekDays.map((d) => {
+                            const ymd = toYmd(d);
+                            const events = getFsEventsForDay(s.id, ymd);
+                            return (
+                              <td key={ymd} className="px-1 py-1 align-top">
+                                <div className="flex flex-col gap-0.5">
+                                  {events.length > 0 ? events.map((ev) => {
+                                    const startHm = new Date(ev.start_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", hour12: false });
+                                    const endHm   = new Date(ev.end_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", hour12: false });
+                                    return (
+                                      <div key={ev.id} className="rounded-md bg-green-50 px-1.5 py-1 text-xs" title={ev.title ?? ""}>
+                                        {ev.all_day ? (
+                                          <p className="font-semibold text-green-700 truncate">{ev.title ?? "終日"}</p>
+                                        ) : (
+                                          <>
+                                            <p className="font-semibold text-green-700">{startHm}〜{endHm}</p>
+                                            {ev.title ? <p className="truncate text-[10px] text-green-600">{ev.title}</p> : null}
+                                          </>
+                                        )}
+                                      </div>
+                                    );
+                                  }) : (
+                                    <div className="flex h-8 items-center justify-center text-[10px] text-zinc-300">予定なし</div>
+                                  )}
+                                </div>
+                              </td>
+                            );
+                          })}
+                          <td className="px-3 py-2 text-right text-[10px] text-green-600">
+                            {getFsEventsForDateRange(s.id, toYmd(weekDays[0]!), toYmd(weekDays[6]!)).length}件
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
                 {/* 週合計サマリー */}
                 {shifts.length > 0 ? (
                   <div className="mt-4 flex flex-wrap gap-3">
-                    {filteredStaff.map((s) => {
+                    {filteredIsStaff.map((s) => {
                       const h = staffWeeklyHours(s.id);
                       if (h === 0) return null;
                       const days = shifts.filter((sh) => sh.staff_id === s.id && weekDays.some((d) => toYmd(d) === sh.shift_date)).length;
@@ -512,7 +610,7 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
                               </div>
                             );
                           })}
-                          <button className="mt-0.5 flex items-center justify-center rounded p-0.5 text-zinc-200 hover:bg-zinc-100 hover:text-zinc-500" onClick={() => openModal(filteredStaff[0]?.id ?? "", ymd)} title="シフトを追加" type="button"><Plus className="size-3" /></button>
+                          <button className="mt-0.5 flex items-center justify-center rounded p-0.5 text-zinc-200 hover:bg-zinc-100 hover:text-zinc-500" onClick={() => openModal(filteredIsStaff[0]?.id ?? "", ymd)} title="シフトを追加" type="button"><Plus className="size-3" /></button>
                         </div>
                       </div>
                     );
@@ -561,7 +659,7 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
                           </div>
                         ) : (
                           <div className="flex items-center gap-2 px-4 py-2.5">
-                            <button className="flex items-center gap-1 text-xs text-zinc-300 hover:text-zinc-500" onClick={() => openModal(filteredStaff[0]?.id ?? "", ymd)} type="button"><Plus className="size-3" />シフトを追加</button>
+                            <button className="flex items-center gap-1 text-xs text-zinc-300 hover:text-zinc-500" onClick={() => openModal(filteredIsStaff[0]?.id ?? "", ymd)} type="button"><Plus className="size-3" />シフトを追加</button>
                           </div>
                         )}
                       </div>
@@ -574,7 +672,7 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
             {/* ===== 個人別表示 ===== */}
             {viewMode === "staff" ? (
               <div className="flex flex-col gap-6">
-                {filteredStaff.map((s) => {
+                {filteredIsStaff.map((s) => {
                   const sShifts = shifts.filter((sh) => sh.staff_id === s.id);
                   const totalH = sShifts.reduce((acc, sh) => acc + workHours(sh), 0);
                   return (
