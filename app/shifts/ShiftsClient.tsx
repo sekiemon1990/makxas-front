@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Clock, Plus, X, BarChart2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlertCircle, BarChart2, ChevronLeft, ChevronRight, Clock, FileImage, FileText, Plus, Table, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -68,6 +68,48 @@ const MODAL_INIT: AddModalState = {
   note: "",
 };
 
+// ---- 一括インポート型 ----
+type ImportTab = "csv" | "text" | "image";
+
+type ParsedRow = {
+  staff_name: string;
+  staff_id: string | null;
+  shift_date: string;
+  start_time: string;
+  end_time: string;
+  break_minutes: number;
+  note: string;
+  match_error?: string;
+};
+
+// CSV を ParsedRow[] に変換（クライアントサイド）
+function parseCsv(text: string, staff: Staff[]): ParsedRow[] {
+  const lines = text.trim().split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length === 0) return [];
+  // ヘッダー行をスキップ（スタッフ名が含まれない行は無視）
+  const start = lines[0]!.includes("スタッフ") || lines[0]!.includes("日付") ? 1 : 0;
+  return lines.slice(start).map((line) => {
+    const cols = line.split(/,|\t/).map((c) => c.trim());
+    const staffName = cols[0] ?? "";
+    const shiftDate = cols[1] ?? "";
+    const startTime = (cols[2] ?? "").replace(/[^0-9:]/g, "").slice(0, 5);
+    const endTime   = (cols[3] ?? "").replace(/[^0-9:]/g, "").slice(0, 5);
+    const breakMin  = parseInt(cols[4] ?? "0", 10) || 0;
+    const note      = cols[5] ?? "";
+    const matched   = staff.find((s) => s.name === staffName || s.name.includes(staffName) || staffName.includes(s.name));
+    return {
+      staff_name: staffName,
+      staff_id: matched?.id ?? null,
+      shift_date: shiftDate,
+      start_time: startTime,
+      end_time: endTime,
+      break_minutes: breakMin,
+      note,
+      match_error: matched ? undefined : `スタッフ「${staffName}」が登録されていません`,
+    };
+  }).filter((r) => r.staff_name && r.shift_date && r.start_time && r.end_time);
+}
+
 export function ShiftsClient({ staff }: { staff: Staff[] }) {
   const [weekStart, setWeekStart] = useState<Date>(() => getMondayOf(new Date()));
   const [shifts, setShifts] = useState<ShiftWithStaff[]>([]);
@@ -75,6 +117,29 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
   const [modal, setModal] = useState<AddModalState>(MODAL_INIT);
   const [saving, setSaving] = useState(false);
   const [filterStaffId, setFilterStaffId] = useState<string>("all");
+
+  // 一括インポート
+  const [importOpen, setImportOpen] = useState(false);
+  const [importTab, setImportTab] = useState<ImportTab>("csv");
+  const [csvText, setCsvText] = useState("");
+  const [freeText, setFreeText] = useState("");
+  const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
+  const [imageFileName, setImageFileName] = useState("");
+  const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
+  const [parsing, setParsing] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importSuccess, setImportSuccess] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  const yearMonth = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, "0")}`;
+
+  const resetImport = () => {
+    setCsvText(""); setFreeText(""); setImageDataUrl(null); setImageFileName("");
+    setParsedRows([]); setParsing(false); setImporting(false);
+    setImportError(null); setImportSuccess(null);
+  };
 
   const weekDays = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
@@ -138,6 +203,72 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
     setShifts((prev) => prev.filter((s) => s.id !== id));
   };
 
+  // ---- 一括インポート操作 ----
+
+  const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      setCsvText(text);
+      setParsedRows(parseCsv(text, staff));
+      setImportError(null);
+    };
+    reader.readAsText(file, "UTF-8");
+  };
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setImageDataUrl(ev.target?.result as string);
+      setParsedRows([]);
+      setImportError(null);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const parseWithAi = async (type: "text" | "image") => {
+    const content = type === "text" ? freeText : imageDataUrl;
+    if (!content) return;
+    setParsing(true);
+    setImportError(null);
+    const res = await fetch("/api/shifts/parse", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, content, year_month: yearMonth }),
+    });
+    const d = (await res.json()) as { rows?: ParsedRow[]; error?: string };
+    setParsing(false);
+    if (d.error) { setImportError(d.error); return; }
+    setParsedRows(d.rows ?? []);
+  };
+
+  const executeImport = async () => {
+    const validRows = parsedRows.filter((r) => r.staff_id && !r.match_error);
+    if (validRows.length === 0) { setImportError("インポートできる行がありません"); return; }
+    setImporting(true);
+    setImportError(null);
+    const res = await fetch("/api/shifts/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rows: validRows }),
+    });
+    const d = (await res.json()) as { inserted?: number; errors?: string[] };
+    setImporting(false);
+    if (d.errors && d.errors.length > 0) {
+      setImportError(d.errors.join("\n"));
+    }
+    if ((d.inserted ?? 0) > 0) {
+      setImportSuccess(`${d.inserted}件のシフトをインポートしました`);
+      void loadShifts();
+      setTimeout(() => { setImportOpen(false); resetImport(); }, 1500);
+    }
+  };
+
   const filteredStaff = filterStaffId === "all" ? staff : staff.filter((s) => s.id === filterStaffId);
 
   // 表示する曜日ラベル（月〜日）
@@ -171,6 +302,14 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
               <BarChart2 className="size-4" />
               月次レポート
             </Link>
+            <button
+              onClick={() => { resetImport(); setImportOpen(true); }}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
+              type="button"
+            >
+              <Upload className="size-4" />
+              一括インポート
+            </button>
             <select
               value={filterStaffId}
               onChange={(e) => setFilterStaffId(e.target.value)}
@@ -366,6 +505,217 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
               </div>
             </CardContent>
           </Card>
+        </div>
+      ) : null}
+
+      {/* ======== 一括インポートモーダル ======== */}
+      {importOpen ? (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-12">
+          <div className="w-full max-w-2xl rounded-xl border border-zinc-200 bg-white shadow-2xl">
+            {/* ヘッダー */}
+            <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
+              <div>
+                <h2 className="text-base font-semibold">シフト一括インポート</h2>
+                <p className="mt-0.5 text-xs text-zinc-500">CSV・テキスト・画像からシフトをまとめて登録できます</p>
+              </div>
+              <button onClick={() => { setImportOpen(false); resetImport(); }} className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700" type="button">
+                <X className="size-5" />
+              </button>
+            </div>
+
+            {/* タブ */}
+            <div className="flex gap-0 border-b border-zinc-100">
+              {([
+                { id: "csv" as ImportTab, label: "CSV", icon: Table },
+                { id: "text" as ImportTab, label: "テキスト", icon: FileText },
+                { id: "image" as ImportTab, label: "画像", icon: FileImage },
+              ] as const).map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  onClick={() => { setImportTab(id); setParsedRows([]); setImportError(null); setImportSuccess(null); }}
+                  className={`flex items-center gap-1.5 border-b-2 px-5 py-3 text-sm font-medium transition ${importTab === id ? "border-zinc-900 text-zinc-900" : "border-transparent text-zinc-500 hover:text-zinc-700"}`}
+                  type="button"
+                >
+                  <Icon className="size-4" />
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="p-5">
+              {/* ===== CSV タブ ===== */}
+              {importTab === "csv" ? (
+                <div className="flex flex-col gap-4">
+                  <div className="rounded-lg bg-zinc-50 px-4 py-3 text-xs text-zinc-600">
+                    <p className="font-semibold">CSV フォーマット（ヘッダー行は任意）:</p>
+                    <p className="mt-1 font-mono text-[11px]">スタッフ名, 日付(YYYY-MM-DD), 開始時間(HH:MM), 終了時間(HH:MM), 休憩(分), メモ</p>
+                    <p className="mt-1 font-mono text-[11px]">例: 田中 太郎,2025-05-12,10:00,19:00,60,早番</p>
+                  </div>
+                  <input ref={fileInputRef} type="file" accept=".csv,.txt,text/csv" className="hidden" onChange={handleCsvFileChange} />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-zinc-300 px-4 py-6 text-sm text-zinc-500 transition hover:border-zinc-400 hover:text-zinc-700"
+                    type="button"
+                  >
+                    <Upload className="size-5" />
+                    CSVファイルを選択
+                  </button>
+                  {csvText ? (
+                    <div>
+                      <p className="mb-1 text-xs text-zinc-500">テキストで貼り付けることもできます:</p>
+                      <textarea
+                        className="h-28 w-full rounded-lg border border-zinc-200 p-2 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-zinc-950"
+                        value={csvText}
+                        onChange={(e) => { setCsvText(e.target.value); setParsedRows(parseCsv(e.target.value, staff)); }}
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="mb-1 text-xs text-zinc-500">またはここに直接貼り付け:</p>
+                      <textarea
+                        className="h-28 w-full rounded-lg border border-zinc-200 p-2 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-zinc-950"
+                        placeholder={"田中 太郎,2025-05-12,10:00,19:00,60\n鈴木 花子,2025-05-12,10:00,18:00,60"}
+                        value={csvText}
+                        onChange={(e) => { setCsvText(e.target.value); setParsedRows(parseCsv(e.target.value, staff)); }}
+                      />
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
+              {/* ===== テキストタブ ===== */}
+              {importTab === "text" ? (
+                <div className="flex flex-col gap-4">
+                  <div className="rounded-lg bg-violet-50 px-4 py-3 text-xs text-violet-700">
+                    <p className="font-semibold">✦ AIが自動解析します — 自由形式で入力OK</p>
+                    <p className="mt-1">例: 「田中 5/12 10〜19時 休憩1時間」「鈴木さん 12日 10:00-18:00」</p>
+                  </div>
+                  <textarea
+                    className="h-36 w-full rounded-lg border border-zinc-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-950"
+                    placeholder={"田中 太郎 5/12 10時〜19時 休憩60分\n鈴木 花子 5/13 10:00-18:00\n..."}
+                    value={freeText}
+                    onChange={(e) => { setFreeText(e.target.value); setParsedRows([]); }}
+                  />
+                  <Button
+                    onClick={() => void parseWithAi("text")}
+                    disabled={!freeText.trim() || parsing}
+                    className="self-start"
+                    type="button"
+                  >
+                    {parsing ? "解析中…" : "AIで解析"}
+                  </Button>
+                </div>
+              ) : null}
+
+              {/* ===== 画像タブ ===== */}
+              {importTab === "image" ? (
+                <div className="flex flex-col gap-4">
+                  <div className="rounded-lg bg-violet-50 px-4 py-3 text-xs text-violet-700">
+                    <p className="font-semibold">✦ シフト表の写真・スクリーンショットをアップロード</p>
+                    <p className="mt-1">Claude Vision APIがシフト内容を読み取り、自動でインポートデータを生成します</p>
+                  </div>
+                  <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageFileChange} />
+                  {imageDataUrl ? (
+                    <div className="flex flex-col gap-3">
+                      <img src={imageDataUrl} alt="シフト表プレビュー" className="max-h-48 rounded-lg border border-zinc-200 object-contain" />
+                      <p className="text-xs text-zinc-500">{imageFileName}</p>
+                      <div className="flex gap-2">
+                        <Button onClick={() => void parseWithAi("image")} disabled={parsing} type="button">
+                          {parsing ? "解析中…" : "AIで読み取り"}
+                        </Button>
+                        <Button variant="outline" onClick={() => { setImageDataUrl(null); setImageFileName(""); setParsedRows([]); }} type="button">
+                          画像を変更
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => imageInputRef.current?.click()}
+                      className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-zinc-300 px-4 py-10 text-sm text-zinc-500 transition hover:border-zinc-400 hover:text-zinc-700"
+                      type="button"
+                    >
+                      <FileImage className="size-6" />
+                      画像ファイルを選択（JPG / PNG）
+                    </button>
+                  )}
+                </div>
+              ) : null}
+
+              {/* エラー表示 */}
+              {importError ? (
+                <div className="mt-4 flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                  <pre className="whitespace-pre-wrap text-xs">{importError}</pre>
+                </div>
+              ) : null}
+
+              {/* 成功表示 */}
+              {importSuccess ? (
+                <div className="mt-4 rounded-lg bg-green-50 px-3 py-2.5 text-sm font-medium text-green-700">
+                  ✓ {importSuccess}
+                </div>
+              ) : null}
+
+              {/* ===== プレビューテーブル ===== */}
+              {parsedRows.length > 0 ? (
+                <div className="mt-5">
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-sm font-semibold">解析結果 — {parsedRows.length}件</p>
+                    <p className="text-xs text-zinc-500">
+                      インポート可能: <span className="font-semibold text-zinc-900">{parsedRows.filter((r) => r.staff_id && !r.match_error).length}件</span>
+                      {parsedRows.some((r) => r.match_error) ? <span className="ml-2 text-red-600">エラー: {parsedRows.filter((r) => r.match_error).length}件</span> : null}
+                    </p>
+                  </div>
+                  <div className="max-h-52 overflow-y-auto rounded-lg border border-zinc-200">
+                    <table className="w-full text-xs">
+                      <thead className="sticky top-0 bg-zinc-50">
+                        <tr className="border-b border-zinc-200">
+                          <th className="px-3 py-2 text-left font-semibold text-zinc-600">スタッフ</th>
+                          <th className="px-3 py-2 text-left font-semibold text-zinc-600">日付</th>
+                          <th className="px-3 py-2 text-left font-semibold text-zinc-600">開始</th>
+                          <th className="px-3 py-2 text-left font-semibold text-zinc-600">終了</th>
+                          <th className="px-3 py-2 text-left font-semibold text-zinc-600">休憩</th>
+                          <th className="px-3 py-2 text-left font-semibold text-zinc-600">メモ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {parsedRows.map((row, i) => (
+                          <tr key={i} className={`border-b border-zinc-100 last:border-0 ${row.match_error ? "bg-red-50" : ""}`}>
+                            <td className="px-3 py-2">
+                              {row.match_error ? (
+                                <span className="text-red-600" title={row.match_error}>{row.staff_name} ⚠</span>
+                              ) : (
+                                <span className="text-zinc-900">{row.staff_name}</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-zinc-700">{row.shift_date}</td>
+                            <td className="px-3 py-2 text-zinc-700">{row.start_time}</td>
+                            <td className="px-3 py-2 text-zinc-700">{row.end_time}</td>
+                            <td className="px-3 py-2 text-zinc-500">{row.break_minutes}分</td>
+                            <td className="px-3 py-2 text-zinc-400">{row.note}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* インポート実行ボタン */}
+                  <div className="mt-4 flex items-center justify-end gap-3">
+                    <Button variant="outline" onClick={() => { setImportOpen(false); resetImport(); }} type="button">
+                      キャンセル
+                    </Button>
+                    <Button
+                      onClick={() => void executeImport()}
+                      disabled={importing || parsedRows.filter((r) => r.staff_id && !r.match_error).length === 0}
+                      type="button"
+                    >
+                      {importing ? "インポート中…" : `${parsedRows.filter((r) => r.staff_id && !r.match_error).length}件をインポート`}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
         </div>
       ) : null}
     </div>
