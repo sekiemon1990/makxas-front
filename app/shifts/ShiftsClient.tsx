@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, BarChart2, ChevronLeft, ChevronRight, Clock, FileImage, FileText, Plus, Table, Upload, X } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ type CalendarEvent = {
   status: string;
   staff?: Pick<Staff, "id" | "name"> | null;
 };
+
 
 const DAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -148,6 +150,7 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
   const [monthRef, setMonthRef] = useState<Date>(() => new Date());
   const [shifts, setShifts] = useState<ShiftWithStaff[]>([]);
   const [calEvents, setCalEvents] = useState<CalendarEvent[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<AddModalState>(MODAL_INIT);
   const [saving, setSaving] = useState(false);
@@ -176,6 +179,7 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
     setParsedRows([]); setParsing(false); setImporting(false);
     setImportError(null); setImportSuccess(null);
   };
+
 
   const weekDays = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
@@ -210,6 +214,7 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
     setLoading(false);
   }, [fetchFrom, fetchTo]);
 
+
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void loadShifts(); }, [loadShifts]);
 
@@ -219,6 +224,7 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
   const prevMonth = () => setMonthRef((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1));
   const nextMonth = () => setMonthRef((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1));
   const thisMonth = () => setMonthRef(new Date());
+
 
   const openModal = (staffId: string, date: string) => {
     setModal({ ...MODAL_INIT, open: true, staffId, date });
@@ -345,6 +351,7 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
       return e.staff_id === staffId && d >= fromYmd && d <= toYmd_;
     });
 
+
   // 表示する曜日ラベル（月〜日）
   const dateLabel = (d: Date) => {
     const dow = DAY_LABELS[d.getDay()] ?? "";
@@ -371,6 +378,7 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
               <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-blue-200" />IS（内勤）</span>
               <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-green-200" />FS（外勤・Googleカレンダー連携）</span>
             </div>
+
           </div>
           <div className="flex items-center gap-2">
             <Link
@@ -396,6 +404,7 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
               <Upload className="size-4" />
               一括インポート
             </button>
+
             <select
               value={filterStaffId}
               onChange={(e) => setFilterStaffId(e.target.value)}
@@ -450,6 +459,7 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
         </div>
 
         {/* ローディング */}
+
         {loading ? (
           <div className="flex items-center gap-2 py-8 text-sm text-zinc-400">
             <Clock className="size-4 animate-spin" />読み込み中...
@@ -719,6 +729,7 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
             ) : null}
           </>
         )}
+
       </div>
 
       {/* シフト追加モーダル */}
@@ -1007,6 +1018,7 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
           </div>
         </div>
       ) : null}
+
     </div>
   );
 }

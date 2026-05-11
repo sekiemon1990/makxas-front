@@ -16,6 +16,7 @@ import {
   Menu,
   MessageCircle,
   Send,
+  Sparkles,
   Tag,
   X,
 } from "lucide-react";
@@ -675,6 +676,7 @@ export function RealtimeInbox({
         setLastSentMsgId(payload.message.id as string);
         setShowEditReasonPrompt(true);
         setTimeout(() => setShowEditReasonPrompt(false), 10000);
+
       }
       // AI state をリセット（次の受信まで提案なし）
       setAiOriginalBody(null);
@@ -1259,6 +1261,7 @@ export function RealtimeInbox({
                         </svg>
                         <span className="font-medium">AIが返信文を生成中...</span>
                         <span className="text-violet-400">しばらくお待ちください</span>
+
                       </div>
                     ) : aiSuggest?.mode === "auto" && aiOriginalBody ? (
                       <>
@@ -1355,6 +1358,7 @@ export function RealtimeInbox({
                               </button>
                             );
                           })}
+
                         </div>
                       </div>
                     ) : null}
@@ -1444,6 +1448,7 @@ export function RealtimeInbox({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         {/* ✦ AI自由相談ボタン（テーマチップでは対応できない複雑なケース向け） */}
+
                         <Button
                           className={cn(
                             "h-7 gap-1 px-2.5 text-xs",
@@ -1459,6 +1464,7 @@ export function RealtimeInbox({
                         >
                           <MessageCircle className="size-3" />
                           {aiPanelOpen ? "相談中…" : "AIに質問"}
+
                         </Button>
                         {templates.length > 0 ? (
                           <Button className="h-7 gap-1 px-2 text-xs" onClick={() => setShowTemplates((v) => !v)} size="sm" type="button" variant="outline">
