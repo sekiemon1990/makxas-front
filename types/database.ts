@@ -498,6 +498,10 @@ export type Database = {
           final_theme: string | null;
           ai_edited: boolean | null;
           ai_original_body: string | null;
+          // AI学習システム（migration 012）
+          ai_edit_reason: string | null;
+          ai_auto_sent: boolean;
+          prompt_version_id: string | null;
         };
         Insert: {
           id?: string;
@@ -517,6 +521,10 @@ export type Database = {
           final_theme?: string | null;
           ai_edited?: boolean | null;
           ai_original_body?: string | null;
+          // AI学習システム（migration 012）
+          ai_edit_reason?: string | null;
+          ai_auto_sent?: boolean;
+          prompt_version_id?: string | null;
         };
         Update: {
           id?: string;
@@ -536,6 +544,10 @@ export type Database = {
           final_theme?: string | null;
           ai_edited?: boolean | null;
           ai_original_body?: string | null;
+          // AI学習システム（migration 012）
+          ai_edit_reason?: string | null;
+          ai_auto_sent?: boolean;
+          prompt_version_id?: string | null;
         };
         Relationships: [
           {
@@ -915,4 +927,36 @@ export type AssignmentRule = {
   priority: number;
   is_active: boolean;
   created_at: string;
+};
+
+// AI学習自動化システム（migration 012）
+export type PromptVersion = {
+  id: string; msg_category: string; theme: string | null;
+  prompt_type: string; content: string; version: number;
+  is_active: boolean; total_uses: number; edit_count: number;
+  edit_rate: number | null; created_by: string; note: string | null;
+  activated_at: string | null; deactivated_at: string | null; created_at: string;
+};
+export type ReplyExample = {
+  id: string; msg_category: string; theme: string;
+  customer_message: string; reply_body: string;
+  was_ai_generated: boolean; edit_distance: number | null;
+  ai_edit_reason: string | null; was_auto_sent: boolean;
+  quality_score: number | null; is_selected_for_prompt: boolean;
+  message_id: string | null; inquiry_id: string | null; created_at: string;
+};
+export type AiLearningRun = {
+  id: string; trigger: string; status: string;
+  messages_analyzed: number | null; date_range_start: string | null;
+  date_range_end: string | null; categories_improved: string[] | null;
+  new_examples_added: number | null; prompts_updated: number | null;
+  summary: Record<string, unknown> | null; error_message: string | null;
+  started_at: string; completed_at: string | null;
+};
+export type AutoSendRule = {
+  id: string; msg_category: string; auto_send_enabled: boolean;
+  edit_rate_threshold: number; min_sample_size: number;
+  review_delay_minutes: number; channel: string | null;
+  current_edit_rate: number | null; current_sample_count: number | null;
+  last_evaluated_at: string | null; updated_at: string;
 };
