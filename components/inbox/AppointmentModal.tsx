@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -42,6 +42,34 @@ export function AppointmentModal({
   const [method, setMethod] = useState<"visit" | "delivery">("visit");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // FS スタッフの稼働状況（日付選択時に取得）
+  type FsEvent = { id: string; title: string | null; start_at: string; end_at: string; all_day: boolean; staff?: { name: string } | null };
+  type FsStaff = { id: string; name: string; events: FsEvent[] };
+  const [fsAvailability, setFsAvailability] = useState<FsStaff[]>([]);
+  const [fsLoading, setFsLoading] = useState(false);
+
+  // 日付が変わったら FS スタッフの予定を取得
+  useEffect(() => {
+    if (!date) { setFsAvailability([]); return; }
+    setFsLoading(true);
+    void fetch(`/api/calendar/events?from=${date}&to=${date}`)
+      .then((r) => r.json())
+      .then((d: { events?: (FsEvent & { staff?: { id: string; name: string; team: string } | null })[] }) => {
+        // FS スタッフごとにグループ化
+        const map = new Map<string, FsStaff>();
+        for (const ev of d.events ?? []) {
+          if (!ev.staff?.id) continue;
+          if (!map.has(ev.staff.id)) {
+            map.set(ev.staff.id, { id: ev.staff.id, name: ev.staff.name, events: [] });
+          }
+          map.get(ev.staff.id)!.events.push(ev);
+        }
+        setFsAvailability([...map.values()]);
+      })
+      .finally(() => setFsLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date]);
 
   const handleSave = async () => {
     if (!inquiry || !date || !time) {
@@ -108,6 +136,43 @@ export function AppointmentModal({
               />
             </Field>
           </div>
+
+          {/* FS スタッフの稼働状況 */}
+          {date ? (
+            <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-zinc-600">
+                <span className="inline-block h-2 w-2 rounded-full bg-green-400" />
+                FS（外勤）スタッフの予定 — {date}
+              </p>
+              {fsLoading ? (
+                <p className="text-xs text-zinc-400">読み込み中…</p>
+              ) : fsAvailability.length === 0 ? (
+                <p className="text-xs text-zinc-400">登録済みのFSスタッフの予定はありません</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {fsAvailability.map((fs) => (
+                    <div key={fs.id} className="flex items-start gap-2">
+                      <span className="w-20 shrink-0 text-xs font-medium text-zinc-700">{fs.name}</span>
+                      <div className="flex flex-wrap gap-1">
+                        {fs.events.length === 0 ? (
+                          <span className="rounded bg-green-100 px-1.5 py-0.5 text-[10px] text-green-700">予定なし（稼働可）</span>
+                        ) : fs.events.map((ev) => {
+                          const start = ev.all_day ? "終日" : new Date(ev.start_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", hour12: false });
+                          const end   = ev.all_day ? "" : `〜${new Date(ev.end_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", hour12: false })}`;
+                          return (
+                            <span key={ev.id} className="rounded bg-orange-100 px-1.5 py-0.5 text-[10px] text-orange-700" title={ev.title ?? ""}>
+                              {start}{end} {ev.title ? `(${ev.title.slice(0, 12)}${ev.title.length > 12 ? "…" : ""})` : ""}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : null}
+
           <Field label="品目カテゴリ">
             <Select value={category} onValueChange={setCategory}>
               <SelectTrigger className="w-full">
