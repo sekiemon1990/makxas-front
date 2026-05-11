@@ -45,7 +45,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <div className="flex min-h-screen flex-col bg-zinc-50 text-zinc-950 md:flex-row">
+    <div className="flex h-screen flex-col overflow-hidden bg-zinc-50 text-zinc-950 md:flex-row">
       {/* デスクトップサイドバー */}
       <aside className="hidden w-[220px] shrink-0 flex-col border-r border-zinc-200 bg-white md:flex">
         <Link
@@ -104,7 +104,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Link>
       </header>
 
-      <main className="min-w-0 flex-1 pb-16 md:pb-0">{children}</main>
+      <main className="flex min-w-0 flex-1 flex-col overflow-y-auto pb-16 md:pb-0">{children}</main>
       <FloatingWidget />
 
       {/* モバイルボトムナビ */}
