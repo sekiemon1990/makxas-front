@@ -1558,6 +1558,7 @@ function FeedbackSection() {
       .finally(() => setLoading(false));
   };
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, []);
 
   const toggle = async (item: FeedbackLog) => {
