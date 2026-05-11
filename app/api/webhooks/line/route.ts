@@ -115,6 +115,28 @@ export async function POST(request: NextRequest) {
           console.error("LINE AI reply suggestion failed", error);
         });
 
+        // テキストメッセージから商品情報をAI抽出（非同期・失敗しても無視）
+        if (event.message?.type === "text" && event.message.text) {
+          void (async () => {
+            try {
+              const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.VERCEL_URL
+                ? `https://${process.env.VERCEL_URL}`
+                : "http://localhost:3000";
+              await fetch(`${baseUrl}/api/ai/extract-items`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  inquiry_id: inquiry.id,
+                  lead_id: lead.id,
+                  text: event.message!.text,
+                }),
+              });
+            } catch {
+              // 抽出失敗は無視（非クリティカル）
+            }
+          })();
+        }
+
         await supabase
           .from("inquiries")
           .update({ updated_at: new Date().toISOString() })

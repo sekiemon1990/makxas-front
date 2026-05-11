@@ -12,6 +12,7 @@ const PUBLIC_PREFIXES = [
   "/api/cron",
   "/api/ai/learning/run",
   "/api/ai/analyze-edit",
+  "/api/ai/extract-items",
 ];
 
 export async function middleware(request: NextRequest) {

@@ -8,8 +8,6 @@ import {
   CalendarPlus,
   ChevronLeft,
   ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Download,
   FileText,
   Image as ImageIcon,
@@ -17,8 +15,6 @@ import {
   Mail,
   Menu,
   MessageCircle,
-  PanelRightClose,
-  PanelRightOpen,
   Send,
   Sparkles,
   Tag,
@@ -28,6 +24,7 @@ import {
 import { ChannelBadge, StatusBadge } from "@/components/badges";
 import { AiSuggestPanel } from "@/components/inbox/AiSuggestPanel";
 import { AppointmentModal } from "@/components/inbox/AppointmentModal";
+import { InquiryItemsPanel } from "@/components/inbox/InquiryItemsPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -196,9 +193,9 @@ export function RealtimeInbox({
   const [aiPanelDraft, setAiPanelDraft] = useState<string | null>(null);
   const [aiPanelDraftKey, setAiPanelDraftKey] = useState(0);
   const [aiPanelThemeName, setAiPanelThemeName] = useState<string | null>(null);
-  // レイアウト折りたたみ
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  // ドロワートグル
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [reminderOpen, setReminderOpen] = useState(false);
   // ⑬ モバイルスワイプ
   const swipeStartX = useRef<number | null>(null);
   const swipeStartY = useRef<number | null>(null);
@@ -854,110 +851,20 @@ export function RealtimeInbox({
         </span>
       </div>
 
-      <div className={cn(
-        "flex min-h-0 flex-1 overflow-hidden",
-        sidebarCollapsed
-          ? "md:grid md:grid-cols-[minmax(200px,280px)_1fr]"
-          : "md:grid md:grid-cols-[180px_minmax(200px,280px)_1fr]"
-      )}>
-        {/* サイドバー */}
-        <aside className={cn("overflow-y-auto border-r border-zinc-200 bg-white", (mobilePanel !== "sidebar" || sidebarCollapsed) && "hidden md:block", sidebarCollapsed && "md:hidden")}>
-          <div className="border-b border-zinc-200 px-4 py-3">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-400">Inbox</span>
-              <span className="text-zinc-300">/</span>
-              <h1 className="text-sm font-semibold text-zinc-800">統合インボックス</h1>
-            </div>
-          </div>
-          <div className="space-y-4 p-3">
-            <FilterSection title="店舗フィルター">
-              {canUseAllStores ? (
-                <FilterButton active={initialStore === "all"} onClick={() => updateQuery({ store: "all", id: null })}>
-                  全店舗
-                </FilterButton>
-              ) : null}
-              {stores.map((store) => (
-                <FilterButton key={store.id} active={initialStore === store.id} onClick={() => updateQuery({ store: store.id, id: null })}>
-                  {store.name}
-                </FilterButton>
-              ))}
-            </FilterSection>
-            {currentStaffId ? (
-              <FilterSection title="担当者フィルター">
-                <FilterButton active={initialAssignee === "all"} onClick={() => updateQuery({ assignee: "all", id: null })}>
-                  全員
-                </FilterButton>
-                <FilterButton active={initialAssignee === "mine"} onClick={() => updateQuery({ assignee: "mine", id: null })}>
-                  自分の担当のみ
-                </FilterButton>
-              </FilterSection>
-            ) : null}
-            <FilterSection title="ステータスフィルター">
-              {statusFilters.map((filter) => (
-                <FilterButton key={filter.value} active={initialStatus === filter.value} onClick={() => updateQuery({ status: filter.value, id: null })}>
-                  {filter.label}
-                </FilterButton>
-              ))}
-            </FilterSection>
-            <FilterSection title="チャネルフィルター">
-              <FilterButton active={initialChannel === "all"} onClick={() => updateQuery({ channel: "all", id: null })}>
-                全て
-              </FilterButton>
-              {channelFilters.map((channel) => (
-                <FilterButton key={channel} active={initialChannel === channel} onClick={() => updateQuery({ channel, id: null })}>
-                  <ChannelBadge channel={channel} />
-                  <span>{channelMeta[channel].label}</span>
-                </FilterButton>
-              ))}
-            </FilterSection>
-            {/* ⑦ プッシュ通知設定 */}
-            <FilterSection title="通知設定">
-              {notifPermission === "granted" ? (
-                <p className="flex items-center gap-2 px-3 text-xs text-emerald-600">
-                  <Bell className="size-3.5" />
-                  プッシュ通知 ON
-                </p>
-              ) : notifPermission === "denied" ? (
-                <p className="px-3 text-xs text-zinc-400">ブラウザでブロックされています</p>
-              ) : (
-                <button
-                  className="flex h-9 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-medium text-zinc-600 transition hover:bg-zinc-100"
-                  onClick={requestNotifPermission}
-                  type="button"
-                >
-                  <Bell className="size-4" />
-                  プッシュ通知を有効にする
-                </button>
-              )}
-            </FilterSection>
-          </div>
-        </aside>
-
+      <div className="flex min-h-0 flex-1 overflow-hidden md:grid md:grid-cols-[minmax(260px,340px)_1fr]">
         {/* 一覧カラム */}
         <section className={cn("overflow-y-auto border-r border-zinc-200 bg-zinc-50", mobilePanel !== "list" && "hidden md:block")}>
-          <div className="sticky top-0 z-10 border-b border-zinc-200 bg-zinc-50/95 px-4 py-3 backdrop-blur">
-            <div className="flex items-center justify-between gap-3">
+          <div className="sticky top-0 z-10 border-b border-zinc-200 bg-zinc-50/95 px-3 py-2.5 backdrop-blur space-y-2">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                {/* サイドバー折りたたみボタン（デスクトップのみ） */}
-                <button
-                  className="hidden md:flex items-center justify-center size-6 rounded text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700 transition"
-                  onClick={() => setSidebarCollapsed(v => !v)}
-                  title={sidebarCollapsed ? "フィルターを表示" : "フィルターを非表示"}
-                  type="button"
-                >
-                  {sidebarCollapsed ? <ChevronsRight className="size-3.5" /> : <ChevronsLeft className="size-3.5" />}
-                </button>
                 <h2 className="text-sm font-semibold text-zinc-900">反響一覧</h2>
-                <span className="text-xs text-zinc-400">
-                  {totalCount}件
-                </span>
+                <span className="text-xs text-zinc-400">{totalCount}件</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Badge variant="outline" className="rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-emerald-600 border-emerald-200">
                   <span className="mr-1 size-1.5 rounded-full bg-emerald-400 inline-block" />
                   Live
                 </Badge>
-                {/* ⑥ ショートカットヘルプボタン */}
                 <button
                   className="flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-50"
                   onClick={() => setShowShortcuts(true)}
@@ -969,19 +876,81 @@ export function RealtimeInbox({
                 </button>
               </div>
             </div>
-            {/* ⑬ モバイル向けスワイプ説明 */}
-            <p className="mt-2 text-[11px] text-zinc-400 md:hidden">
+            <input
+              className="h-8 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="件名・顧客名・電話・メールで検索"
+              type="search"
+              value={searchQuery}
+            />
+            {/* フィルターチップ */}
+            <div className="flex flex-wrap gap-1.5">
+              <Select value={initialStatus} onValueChange={(v) => updateQuery({ status: v, id: null })}>
+                <SelectTrigger className="h-7 w-auto rounded-full border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-600 gap-1 [&>svg]:size-3">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusFilters.map((f) => (
+                    <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={initialChannel} onValueChange={(v) => updateQuery({ channel: v, id: null })}>
+                <SelectTrigger className="h-7 w-auto rounded-full border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-600 gap-1 [&>svg]:size-3">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全チャンネル</SelectItem>
+                  {channelFilters.map((ch) => (
+                    <SelectItem key={ch} value={ch}>{channelMeta[ch].label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {stores.length > 1 || canUseAllStores ? (
+                <Select value={initialStore} onValueChange={(v) => updateQuery({ store: v, id: null })}>
+                  <SelectTrigger className="h-7 w-auto rounded-full border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-600 gap-1 [&>svg]:size-3">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {canUseAllStores ? <SelectItem value="all">全店舗</SelectItem> : null}
+                    {stores.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : null}
+              {currentStaffId ? (
+                <button
+                  className={cn(
+                    "h-7 rounded-full border px-3 text-xs font-medium transition",
+                    initialAssignee === "mine"
+                      ? "border-violet-400 bg-violet-50 text-violet-700"
+                      : "border-zinc-200 bg-white text-zinc-600 hover:border-violet-300 hover:text-violet-600",
+                  )}
+                  onClick={() => updateQuery({ assignee: initialAssignee === "mine" ? "all" : "mine", id: null })}
+                  type="button"
+                >
+                  {initialAssignee === "mine" ? "自分のみ ✓" : "自分のみ"}
+                </button>
+              ) : null}
+              {notifPermission !== "granted" && notifPermission !== "denied" ? (
+                <button
+                  className="h-7 rounded-full border border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-500 hover:bg-zinc-50 flex items-center gap-1"
+                  onClick={requestNotifPermission}
+                  type="button"
+                >
+                  <Bell className="size-3" />
+                  通知ON
+                </button>
+              ) : notifPermission === "granted" ? (
+                <span className="h-7 flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 text-xs text-emerald-600">
+                  <Bell className="size-3" />通知ON
+                </span>
+              ) : null}
+            </div>
+            <p className="text-[11px] text-zinc-400 md:hidden">
               ← スワイプで保留 ／ スワイプで対応中 →
             </p>
-            <div className="mt-3">
-              <input
-                className="h-8 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-300"
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="件名・顧客名・電話・メールで検索"
-                type="search"
-                value={searchQuery}
-              />
-            </div>
           </div>
           <div className="space-y-2 p-3">
             {filteredItems.map((item) => (
@@ -1074,6 +1043,15 @@ export function RealtimeInbox({
                           <span className="truncate">{item.staff.name}</span>
                         </>
                       ) : null}
+                      {item.lead_id ? (
+                        <a
+                          href={`/leads/${item.lead_id}`}
+                          className="ml-auto text-[10px] text-zinc-400 hover:text-violet-600 transition-colors shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          リード→
+                        </a>
+                      ) : null}
                     </span>
                   </div>
                 </button>
@@ -1124,32 +1102,54 @@ export function RealtimeInbox({
         <section className={cn("relative flex min-w-0 flex-col bg-white overflow-hidden", mobilePanel !== "detail" && "hidden md:flex")}>
           {selectedInquiry ? (
             <>
-              <div className="sticky top-0 z-10 border-b border-zinc-200 bg-white px-5 py-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
+              <div className="sticky top-0 z-10 border-b border-zinc-200 bg-white px-4 py-2.5">
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <ChannelBadge channel={selectedInquiry.channel} showLabel />
-                      <StatusBadge status={selectedInquiry.status} />
+                    {selectedInquiry.lead_id ? (
+                      <a
+                        href={`/leads/${selectedInquiry.lead_id}`}
+                        className="text-xs font-medium text-zinc-700 hover:text-violet-600 hover:underline transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {getCustomerName(selectedInquiry)}
+                      </a>
+                    ) : (
+                      <span className="text-xs font-medium text-zinc-700">{getCustomerName(selectedInquiry)}</span>
+                    )}
+                      {(selectedInquiry.brands?.name ?? selectedInquiry.stores?.name) ? (
+                        <span className="text-xs text-zinc-400">{selectedInquiry.brands?.name ?? selectedInquiry.stores?.name}</span>
+                      ) : null}
+                      <span className="text-xs text-zinc-400">{formatDateTime(selectedInquiry.created_at)}</span>
                     </div>
-                    <h2 className="mt-1.5 truncate text-base font-semibold tracking-tight text-zinc-900">
+                    <h2 className="mt-0.5 truncate text-sm font-bold tracking-tight text-zinc-900">
                       {selectedInquiry.subject ?? "件名なし"}
                     </h2>
-                    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-zinc-500">
-                      <span className="font-medium text-zinc-700">{getCustomerName(selectedInquiry)}</span>
-                      {(selectedInquiry.brands?.name ?? selectedInquiry.stores?.name) ? (
-                        <>
-                          <span className="text-zinc-300">·</span>
-                          <span>{selectedInquiry.brands?.name ?? selectedInquiry.stores?.name}</span>
-                        </>
-                      ) : null}
-                      <span className="text-zinc-300">·</span>
-                      <span>{formatDateTime(selectedInquiry.created_at)}</span>
-                    </p>
                   </div>
-                  <Button size="sm" className="shrink-0" onClick={() => setAppointmentOpen(true)}>
-                    <CalendarPlus className="size-3.5" aria-hidden="true" />
-                    アポ設定
-                  </Button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Select value={selectedInquiry.status} onValueChange={(value) => handleStatusChange(value as InquiryStatus)}>
+                      <SelectTrigger className="h-8 w-28 bg-white text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {statusFilters.filter((filter) => filter.value !== "all").map((filter) => (
+                          <SelectItem key={filter.value} value={filter.value}>{filter.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={selectedInquiry.assigned_to ?? "unassigned"} onValueChange={handleAssignChange}>
+                      <SelectTrigger className="h-8 w-24 bg-white text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">未アサイン</SelectItem>
+                        {staff.map((member) => (
+                          <SelectItem key={member.id} value={member.id}>{member.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button size="sm" className="shrink-0 h-8" onClick={() => setAppointmentOpen(true)}>
+                      <CalendarPlus className="size-3.5" aria-hidden="true" />
+                      アポ設定
+                    </Button>
+                  </div>
                 </div>
               </div>
 
@@ -1292,491 +1292,409 @@ export function RealtimeInbox({
                 </div>
               </div>
 
+              {/* 商品情報パネル */}
+              <div className="border-t border-zinc-200 px-4 pt-3">
+                <InquiryItemsPanel
+                  inquiryId={selectedInquiry.id}
+                  leadId={selectedInquiry.lead_id}
+                />
+              </div>
+
               {/* 返信・操作エリア */}
-              <div className="border-t border-zinc-200 bg-zinc-50/80 px-4 py-3">
-                <div className={cn("grid gap-3", rightPanelOpen ? "grid-cols-[1fr_200px]" : "grid-cols-[1fr]")}>
-                  <div className="space-y-3">
-                    {/* ⑪ 送信待ち画像プレビュー */}
-                    {imageFiles.length > 0 ? (
-                      <div className="flex flex-wrap gap-2 rounded-md border border-zinc-200 bg-white p-2">
-                        {imageFiles.map((f, i) => (
-                          <div key={i} className="relative">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={URL.createObjectURL(f)}
-                              alt={f.name}
-                              className="size-14 rounded object-cover"
-                            />
-                            <button
-                              className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-red-500 text-white"
-                              onClick={() => setImageFiles((prev) => prev.filter((_, j) => j !== i))}
-                              type="button"
-                            >
-                              <X className="size-2.5" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-                    {/* ── AI返信提案エリア（ユーザー操作後のみ表示） ── */}
-                    {aiLoading ? (
-                      /* テーマ取得中スピナー（ボタン押下後のみ表示） */
-                      <div className="flex items-center gap-2 rounded-lg border border-violet-100 bg-violet-50/60 px-3 py-2 text-xs text-violet-500">
-                        <svg className="size-3 animate-spin text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                        <span>AIが分析中...</span>
-                      </div>
-                    ) : aiSuggest && (aiSuggest.mode === "themes" || aiSuggest.mode === "auto") ? (
-                      /* テーマチップ（ボタン押下後に表示） */
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-1.5 text-[10px] text-violet-500 font-medium">
-                          <Sparkles className="size-3 shrink-0" />
-                          パターンを選択してください
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {[...aiSuggest.themes].sort((a, b) => b.confidence - a.confidence).map((t, i) => {
-                            const isTop = i === 0;
-                            const isSelected = aiCurrentTheme === t.key;
-                            return (
-                              <button
-                                key={t.key}
-                                className={cn(
-                                  "rounded-full border font-medium transition",
-                                  isSelected
-                                    ? "border-violet-500 bg-violet-500 text-white px-3 py-1 text-xs"
-                                    : isTop
-                                    ? "border-violet-400 bg-violet-50 text-violet-700 px-3 py-1 text-xs hover:bg-violet-100"
-                                    : "border-zinc-200 bg-white text-zinc-500 px-2.5 py-0.5 text-[11px] hover:border-violet-300 hover:text-violet-600",
-                                )}
-                                onClick={async () => {
-                                  setAiCurrentTheme(t.key);
-                                  setAiLoading(true);
-                                  try {
-                                    const res = await fetch("/api/ai/suggest", {
-                                      method: "POST",
-                                      headers: { "Content-Type": "application/json" },
-                                      body: JSON.stringify({ inquiry_id: selectedInquiry.id, force_theme: t.key }),
-                                    });
-                                    const data = await res.json() as import("@/app/api/ai/suggest/route").AiSuggestResult;
-                                    if (data.body) {
-                                      setAiSuggest(data);
-                                      setAiPanelDraft(data.body);
-                                      setAiPanelThemeName(t.label);
-                                      setAiPanelDraftKey(k => k + 1);
-                                      setAiPanelOpen(true);
-                                    }
-                                  } finally { setAiLoading(false); }
-                                }}
-                                type="button"
-                              >
-                                {isTop && !isSelected && <span className="mr-1 text-[10px] opacity-60">おすすめ</span>}
-                                {t.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : null}
-                    {/* ── /AI返信提案エリア ── */}
-
-                    {/* AI編集理由タグUI */}
-                    {showEditReasonPrompt && (
-                      <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs">
-                        <span className="shrink-0 font-medium text-violet-700">修正理由（任意）：</span>
-                        {(["tone", "missing_info", "wrong_theme", "factual", "length", "other"] as const).map((r) => (
-                          <button
-                            key={r}
-                            className="rounded-full border border-violet-300 bg-white px-2 py-0.5 text-[10px] text-violet-700 hover:bg-violet-100"
-                            onClick={() => {
-                              if (lastSentMsgId) {
-                                void fetch(`/api/messages/${lastSentMsgId}/edit-reason`, {
-                                  method: "PATCH",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ ai_edit_reason: r }),
-                                });
-                              }
-                              setShowEditReasonPrompt(false);
-                            }}
-                            type="button"
-                          >
-                            {({ tone: "語調", missing_info: "情報不足", wrong_theme: "テーマ違い", factual: "事実誤り", length: "長さ", other: "その他" } as Record<string, string>)[r]}
-                          </button>
-                        ))}
-                        <button
-                          className="ml-auto text-zinc-400 hover:text-zinc-600"
-                          onClick={() => setShowEditReasonPrompt(false)}
-                          type="button"
-                        >
-                          ✕
+              <div className="border-t border-zinc-200 bg-zinc-50/80 px-4 py-3 space-y-2.5">
+                {/* タグ + 内部メモ・リマインダートグルバー */}
+                <div className="flex items-center gap-2 flex-wrap border-b border-zinc-100 pb-2">
+                  <Tag className="size-3 text-zinc-400 shrink-0" aria-hidden="true" />
+                  <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
+                    {(selectedInquiry.inquiry_tags ?? []).map((tag) => (
+                      <Badge key={tag.tag} variant="outline" className="rounded-md bg-white pr-1 text-xs">
+                        {tag.tag}
+                        <button className="ml-1 rounded hover:text-red-500" onClick={() => handleRemoveTag(tag.tag)} type="button">
+                          <X className="size-2.5" />
                         </button>
-                      </div>
-                    )}
+                      </Badge>
+                    ))}
+                    <div className="relative">
+                      <input
+                        ref={tagInputRef}
+                        className="h-6 w-28 rounded-md border border-dashed border-zinc-300 bg-transparent px-2 text-xs placeholder:text-zinc-400 focus:outline-none focus:border-zinc-400"
+                        onBlur={() => setTimeout(() => setShowTagSuggestions(false), 150)}
+                        onChange={(e) => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
+                        onFocus={() => setShowTagSuggestions(true)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && tagInput.trim()) {
+                            e.preventDefault();
+                            void handleAddTag(tagInput);
+                          }
+                        }}
+                        placeholder="+ タグ追加"
+                        value={tagInput}
+                      />
+                      {showTagSuggestions && tagSuggestions.length > 0 ? (
+                        <div className="absolute z-20 mt-1 max-h-40 w-48 overflow-y-auto rounded-md border border-zinc-200 bg-white shadow-md">
+                          {tagSuggestions.map((t) => (
+                            <button key={t} className="w-full px-3 py-1.5 text-left text-xs hover:bg-zinc-50" onMouseDown={() => handleAddTag(t)} type="button">{t}</button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 ml-auto shrink-0">
+                    <button
+                      className={cn(
+                        "h-6 rounded border px-2 text-[11px] font-medium transition flex items-center gap-1",
+                        noteOpen
+                          ? "border-amber-400 bg-amber-50 text-amber-700"
+                          : "border-zinc-200 bg-white text-zinc-500 hover:border-amber-300 hover:text-amber-600",
+                      )}
+                      onClick={() => setNoteOpen(v => !v)}
+                      type="button"
+                    >
+                      内部メモ
+                    </button>
+                    <button
+                      className={cn(
+                        "h-6 rounded border px-2 text-[11px] font-medium transition flex items-center gap-1",
+                        reminderOpen
+                          ? "border-blue-400 bg-blue-50 text-blue-700"
+                          : "border-zinc-200 bg-white text-zinc-500 hover:border-blue-300 hover:text-blue-600",
+                      )}
+                      onClick={() => setReminderOpen(v => !v)}
+                      type="button"
+                    >
+                      <Bell className="size-3" />
+                      リマインダー
+                    </button>
+                  </div>
+                </div>
 
-                    {/* メール返信時は件名フィールドを表示 */}
-                    {["email", "web_form", "hikakaku", "uridoki", "oikura"].includes(
-                      selectedInquiry.channel ?? "",
-                    ) ? (
-                      <div className="flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-2">
-                        <span className="shrink-0 text-xs font-medium text-zinc-500">件名</span>
-                        <input
-                          className="flex-1 bg-transparent text-sm outline-none placeholder:text-zinc-400"
-                          onChange={(e) => setReplySubject(e.target.value)}
-                          placeholder={selectedInquiry.subject ?? "Re: お問い合わせ"}
-                          type="text"
-                          value={replySubject}
-                        />
-                      </div>
-                    ) : null}
+                {/* 内部メモ（折りたたみ） */}
+                {noteOpen ? (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-amber-700 flex items-center gap-1.5">
+                      <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
+                      内部メモ（顧客には非表示）
+                    </label>
                     <div className="relative">
                       <Textarea
-                        ref={replyRef}
-                        className={cn(
-                          "min-h-[68px] resize-none bg-white",
-                          aiOriginalBody && "border-violet-300 bg-violet-50/30 focus-visible:ring-violet-400",
-                        )}
-                        onChange={(event) => setReplyBody(event.target.value)}
-                        placeholder="返信メッセージを入力（r キーでフォーカス）"
-                        value={replyBody}
+                        ref={noteRef}
+                        className="min-h-16 resize-none border-amber-200 bg-amber-50 placeholder:text-amber-400 focus-visible:ring-amber-300"
+                        onBlur={() => setTimeout(() => setMentionQuery(null), 150)}
+                        onChange={handleNoteChange}
+                        placeholder="スタッフ向けメモ（@名前でメンション）"
+                        value={internalNote}
                       />
-                      {/* ⑤ テンプレート変数ヒント */}
-                      {showTemplates && templates.length > 0 ? (
-                        <div className="absolute bottom-full z-20 mb-1 max-h-48 w-full overflow-y-auto rounded-md border border-zinc-200 bg-white shadow-md">
-                          {templates.map((t) => (
-                            <button
-                              key={t.id}
-                              className="w-full px-3 py-2 text-left hover:bg-zinc-50"
-                              onMouseDown={() => {
-                                // ⑤ 変数を実際の値に置換してセット
-                                const resolved = applyTemplateVars(t.body, selectedInquiry, currentStaff);
-                                setReplyBody(resolved);
-                                setShowTemplates(false);
-                              }}
-                              type="button"
-                            >
-                              <p className="text-xs font-semibold text-zinc-800">{t.name}</p>
-                              <p className="mt-0.5 truncate text-xs text-zinc-500">{t.body}</p>
+                      {mentionSuggestions.length > 0 ? (
+                        <div className="absolute bottom-full z-20 mb-1 max-h-36 w-full overflow-y-auto rounded-md border border-zinc-200 bg-white shadow-md">
+                          {mentionSuggestions.map((s) => (
+                            <button key={s.id} className="w-full px-3 py-1.5 text-left text-xs hover:bg-zinc-50" onMouseDown={() => handleInsertMention(s)} type="button">
+                              @{s.name}
                             </button>
                           ))}
                         </div>
                       ) : null}
                     </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        {/* ✦ AI下書き生成ボタン（押した時だけフェッチ） */}
-                        <Button
-                          className={cn(
-                            "h-8 gap-1 px-2.5 text-xs",
-                            aiSuggest
-                              ? "border-violet-400 bg-violet-50 text-violet-700"
-                              : "border-violet-300 text-violet-600 hover:bg-violet-50",
-                          )}
-                          disabled={aiLoading}
-                          onClick={async () => {
-                            if (aiSuggest) {
-                              // すでに取得済みならリセット（トグル）
-                              setAiSuggest(null);
-                              setAiCurrentTheme(null);
-                              return;
-                            }
-                            setAiLoading(true);
-                            try {
-                              const res = await fetch("/api/ai/suggest", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ inquiry_id: selectedInquiry.id }),
-                              });
-                              const data = await res.json() as import("@/app/api/ai/suggest/route").AiSuggestResult;
-                              setAiSuggest(data);
-                            } catch {
-                              // 失敗は無視
-                            } finally {
-                              setAiLoading(false);
-                            }
-                          }}
-                          size="sm"
-                          title="AIが返信パターンを分析してテーマチップを表示"
-                          type="button"
-                          variant="outline"
-                        >
-                          <Sparkles className="size-3.5" />
-                          {aiLoading ? "分析中..." : aiSuggest ? "AI生成済み ✕" : "AI下書き"}
-                        </Button>
-                        {/* ✦ AI自由相談ボタン */}
-                        <Button
-                          className={cn(
-                            "h-8 gap-1 px-2.5 text-xs",
-                            aiPanelOpen
-                              ? "border-violet-400 text-violet-700 bg-violet-50"
-                              : "border-zinc-200 text-zinc-600 hover:bg-zinc-50",
-                          )}
-                          onClick={() => setAiPanelOpen((v) => !v)}
-                          size="sm"
-                          title="テーマチップにない複雑なケースをAIに自由相談"
-                          type="button"
-                          variant="outline"
-                        >
-                          <MessageCircle className="size-3.5" />
-                          {aiPanelOpen ? "相談中…" : "AIに質問"}
-                        </Button>
-                        {templates.length > 0 ? (
-                          <Button className="h-8 gap-1 px-2.5 text-xs" onClick={() => setShowTemplates((v) => !v)} size="sm" type="button" variant="outline">
-                            <FileText className="size-3.5" />
-                            テンプレート
-                          </Button>
-                        ) : null}
-                        {/* ⑪ 画像送信ボタン（LINE のみ） */}
-                        {selectedInquiry.channel === "line" ? (
-                          <>
-                            <Button
-                              className="h-8 gap-1 px-2.5 text-xs"
-                              onClick={() => imageInputRef.current?.click()}
-                              size="sm"
-                              type="button"
-                              variant="outline"
-                            >
-                              <ImageIcon className="size-3.5" />
-                              画像
-                            </Button>
-                            <input
-                              ref={imageInputRef}
-                              accept="image/*"
-                              className="hidden"
-                              multiple
-                              onChange={(e) => {
-                                const files = Array.from(e.target.files ?? []);
-                                setImageFiles((prev) => [...prev, ...files]);
-                                e.target.value = "";
-                              }}
-                              type="file"
-                            />
-                          </>
-                        ) : null}
-                        {/* ⑪ 受信画像一括ダウンロード */}
-                        {inboundImageMessages.length > 0 ? (
-                          <Button
-                            className="h-8 gap-1 px-2.5 text-xs"
-                            onClick={handleDownloadImages}
-                            size="sm"
-                            type="button"
-                            variant="outline"
-                            title={`受信画像 ${inboundImageMessages.length} 枚を一括ダウンロード`}
-                          >
-                            <Download className="size-3.5" />
-                            ({inboundImageMessages.length})
-                          </Button>
-                        ) : null}
-                        {selectedInquiry.ai_suggested_reply ? (
-                          <Button
-                            className="h-8 gap-1 border-violet-300 bg-violet-50 px-2.5 text-xs text-violet-700 hover:bg-violet-100"
-                            onClick={() => {
-                              setAiPanelDraft(selectedInquiry.ai_suggested_reply!);
-                              setAiPanelThemeName(null);
-                              setAiPanelDraftKey(k => k + 1);
-                              setAiPanelOpen(true);
-                            }}
-                            size="sm"
-                            type="button"
-                            variant="outline"
-                          >
-                            ✦ AI原案を確認
-                          </Button>
-                        ) : null}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {/* 右パネル（ステータス等）トグルボタン */}
-                        <button
-                          className={cn(
-                            "hidden md:flex items-center justify-center size-8 rounded border transition",
-                            rightPanelOpen
-                              ? "border-zinc-300 bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-                              : "border-zinc-200 bg-white text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600",
-                          )}
-                          onClick={() => setRightPanelOpen(v => !v)}
-                          title={rightPanelOpen ? "ステータス・タグ・メモを非表示" : "ステータス・タグ・メモを表示"}
-                          type="button"
-                        >
-                          {rightPanelOpen ? <PanelRightClose className="size-3.5" /> : <PanelRightOpen className="size-3.5" />}
-                        </button>
-                        {/* ⑪ 画像送信ボタン */}
-                        {imageFiles.length > 0 ? (
-                          <Button
-                            className="h-8 gap-1 text-xs"
-                            disabled={sendingImages}
-                            onClick={handleSendImages}
-                            size="sm"
-                            type="button"
-                            variant="outline"
-                          >
-                            <ImageIcon className="size-3.5" aria-hidden="true" />
-                            {sendingImages ? "送信中..." : `画像送信 (${imageFiles.length}枚)`}
-                          </Button>
-                        ) : null}
-                        <Button className="h-8 gap-1.5 px-4 text-sm" onClick={handleSendMessage} size="sm" type="button" disabled={!replyBody.trim()}>
-                          {["email", "web_form", "hikakaku", "uridoki", "oikura"].includes(
-                            selectedInquiry.channel ?? "",
-                          ) ? (
-                            <Mail className="size-3.5" aria-hidden="true" />
-                          ) : (
-                            <Send className="size-3.5" aria-hidden="true" />
-                          )}
-                          送信
-                        </Button>
-                      </div>
+                    <div className="flex justify-end">
+                      <Button
+                        className="h-7 px-3 text-xs"
+                        disabled={noteSaving || internalNote === (selectedInquiry.internal_note ?? "")}
+                        onClick={handleSaveNote}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        {noteSaving ? "保存中..." : "保存"}
+                      </Button>
                     </div>
                   </div>
+                ) : null}
 
-                  {/* 右サイドパネル（ステータス・タグ・メモ・リマインダー） */}
-                  {rightPanelOpen ? <div className="space-y-3 min-w-0">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <label className="text-xs font-medium text-zinc-500">ステータス変更</label>
-                        <Select value={selectedInquiry.status} onValueChange={(value) => handleStatusChange(value as InquiryStatus)}>
-                          <SelectTrigger className="w-full bg-white"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {statusFilters.filter((filter) => filter.value !== "all").map((filter) => (
-                              <SelectItem key={filter.value} value={filter.value}>{filter.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-medium text-zinc-500">担当者</label>
-                        <Select value={selectedInquiry.assigned_to ?? "unassigned"} onValueChange={handleAssignChange}>
-                          <SelectTrigger className="w-full bg-white"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="unassigned">未アサイン</SelectItem>
-                            {staff.map((member) => (
-                              <SelectItem key={member.id} value={member.id}>{member.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    <div className="space-y-2">
+                {/* リマインダー（折りたたみ） */}
+                {reminderOpen ? (
+                  <div className="space-y-2 rounded-md border border-zinc-200 bg-white p-2.5">
+                    <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-xs font-medium text-zinc-500">
-                        <Tag className="size-3.5" aria-hidden="true" />
-                        タグ
+                        <Bell className="size-3.5" aria-hidden="true" />
+                        リマインダー
                       </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {(selectedInquiry.inquiry_tags ?? []).map((tag) => (
-                          <Badge key={tag.tag} variant="outline" className="rounded-md bg-white pr-1 text-xs">
-                            {tag.tag}
-                            <button className="ml-1 rounded hover:text-red-500" onClick={() => handleRemoveTag(tag.tag)} type="button">
-                              <X className="size-2.5" />
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                      <div className="relative">
+                      <button className="text-xs text-zinc-500 hover:text-zinc-900" onClick={() => setShowReminderForm((v) => !v)} type="button">
+                        {showReminderForm ? "キャンセル" : "+ 追加"}
+                      </button>
+                    </div>
+                    {showReminderForm ? (
+                      <div className="space-y-1.5">
                         <input
-                          ref={tagInputRef}
+                          className="h-7 w-full rounded-md border border-zinc-200 bg-white px-2 text-xs focus:outline-none focus:ring-1 focus:ring-zinc-300"
+                          min={new Date().toISOString().slice(0, 16)}
+                          onChange={(e) => setReminderDate(e.target.value)}
+                          type="datetime-local"
+                          value={reminderDate}
+                        />
+                        <input
                           className="h-7 w-full rounded-md border border-zinc-200 bg-white px-2 text-xs placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-300"
-                          onBlur={() => setTimeout(() => setShowTagSuggestions(false), 150)}
-                          onChange={(e) => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
-                          onFocus={() => setShowTagSuggestions(true)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && tagInput.trim()) {
-                              e.preventDefault();
-                              void handleAddTag(tagInput);
-                            }
-                          }}
-                          placeholder="タグを追加（Enter で確定）"
-                          value={tagInput}
+                          onChange={(e) => setReminderNote(e.target.value)}
+                          placeholder="メモ（任意）"
+                          value={reminderNote}
                         />
-                        {showTagSuggestions && tagSuggestions.length > 0 ? (
-                          <div className="absolute z-20 mt-1 max-h-40 w-full overflow-y-auto rounded-md border border-zinc-200 bg-white shadow-md">
-                            {tagSuggestions.map((t) => (
-                              <button key={t} className="w-full px-3 py-1.5 text-left text-xs hover:bg-zinc-50" onMouseDown={() => handleAddTag(t)} type="button">{t}</button>
-                            ))}
-                          </div>
-                        ) : null}
+                        <Button className="h-6 w-full text-xs" disabled={!reminderDate} onClick={handleSaveReminder} size="sm" type="button">設定</Button>
                       </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-amber-700 flex items-center gap-1.5">
-                        <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
-                        内部メモ（顧客には非表示）
-                      </label>
-                      <div className="relative">
-                        <Textarea
-                          ref={noteRef}
-                          className="min-h-20 resize-none border-amber-200 bg-amber-50 placeholder:text-amber-400 focus-visible:ring-amber-300"
-                          onBlur={() => setTimeout(() => setMentionQuery(null), 150)}
-                          onChange={handleNoteChange}
-                          placeholder="スタッフ向けメモ（@名前でメンション）"
-                          value={internalNote}
-                        />
-                        {mentionSuggestions.length > 0 ? (
-                          <div className="absolute bottom-full z-20 mb-1 max-h-36 w-full overflow-y-auto rounded-md border border-zinc-200 bg-white shadow-md">
-                            {mentionSuggestions.map((s) => (
-                              <button key={s.id} className="w-full px-3 py-1.5 text-left text-xs hover:bg-zinc-50" onMouseDown={() => handleInsertMention(s)} type="button">
-                                @{s.name}
-                              </button>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                      <div className="flex justify-end">
-                        <Button
-                          className="h-7 px-3 text-xs"
-                          disabled={noteSaving || internalNote === (selectedInquiry.internal_note ?? "")}
-                          onClick={handleSaveNote}
-                          size="sm"
-                          type="button"
-                          variant="outline"
-                        >
-                          {noteSaving ? "保存中..." : "保存"}
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-xs font-medium text-zinc-500">
-                          <Bell className="size-3.5" aria-hidden="true" />
-                          リマインダー
+                    ) : null}
+                    {reminders.filter((r) => !r.is_done).map((r) => (
+                      <div key={r.id} className="flex items-start justify-between gap-2 rounded-md border border-zinc-200 px-2 py-1.5">
+                        <div>
+                          <p className="text-xs font-medium text-zinc-700">{formatDateTime(r.remind_at)}</p>
+                          {r.note ? <p className="text-xs text-zinc-500">{r.note}</p> : null}
                         </div>
-                        <button className="text-xs text-zinc-500 hover:text-zinc-900" onClick={() => setShowReminderForm((v) => !v)} type="button">
-                          {showReminderForm ? "キャンセル" : "+ 追加"}
+                        <button className="text-zinc-400 hover:text-red-500" onClick={() => handleDeleteReminder(r.id)} type="button">
+                          <X className="size-3" />
                         </button>
                       </div>
-                      {showReminderForm ? (
-                        <div className="space-y-1.5 rounded-md border border-zinc-200 p-2">
-                          <input
-                            className="h-7 w-full rounded-md border border-zinc-200 bg-white px-2 text-xs focus:outline-none focus:ring-1 focus:ring-zinc-300"
-                            min={new Date().toISOString().slice(0, 16)}
-                            onChange={(e) => setReminderDate(e.target.value)}
-                            type="datetime-local"
-                            value={reminderDate}
-                          />
-                          <input
-                            className="h-7 w-full rounded-md border border-zinc-200 bg-white px-2 text-xs placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-300"
-                            onChange={(e) => setReminderNote(e.target.value)}
-                            placeholder="メモ（任意）"
-                            value={reminderNote}
-                          />
-                          <Button className="h-6 w-full text-xs" disabled={!reminderDate} onClick={handleSaveReminder} size="sm" type="button">設定</Button>
-                        </div>
-                      ) : null}
-                      {reminders.filter((r) => !r.is_done).map((r) => (
-                        <div key={r.id} className="flex items-start justify-between gap-2 rounded-md border border-zinc-200 px-2 py-1.5">
-                          <div>
-                            <p className="text-xs font-medium text-zinc-700">{formatDateTime(r.remind_at)}</p>
-                            {r.note ? <p className="text-xs text-zinc-500">{r.note}</p> : null}
-                          </div>
-                          <button className="text-zinc-400 hover:text-red-500" onClick={() => handleDeleteReminder(r.id)} type="button">
-                            <X className="size-3" />
-                          </button>
-                        </div>
-                      ))}
+                    ))}
+                  </div>
+                ) : null}
+
+                {/* AIエリア（ボタン押下後のみ表示） */}
+                {aiLoading ? (
+                  <div className="flex items-center gap-2 rounded-lg border border-violet-100 bg-violet-50/60 px-3 py-2 text-xs text-violet-500">
+                    <svg className="size-3 animate-spin text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <span>AIが分析中...</span>
+                  </div>
+                ) : aiSuggest && (aiSuggest.mode === "themes" || aiSuggest.mode === "auto") ? (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-[10px] text-violet-500 font-medium">
+                      <Sparkles className="size-3 shrink-0" />
+                      パターンを選択してください
                     </div>
-                  </div> : null}
+                    <div className="flex flex-wrap gap-1.5">
+                      {[...aiSuggest.themes].sort((a, b) => b.confidence - a.confidence).map((t, i) => {
+                        const isTop = i === 0;
+                        const isSelected = aiCurrentTheme === t.key;
+                        return (
+                          <button
+                            key={t.key}
+                            className={cn(
+                              "rounded-full border font-medium transition",
+                              isSelected
+                                ? "border-violet-500 bg-violet-500 text-white px-3 py-1 text-xs"
+                                : isTop
+                                  ? "border-violet-300 bg-violet-50 text-violet-700 px-3 py-1 text-xs hover:bg-violet-100"
+                                  : "border-zinc-200 bg-white text-zinc-600 px-2.5 py-0.5 text-[11px] hover:border-violet-200 hover:text-violet-600",
+                            )}
+                            onClick={async () => {
+                              if (isSelected) {
+                                setAiCurrentTheme(null);
+                                return;
+                              }
+                              setAiCurrentTheme(t.key);
+                              setAiPanelDraft(null);
+                              setAiPanelDraftKey(k => k + 1);
+                              setAiPanelOpen(false);
+                              setAiLoading(true);
+                              try {
+                                const res = await fetch("/api/ai/suggest", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ inquiry_id: selectedInquiry.id, theme: t.key }),
+                                });
+                                const data = await res.json() as import("@/app/api/ai/suggest/route").AiSuggestResult;
+                                if (data.body) {
+                                  setAiPanelDraft(data.body);
+                                  setAiPanelThemeName(t.label);
+                                  setAiPanelDraftKey(k => k + 1);
+                                  setAiPanelOpen(true);
+                                }
+                              } catch {
+                                // 失敗は無視
+                              } finally {
+                                setAiLoading(false);
+                              }
+                            }}
+                            type="button"
+                          >
+                            {t.label}
+                            {isTop ? <span className="ml-1 text-[9px] opacity-70">★</span> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* 送信待ち画像プレビュー */}
+                {imageFiles.length > 0 ? (
+                  <div className="flex flex-wrap gap-2 rounded-md border border-zinc-200 bg-white p-2">
+                    {imageFiles.map((f, i) => (
+                      <div key={i} className="relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={URL.createObjectURL(f)}
+                          alt={f.name}
+                          className="size-14 rounded object-cover"
+                        />
+                        <button
+                          className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-red-500 text-white"
+                          onClick={() => setImageFiles((prev) => prev.filter((_, j) => j !== i))}
+                          type="button"
+                        >
+                          <X className="size-2.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {/* テンプレート選択ドロップダウン */}
+                {showTemplates ? (
+                  <div className="max-h-40 overflow-y-auto rounded-md border border-zinc-200 bg-white shadow-sm">
+                    {templates.map((t) => (
+                      <button
+                        key={t.id}
+                        className="w-full px-3 py-2 text-left text-xs hover:bg-zinc-50 border-b border-zinc-100 last:border-0"
+                        onClick={() => { setReplyBody(t.body); setShowTemplates(false); }}
+                        type="button"
+                      >
+                        <span className="font-medium text-zinc-700">{t.name}</span>
+                        <span className="ml-2 text-zinc-400 truncate">{t.body.slice(0, 40)}...</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+
+                {/* 返信テキストエリア（全幅） */}
+                <Textarea
+                  ref={replyRef}
+                  className="min-h-[80px] resize-none bg-white text-sm"
+                  onChange={(e) => {
+                    setReplyBody(e.target.value);
+                    setAiOriginalBody(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
+                  placeholder="返信メッセージを入力（r キーでフォーカス）"
+                  value={replyBody}
+                />
+                {aiOriginalBody && replyBody !== aiOriginalBody ? (
+                  <p className="text-[10px] text-zinc-400">
+                    ✏️ AI原案から編集中
+                    <button className="ml-1.5 text-violet-500 underline hover:text-violet-700" onClick={() => setReplyBody(aiOriginalBody)} type="button">元に戻す</button>
+                  </p>
+                ) : null}
+
+                {/* ボタン行 */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    className={cn(
+                      "h-8 gap-1 px-2.5 text-xs",
+                      aiSuggest ? "border-violet-400 bg-violet-50 text-violet-700" : "border-violet-300 text-violet-600 hover:bg-violet-50",
+                    )}
+                    disabled={aiLoading}
+                    onClick={async () => {
+                      if (aiSuggest) { setAiSuggest(null); setAiCurrentTheme(null); return; }
+                      setAiLoading(true);
+                      try {
+                        const res = await fetch("/api/ai/suggest", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ inquiry_id: selectedInquiry.id }),
+                        });
+                        const data = await res.json() as import("@/app/api/ai/suggest/route").AiSuggestResult;
+                        setAiSuggest(data);
+                      } catch {
+                        // 失敗は無視
+                      } finally {
+                        setAiLoading(false);
+                      }
+                    }}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <Sparkles className="size-3.5" />
+                    {aiLoading ? "分析中..." : aiSuggest ? "AI生成済み ✕" : "AI下書き"}
+                  </Button>
+                  <Button
+                    className={cn(
+                      "h-8 gap-1 px-2.5 text-xs",
+                      aiPanelOpen ? "border-violet-400 text-violet-700 bg-violet-50" : "border-zinc-200 text-zinc-600 hover:bg-zinc-50",
+                    )}
+                    onClick={() => setAiPanelOpen((v) => !v)}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <MessageCircle className="size-3.5" />
+                    {aiPanelOpen ? "相談中…" : "AIに質問"}
+                  </Button>
+                  {templates.length > 0 ? (
+                    <Button className="h-8 gap-1 px-2.5 text-xs" onClick={() => setShowTemplates((v) => !v)} size="sm" type="button" variant="outline">
+                      <FileText className="size-3.5" />
+                      テンプレート
+                    </Button>
+                  ) : null}
+                  {selectedInquiry.channel === "line" ? (
+                    <>
+                      <Button className="h-8 gap-1 px-2.5 text-xs" onClick={() => imageInputRef.current?.click()} size="sm" type="button" variant="outline">
+                        <ImageIcon className="size-3.5" />
+                        画像
+                      </Button>
+                      <input
+                        ref={imageInputRef}
+                        accept="image/*"
+                        className="hidden"
+                        multiple
+                        onChange={(e) => {
+                          const files = Array.from(e.target.files ?? []);
+                          setImageFiles((prev) => [...prev, ...files]);
+                          e.target.value = "";
+                        }}
+                        type="file"
+                      />
+                    </>
+                  ) : null}
+                  {inboundImageMessages.length > 0 ? (
+                    <Button className="h-8 gap-1 px-2.5 text-xs" onClick={handleDownloadImages} size="sm" type="button" variant="outline" title={`受信画像 ${inboundImageMessages.length} 枚を一括ダウンロード`}>
+                      <Download className="size-3.5" />
+                      ({inboundImageMessages.length})
+                    </Button>
+                  ) : null}
+                  {selectedInquiry.ai_suggested_reply ? (
+                    <Button
+                      className="h-8 gap-1 border-violet-300 bg-violet-50 px-2.5 text-xs text-violet-700 hover:bg-violet-100"
+                      onClick={() => {
+                        setAiPanelDraft(selectedInquiry.ai_suggested_reply!);
+                        setAiPanelThemeName(null);
+                        setAiPanelDraftKey(k => k + 1);
+                        setAiPanelOpen(true);
+                      }}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      ✦ AI原案を確認
+                    </Button>
+                  ) : null}
+                  <div className="flex-1" />
+                  {imageFiles.length > 0 ? (
+                    <Button className="h-8 gap-1 text-xs" disabled={sendingImages} onClick={handleSendImages} size="sm" type="button" variant="outline">
+                      <ImageIcon className="size-3.5" aria-hidden="true" />
+                      {sendingImages ? "送信中..." : `画像送信 (${imageFiles.length}枚)`}
+                    </Button>
+                  ) : null}
+                  <Button className="h-8 gap-1.5 px-4 text-sm" onClick={handleSendMessage} size="sm" type="button" disabled={!replyBody.trim()}>
+                    {["email", "web_form", "hikakaku", "uridoki", "oikura"].includes(selectedInquiry.channel ?? "") ? (
+                      <Mail className="size-3.5" aria-hidden="true" />
+                    ) : (
+                      <Send className="size-3.5" aria-hidden="true" />
+                    )}
+                    送信
+                  </Button>
                 </div>
               </div>
             </>
