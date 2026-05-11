@@ -15,6 +15,7 @@ import {
 
 import { AppShell } from "@/components/app-shell";
 import { ChannelBadge, StatusBadge } from "@/components/badges";
+import { ApptTrendChart } from "@/components/dashboard/ApptTrendChart";
 import {
   Card,
   CardContent,
@@ -25,7 +26,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { channelFilters, channelMeta } from "@/lib/inquiry-options";
 import { createServiceClient } from "@/lib/supabase/service";
-import type { InquiryChannel, InquiryWithLead } from "@/types/database";
+import type { InquiryChannel, InquiryWithLead, Shift } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,7 @@ export default async function DashboardPage() {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
 
   const [
     { count: newCount },
@@ -65,6 +67,8 @@ export default async function DashboardPage() {
     { count: prevMonthApptCount },
     // リード×アポ（平均仕入点数用）
     { data: leadApptRows },
+    // 過去6ヶ月アポ（トレンドチャート）
+    { data: trendApptRows },
   ] = await Promise.all([
     supabase.from("inquiries").select("id", { count: "exact", head: true }).eq("status", "new"),
     supabase.from("inquiries").select("id", { count: "exact", head: true }).eq("status", "in_progress"),
@@ -123,7 +127,29 @@ export default async function DashboardPage() {
       .from("appointments")
       .select("lead_id")
       .neq("status", "cancelled"),
+    // 過去6ヶ月のアポ（トレンドチャート用）
+    supabase
+      .from("appointments")
+      .select("scheduled_at")
+      .gte("scheduled_at", sixMonthsAgo.toISOString())
+      .neq("status", "cancelled"),
   ]);
+
+  // 今月のシフトデータ（生産性計算用）
+  type ShiftRow = Shift & { staff?: { id: string; name: string } | null };
+  let monthlyShifts: ShiftRow[] = [];
+  try {
+    const monthFrom = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    const monthToDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const monthTo = `${monthToDate.getFullYear()}-${String(monthToDate.getMonth() + 1).padStart(2, "0")}-${String(monthToDate.getDate()).padStart(2, "0")}`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: shiftRows } = await (supabase as any)
+      .from("shifts")
+      .select("*, staff(id,name)")
+      .gte("shift_date", monthFrom)
+      .lte("shift_date", monthTo);
+    monthlyShifts = (shiftRows ?? []) as ShiftRow[];
+  } catch { /* テーブル未作成の場合スキップ */ }
 
   // --- 今月のアポ集計 ---
   type ApptRow = { id: string; item_category: string | null; staff: { name: string | null } | null; lead_id: string | null };
@@ -191,6 +217,67 @@ export default async function DashboardPage() {
     appointments: thisMonthApptCount,
     inquiries: monthlyInquiries.length,
   };
+
+  // --- 6ヶ月アポ推移データ ---
+  const trendData = (() => {
+    const countMap: Record<string, number> = {};
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      countMap[key] = 0;
+    }
+    for (const row of (trendApptRows ?? [])) {
+      const d = new Date(row.scheduled_at as string);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      if (key in countMap) countMap[key] = (countMap[key] ?? 0) + 1;
+    }
+    return Object.entries(countMap).map(([key, count]) => {
+      const [y, m] = key.split("-");
+      return { month: `${Number(m)}月`, count };
+    });
+  })();
+
+  // --- 生産性計算（シフトデータあり時のみ） ---
+  const shiftWorkHours = (s: Shift) => {
+    const [sh, sm] = s.start_time.split(":").map(Number);
+    const [eh, em] = s.end_time.split(":").map(Number);
+    const mins = ((eh ?? 0) * 60 + (em ?? 0)) - ((sh ?? 0) * 60 + (sm ?? 0)) - s.break_minutes;
+    return Math.max(0, mins) / 60;
+  };
+
+  // スタッフ別: 今月の総稼働時間
+  const staffHoursMap: Record<string, { name: string; hours: number }> = {};
+  for (const s of monthlyShifts) {
+    const staffId = s.staff_id;
+    const name = s.staff?.name ?? "不明";
+    if (!staffHoursMap[staffId]) staffHoursMap[staffId] = { name, hours: 0 };
+    staffHoursMap[staffId].hours += shiftWorkHours(s);
+  }
+
+  // スタッフ別: 今月のアポ数
+  const staffApptCountMap: Record<string, number> = {};
+  for (const [name, count] of staffRanking) {
+    // staffRankingはname→count、staffHoursMapはid→{name,hours}
+    // nameで突合
+    const staffEntry = Object.entries(staffHoursMap).find(([, v]) => v.name === name);
+    if (staffEntry) staffApptCountMap[staffEntry[0]] = count;
+  }
+
+  // 生産性ランキング（稼働時間あたりアポ数）
+  const productivityRanking = Object.entries(staffHoursMap)
+    .map(([id, { name, hours }]) => {
+      const appts = staffApptCountMap[id] ?? 0;
+      const rate = hours > 0 ? appts / hours : 0; // アポ数/h
+      return { name, hours, appts, rate };
+    })
+    .filter((r) => r.hours > 0)
+    .sort((a, b) => b.rate - a.rate)
+    .slice(0, 5);
+
+  const totalMonthlyHours = Object.values(staffHoursMap).reduce((acc, { hours }) => acc + hours, 0);
+  const overallProductivity = totalMonthlyHours > 0
+    ? (thisMonthApptCount / totalMonthlyHours).toFixed(2)
+    : null;
 
   // --- 既存集計 ---
   const recentInquiries = (recentRows ?? []) as unknown as InquiryWithLead[];
@@ -400,6 +487,27 @@ export default async function DashboardPage() {
             </Card>
           </div>
 
+          {/* アポ推移グラフ */}
+          <div className="mt-6">
+            <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
+              <CardHeader className="flex-row items-center justify-between">
+                <div>
+                  <CardTitle>アポ数推移</CardTitle>
+                  <CardDescription>過去6ヶ月のアポ取得件数</CardDescription>
+                </div>
+                <Link
+                  href="/shifts/report"
+                  className="text-xs text-zinc-400 hover:text-zinc-600"
+                >
+                  稼働レポート →
+                </Link>
+              </CardHeader>
+              <CardContent>
+                <ApptTrendChart data={trendData} />
+              </CardContent>
+            </Card>
+          </div>
+
           {/* 今月のアポ分析 3カラム */}
           <div className="mt-6 grid grid-cols-3 gap-6">
             {/* 今月のアポ件数カード */}
@@ -564,6 +672,94 @@ export default async function DashboardPage() {
               </Card>
             </div>
           ) : null}
+
+          {/* 生産性ウィジェット（シフトデータあり時のみ） */}
+          {productivityRanking.length > 0 ? (
+            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+              {/* 総合生産性 */}
+              <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm font-semibold text-zinc-700">
+                    ⚡ 時間あたり生産性（{monthLabel}）
+                  </CardTitle>
+                  <CardDescription>総稼働時間に対するアポ取得数</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-end gap-3">
+                    <span className="text-4xl font-bold tracking-tight text-zinc-900">{overallProductivity}</span>
+                    <span className="mb-1 text-sm text-zinc-500">件 / h</span>
+                  </div>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    総稼働 {Math.round(totalMonthlyHours)}h ÷ アポ {thisMonthApptCount}件
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* スタッフ別生産性ランキング */}
+              <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold text-zinc-700">
+                    👤 スタッフ別生産性（{monthLabel}）
+                  </CardTitle>
+                  <CardDescription>稼働1時間あたりのアポ取得数</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col gap-2">
+                    {productivityRanking.map((r, i) => {
+                      const maxRate = productivityRanking[0]?.rate ?? 1;
+                      const pct = maxRate > 0 ? Math.round((r.rate / maxRate) * 100) : 0;
+                      return (
+                        <div key={r.name} className="space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-4 font-bold text-zinc-400">{i + 1}</span>
+                              <span className="font-medium text-zinc-800">{r.name}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-zinc-500">
+                              <span>{r.appts}件 / {Math.round(r.hours)}h</span>
+                              <span className="font-semibold text-zinc-900">{r.rate.toFixed(2)}/h</span>
+                            </div>
+                          </div>
+                          <div className="h-1.5 w-full rounded-full bg-zinc-100">
+                            <div
+                              className="h-1.5 rounded-full bg-violet-400 transition-all"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <Link
+                    href="/shifts"
+                    className="mt-3 inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-700"
+                  >
+                    シフト管理へ →
+                  </Link>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <div className="mt-6">
+              <div className="flex items-center justify-between rounded-xl border border-dashed border-zinc-200 bg-white p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-9 items-center justify-center rounded-full bg-zinc-100">
+                    <span className="text-base">⚡</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-zinc-700">シフトを登録すると生産性が確認できます</p>
+                    <p className="text-xs text-zinc-400">稼働時間あたりのアポ取得数・スタッフ別効率を表示</p>
+                  </div>
+                </div>
+                <Link
+                  href="/shifts"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 px-3 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                >
+                  シフト管理へ
+                </Link>
+              </div>
+            </div>
+          )}
 
           {/* 目標未設定の場合のCTA */}
           {goals.length === 0 ? (
