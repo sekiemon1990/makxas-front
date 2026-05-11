@@ -17,8 +17,28 @@ export async function POST(request: Request) {
   if (!body.inquiry_id) {
     return NextResponse.json({ error: "inquiry_id required" }, { status: 400 });
   }
+
+  // text/image_urls が未指定の場合、DBから反響のメッセージを自動取得
   if (!body.text && (!body.image_urls || body.image_urls.length === 0)) {
-    return NextResponse.json({ error: "text or image_urls required" }, { status: 400 });
+    const supabase = createServiceClient();
+    const { data: msgs } = await supabase
+      .from("messages")
+      .select("body, media_urls, direction")
+      .eq("inquiry_id", body.inquiry_id)
+      .eq("direction", "inbound")
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    if (msgs && msgs.length > 0) {
+      const texts = msgs.map((m) => m.body).filter(Boolean) as string[];
+      if (texts.length > 0) body.text = texts.join("\n");
+      const imgUrls = msgs.flatMap((m) => (m.media_urls as string[] | null) ?? []).filter(Boolean);
+      if (imgUrls.length > 0) body.image_urls = imgUrls;
+    }
+
+    if (!body.text && (!body.image_urls || body.image_urls.length === 0)) {
+      return NextResponse.json({ error: "No messages found for this inquiry" }, { status: 400 });
+    }
   }
 
   const systemPrompt = `あなたは買取査定の専門AIです。顧客から送られてきたメッセージや画像から、査定対象の商品情報を抽出してください。
