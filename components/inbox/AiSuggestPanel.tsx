@@ -167,11 +167,11 @@ export function AiSuggestPanel({
 
   return (
     <div
-      className={cn(
-        "absolute right-0 top-0 bottom-0 z-20 flex w-[340px] flex-col bg-white border-l border-zinc-200 shadow-xl",
-        "transition-transform duration-200 ease-in-out",
-        open ? "translate-x-0" : "translate-x-full",
-      )}
+      className="absolute right-0 top-0 bottom-0 z-20 flex w-[340px] flex-col bg-white border-l border-zinc-200 shadow-xl"
+      style={{
+        transform: open ? "translateX(0)" : "translateX(100%)",
+        transition: "transform 200ms ease-in-out",
+      }}
     >
       {/* ヘッダー */}
       <div className="flex shrink-0 items-center justify-between bg-gradient-to-r from-indigo-500 to-violet-500 px-4 py-3 text-white">
