@@ -868,11 +868,14 @@ export function RealtimeInbox({
       <div className="flex min-h-0 flex-1 overflow-hidden md:grid md:grid-cols-[260px_minmax(360px,480px)_minmax(460px,1fr)]">
         {/* サイドバー */}
         <aside className={cn("overflow-y-auto border-r border-zinc-200 bg-white", mobilePanel !== "sidebar" && "hidden md:block")}>
-          <div className="border-b border-zinc-200 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Inbox</p>
-            <h1 className="mt-2 text-xl font-semibold tracking-tight">統合インボックス</h1>
+          <div className="border-b border-zinc-200 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-400">Inbox</span>
+              <span className="text-zinc-300">/</span>
+              <h1 className="text-sm font-semibold text-zinc-800">統合インボックス</h1>
+            </div>
           </div>
-          <div className="space-y-7 p-4">
+          <div className="space-y-4 p-3">
             <FilterSection title="店舗フィルター">
               {canUseAllStores ? (
                 <FilterButton active={initialStore === "all"} onClick={() => updateQuery({ store: "all", id: null })}>
@@ -938,16 +941,19 @@ export function RealtimeInbox({
 
         {/* 一覧カラム */}
         <section className={cn("overflow-y-auto border-r border-zinc-200 bg-zinc-50", mobilePanel !== "list" && "hidden md:block")}>
-          <div className="sticky top-0 z-10 border-b border-zinc-200 bg-zinc-50/95 px-5 py-4 backdrop-blur">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold tracking-tight">反響一覧</h2>
-                <p className="mt-1 text-sm text-zinc-500">
-                  全{totalCount}件中 {(page - 1) * 50 + 1}〜{Math.min(page * 50, totalCount)}件
-                </p>
-              </div>
+          <div className="sticky top-0 z-10 border-b border-zinc-200 bg-zinc-50/95 px-4 py-3 backdrop-blur">
+            <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="rounded-md bg-white">Live</Badge>
+                <h2 className="text-sm font-semibold text-zinc-900">反響一覧</h2>
+                <span className="text-xs text-zinc-400">
+                  {totalCount}件
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Badge variant="outline" className="rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-emerald-600 border-emerald-200">
+                  <span className="mr-1 size-1.5 rounded-full bg-emerald-400 inline-block" />
+                  Live
+                </Badge>
                 {/* ⑥ ショートカットヘルプボタン */}
                 <button
                   className="flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-50"
@@ -955,8 +961,8 @@ export function RealtimeInbox({
                   title="キーボードショートカット"
                   type="button"
                 >
-                  <Keyboard className="size-3.5" />
-                  <kbd className="font-mono">?</kbd>
+                  <Keyboard className="size-3" />
+                  <kbd className="font-mono text-[10px]">?</kbd>
                 </button>
               </div>
             </div>
@@ -974,7 +980,7 @@ export function RealtimeInbox({
               />
             </div>
           </div>
-          <div className="space-y-3 p-4">
+          <div className="space-y-2 p-3">
             {filteredItems.map((item) => (
               <div
                 key={item.id}
@@ -1007,7 +1013,7 @@ export function RealtimeInbox({
                   onClick={(e) => e.stopPropagation()}
                 />
                 <button
-                  className="w-full p-4 text-left"
+                  className="w-full px-4 py-3 text-left"
                   onClick={() => {
                     setSelectedId(item.id);
                     setMobilePanel("detail");
@@ -1017,7 +1023,7 @@ export function RealtimeInbox({
                   type="button"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex min-w-0 items-start gap-2.5">
                       <div className="relative shrink-0">
                         <ChannelBadge channel={item.channel} />
                         {!readIds.has(item.id) ? (
@@ -1025,17 +1031,17 @@ export function RealtimeInbox({
                         ) : null}
                       </div>
                       <div className="min-w-0">
-                        <p className={cn("truncate text-sm", readIds.has(item.id) ? "font-medium" : "font-semibold")}>
+                        <p className={cn("truncate text-sm", readIds.has(item.id) ? "font-medium text-zinc-700" : "font-semibold text-zinc-900")}>
                           {getCustomerName(item)}
                         </p>
-                        <p className="mt-1 truncate text-sm text-zinc-600">
+                        <p className="mt-0.5 truncate text-xs text-zinc-500">
                           {item.subject ?? "件名なし"}
                         </p>
                       </div>
                     </div>
                     <StatusBadge status={item.status} />
                   </div>
-                  <div className="mt-4 flex items-center justify-between text-xs text-zinc-500">
+                  <div className="mt-2 flex items-center justify-between text-xs text-zinc-400">
                     <div className="flex items-center gap-1.5">
                       <span>{formatElapsed(item.created_at)}</span>
                       {getStaleLevel(item) !== "none" ? (
@@ -1045,12 +1051,20 @@ export function RealtimeInbox({
                             ? "bg-red-100 text-red-700"
                             : "bg-orange-100 text-orange-700",
                         )}>
-                          ⚠ 未返信 {getStaleHours(item)}h
+                          ⚠ {getStaleHours(item)}h
                         </span>
                       ) : null}
                     </div>
-                    <span>
-                      {item.stores?.name ?? "店舗未設定"} / {item.staff?.name ?? "未アサイン"}
+                    <span className="flex items-center gap-1 truncate">
+                      {(item.brands?.name ?? item.stores?.name) ? (
+                        <span className="truncate">{item.brands?.name ?? item.stores?.name}</span>
+                      ) : null}
+                      {item.staff?.name ? (
+                        <>
+                          {(item.brands?.name ?? item.stores?.name) ? <span className="text-zinc-300">·</span> : null}
+                          <span className="truncate">{item.staff.name}</span>
+                        </>
+                      ) : null}
                     </span>
                   </div>
                 </button>
@@ -1101,23 +1115,31 @@ export function RealtimeInbox({
         <section className={cn("relative flex min-w-0 flex-col bg-white overflow-hidden", mobilePanel !== "detail" && "hidden md:flex")}>
           {selectedInquiry ? (
             <>
-              <div className="sticky top-0 z-10 border-b border-zinc-200 bg-white px-6 py-4">
-                <div className="flex items-start justify-between gap-4">
+              <div className="sticky top-0 z-10 border-b border-zinc-200 bg-white px-5 py-3">
+                <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                       <ChannelBadge channel={selectedInquiry.channel} showLabel />
                       <StatusBadge status={selectedInquiry.status} />
                     </div>
-                    <h2 className="mt-3 truncate text-2xl font-semibold tracking-tight">
+                    <h2 className="mt-1.5 truncate text-base font-semibold tracking-tight text-zinc-900">
                       {selectedInquiry.subject ?? "件名なし"}
                     </h2>
-                    <p className="mt-1 text-sm text-zinc-500">
-                      {getCustomerName(selectedInquiry)} / {selectedInquiry.stores?.name ?? "店舗未設定"} / {formatDateTime(selectedInquiry.created_at)}
+                    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-zinc-500">
+                      <span className="font-medium text-zinc-700">{getCustomerName(selectedInquiry)}</span>
+                      {(selectedInquiry.brands?.name ?? selectedInquiry.stores?.name) ? (
+                        <>
+                          <span className="text-zinc-300">·</span>
+                          <span>{selectedInquiry.brands?.name ?? selectedInquiry.stores?.name}</span>
+                        </>
+                      ) : null}
+                      <span className="text-zinc-300">·</span>
+                      <span>{formatDateTime(selectedInquiry.created_at)}</span>
                     </p>
                   </div>
-                  <Button onClick={() => setAppointmentOpen(true)}>
-                    <CalendarPlus className="size-4" aria-hidden="true" />
-                    アポを設定
+                  <Button size="sm" className="shrink-0" onClick={() => setAppointmentOpen(true)}>
+                    <CalendarPlus className="size-3.5" aria-hidden="true" />
+                    アポ設定
                   </Button>
                 </div>
               </div>
@@ -1182,7 +1204,7 @@ export function RealtimeInbox({
               ) : null}
 
               {/* メッセージスレッド */}
-              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
                 <div className="space-y-4">
                   {messages.map((message) => (
                     <div
@@ -1236,8 +1258,8 @@ export function RealtimeInbox({
               </div>
 
               {/* 返信・操作エリア */}
-              <div className="border-t border-zinc-200 bg-zinc-50 p-5">
-                <div className="grid grid-cols-[1fr_280px] gap-5">
+              <div className="border-t border-zinc-200 bg-zinc-50/80 px-5 py-4">
+                <div className="grid grid-cols-[1fr_260px] gap-4">
                   <div className="space-y-3">
                     {/* ⑪ 送信待ち画像プレビュー */}
                     {imageFiles.length > 0 ? (
@@ -1336,7 +1358,7 @@ export function RealtimeInbox({
                       <div className="space-y-2">
                         <div className="flex items-center gap-1.5 text-[11px] text-violet-600 font-medium">
                           <span className="size-1.5 rounded-full bg-violet-500 animate-pulse shrink-0" />
-                          ✦ どのパターンで返信しますか？ — タップで下書きを作成
+                          ✦ AI下書きを生成 — パターンを選択
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                           {[...aiSuggest.themes].sort((a, b) => b.confidence - a.confidence).map((t, i) => {
@@ -1437,7 +1459,7 @@ export function RealtimeInbox({
                       <Textarea
                         ref={replyRef}
                         className={cn(
-                          "min-h-24 resize-none bg-white",
+                          "min-h-[68px] resize-none bg-white",
                           aiOriginalBody && "border-violet-300 bg-violet-50/30 focus-visible:ring-violet-400",
                         )}
                         onChange={(event) => setReplyBody(event.target.value)}
@@ -1578,7 +1600,7 @@ export function RealtimeInbox({
                   </div>
 
                   {/* 右サイドパネル（ステータス・タグ・メモ・リマインダー） */}
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-2">
                         <label className="text-xs font-medium text-zinc-500">ステータス変更</label>
@@ -1765,9 +1787,9 @@ export function RealtimeInbox({
 
 function FilterSection({ children, title }: { children: React.ReactNode; title: string }) {
   return (
-    <section className="rounded-lg border border-zinc-100 bg-zinc-50/60 p-3">
-      <h2 className="mb-2.5 text-[11px] font-bold uppercase tracking-widest text-zinc-400">{title}</h2>
-      <div className="space-y-1">{children}</div>
+    <section>
+      <h2 className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-400">{title}</h2>
+      <div className="space-y-0.5">{children}</div>
     </section>
   );
 }
@@ -1776,8 +1798,8 @@ function FilterButton({ active, children, onClick }: { active: boolean; children
   return (
     <button
       className={cn(
-        "flex h-9 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950",
-        active && "bg-zinc-950 text-white hover:bg-zinc-900 hover:text-white",
+        "flex h-8 w-full items-center gap-2 rounded-md px-3 text-left text-sm text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900",
+        active && "bg-violet-100 font-semibold text-violet-700 hover:bg-violet-100 hover:text-violet-700",
       )}
       onClick={onClick}
       type="button"
