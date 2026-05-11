@@ -857,8 +857,8 @@ export function RealtimeInbox({
       <div className={cn(
         "flex min-h-0 flex-1 overflow-hidden",
         sidebarCollapsed
-          ? "md:grid md:grid-cols-[minmax(280px,380px)_minmax(360px,1fr)]"
-          : "md:grid md:grid-cols-[220px_minmax(280px,380px)_minmax(360px,1fr)]"
+          ? "md:grid md:grid-cols-[minmax(200px,280px)_1fr]"
+          : "md:grid md:grid-cols-[180px_minmax(200px,280px)_1fr]"
       )}>
         {/* サイドバー */}
         <aside className={cn("overflow-y-auto border-r border-zinc-200 bg-white", (mobilePanel !== "sidebar" || sidebarCollapsed) && "hidden md:block", sidebarCollapsed && "md:hidden")}>
@@ -1294,7 +1294,7 @@ export function RealtimeInbox({
 
               {/* 返信・操作エリア */}
               <div className="border-t border-zinc-200 bg-zinc-50/80 px-4 py-3">
-                <div className={cn("grid gap-4", rightPanelOpen ? "grid-cols-[1fr_220px]" : "grid-cols-[1fr]")}>
+                <div className={cn("grid gap-3", rightPanelOpen ? "grid-cols-[1fr_200px]" : "grid-cols-[1fr]")}>
                   <div className="space-y-3">
                     {/* ⑪ 送信待ち画像プレビュー */}
                     {imageFiles.length > 0 ? (
