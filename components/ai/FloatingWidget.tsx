@@ -63,6 +63,8 @@ export function FloatingWidget({ pageContext: pageContextProp }: { pageContext?:
   const didDrag = useRef(false);
   const dragStartPos = useRef<Pos>({ x: 0, y: 0 });
   const justDragged = useRef(false);
+  // 開く前のボタン位置を保存（閉じた時に元の位置に戻すため）
+  const buttonPosBeforeOpen = useRef<Pos | null>(null);
 
   useEffect(() => {
     const saved = loadPos();
@@ -82,23 +84,42 @@ export function FloatingWidget({ pageContext: pageContextProp }: { pageContext?:
 
   const handleOpen = useCallback((nextOpen: boolean) => {
     setOpen(nextOpen);
-    setPos((prev) => {
-      if (!prev) return prev;
-      const c: Pos = {
-        x: clamp(
-          prev.x,
-          0,
-          window.innerWidth - (nextOpen ? PANEL_W : BUTTON_SIZE),
-        ),
-        y: clamp(
-          prev.y,
-          0,
-          window.innerHeight - (nextOpen ? PANEL_H : BUTTON_SIZE),
-        ),
-      };
-      posRef.current = c;
-      return c;
-    });
+    if (nextOpen) {
+      // 開く前のボタン位置を保存
+      buttonPosBeforeOpen.current = { ...posRef.current };
+      // パネルが画面内に収まるようクランプ
+      setPos((prev) => {
+        if (!prev) return prev;
+        const c: Pos = {
+          x: clamp(prev.x, 0, window.innerWidth - PANEL_W),
+          y: clamp(prev.y, 0, window.innerHeight - PANEL_H),
+        };
+        posRef.current = c;
+        return c;
+      });
+    } else {
+      // 閉じる時は開く前のボタン位置に戻す
+      const restored = buttonPosBeforeOpen.current;
+      buttonPosBeforeOpen.current = null;
+      if (restored) {
+        const c: Pos = {
+          x: clamp(restored.x, 0, window.innerWidth - BUTTON_SIZE),
+          y: clamp(restored.y, 0, window.innerHeight - BUTTON_SIZE),
+        };
+        posRef.current = c;
+        setPos(c);
+      } else {
+        setPos((prev) => {
+          if (!prev) return prev;
+          const c: Pos = {
+            x: clamp(prev.x, 0, window.innerWidth - BUTTON_SIZE),
+            y: clamp(prev.y, 0, window.innerHeight - BUTTON_SIZE),
+          };
+          posRef.current = c;
+          return c;
+        });
+      }
+    }
   }, []);
 
   // 閉じた状態のボタン用：mousedown でドラッグ開始を準備
