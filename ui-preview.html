@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>UI Preview – A案 / B案</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  .tab-btn { transition: all 0.15s; }
+  .badge { display:inline-flex; align-items:center; border-radius:9999px; padding:2px 8px; font-size:11px; font-weight:600; }
+  .badge-green { background:#dcfce7; color:#16a34a; }
+  .badge-yellow { background:#fef9c3; color:#ca8a04; }
+  .badge-blue { background:#dbeafe; color:#1d4ed8; }
+  .badge-red { background:#fee2e2; color:#dc2626; }
+  .badge-purple { background:#f3e8ff; color:#7c3aed; }
+  .msg-in { background:#f4f4f5; border-radius:12px 12px 12px 4px; }
+  .msg-out { background:#1f2937; color:#fff; border-radius:12px 12px 4px 12px; }
+  .chip { display:inline-flex; align-items:center; gap:4px; border:1px solid #e4e4e7; border-radius:9999px; padding:3px 10px; font-size:11px; color:#52525b; background:#fff; cursor:pointer; }
+  .chip:hover { border-color:#a78bfa; color:#7c3aed; background:#faf5ff; }
+  .chip.active { border-color:#7c3aed; background:#f3e8ff; color:#7c3aed; }
+  .panel { display:none; }
+  .panel.active { display:flex; }
+  select { appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 8px center; padding-right:24px; }
+</style>
+</head>
+<body class="bg-zinc-100 min-h-screen">
+
+<!-- タブ切り替えヘッダー -->
+<div class="sticky top-0 z-50 bg-white border-b border-zinc-200 px-6 py-3 flex items-center gap-4">
+  <span class="text-sm font-semibold text-zinc-500 mr-2">UIプレビュー</span>
+  <button id="btn-a" class="tab-btn px-4 py-1.5 rounded-full text-sm font-semibold bg-violet-600 text-white shadow-sm" onclick="show('a')">
+    A案：フィルターをドロワー化
+  </button>
+  <button id="btn-b" class="tab-btn px-4 py-1.5 rounded-full text-sm font-medium text-zinc-500 border border-zinc-200 hover:border-violet-300 hover:text-violet-700" onclick="show('b')">
+    B案：メタデータをヘッダー集約
+  </button>
+  <span class="ml-auto text-xs text-zinc-400">現在表示: <span id="label" class="font-semibold text-violet-600">A案</span></span>
+</div>
+
+<!-- ========== A案 ========== -->
+<div id="panel-a" class="panel active h-[calc(100vh-52px)] bg-white">
+
+  <!-- 左ナビ (共通) -->
+  <aside class="w-[200px] shrink-0 border-r border-zinc-200 bg-white flex flex-col">
+    <div class="h-12 flex items-center px-4 border-b border-zinc-200">
+      <span class="text-sm font-bold text-zinc-800">makxas-front</span>
+    </div>
+    <nav class="flex flex-col gap-0.5 p-2 flex-1">
+      <a class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs text-zinc-500 hover:bg-zinc-100">
+        <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        ダッシュボード
+      </a>
+      <a class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-violet-700 bg-violet-50">
+        <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4h16v12H4z" stroke-linejoin="round"/><path d="M4 8h16M8 4v4"/></svg>
+        インボックス
+        <span class="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">3</span>
+      </a>
+      <a class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs text-zinc-500 hover:bg-zinc-100">
+        <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        リード一覧
+      </a>
+      <a class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs text-zinc-500 hover:bg-zinc-100">
+        <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        アポ一覧
+      </a>
+      <a class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs text-zinc-500 hover:bg-zinc-100">
+        <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 1 0 4.93 19.07"/></svg>
+        設定
+      </a>
+    </nav>
+  </aside>
+
+  <!-- A案メイン：2カラム -->
+  <div class="flex flex-1 min-w-0 overflow-hidden">
+
+    <!-- 反響一覧（フィルター統合） -->
+    <div class="w-[300px] shrink-0 border-r border-zinc-200 flex flex-col bg-white">
+      <!-- 一覧ヘッダー：検索 + フィルターチップ -->
+      <div class="border-b border-zinc-100 px-3 py-2.5 space-y-2">
+        <div class="flex items-center gap-2">
+          <input class="flex-1 h-8 rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-xs placeholder:text-zinc-400 outline-none focus:border-violet-300" placeholder="名前・件名・電話で検索" />
+          <!-- フィルターボタン -->
+          <button class="h-8 px-2.5 rounded-lg border border-zinc-200 text-xs text-zinc-500 hover:border-violet-300 hover:text-violet-700 flex items-center gap-1 shrink-0">
+            <svg class="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 6h18M7 12h10M11 18h2"/></svg>
+            フィルター
+          </button>
+        </div>
+        <!-- アクティブなフィルターチップ（例） -->
+        <div class="flex flex-wrap gap-1.5">
+          <span class="chip active">全チャンネル ▾</span>
+          <span class="chip active">全ステータス ▾</span>
+          <span class="chip">全員 ▾</span>
+        </div>
+      </div>
+      <!-- 件数・ソート -->
+      <div class="flex items-center justify-between px-3 py-1.5 border-b border-zinc-100">
+        <span class="text-[10px] text-zinc-400 font-medium">8件</span>
+        <div class="flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+          <span class="text-[10px] text-zinc-400">Live</span>
+        </div>
+      </div>
+      <!-- リスト -->
+      <div class="flex-1 overflow-y-auto divide-y divide-zinc-100">
+
+        <!-- 選択中 -->
+        <div class="px-3 py-3 bg-violet-50 border-l-2 border-violet-500 cursor-pointer">
+          <div class="flex items-start justify-between gap-2 mb-1">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="size-7 rounded-full bg-green-500 flex items-center justify-center text-white text-[11px] font-bold shrink-0">田</div>
+              <span class="text-xs font-semibold text-zinc-900 truncate">田中 花子</span>
+            </div>
+            <span class="badge badge-yellow shrink-0">対応中</span>
+          </div>
+          <p class="text-xs text-zinc-600 truncate pl-9">ブランド品査定希望</p>
+          <div class="flex items-center justify-between pl-9 mt-1">
+            <span class="text-[10px] text-zinc-400">4日前</span>
+            <span class="text-[10px] bg-green-100 text-green-700 rounded px-1.5 font-medium">LINE</span>
+          </div>
+        </div>
+
+        <div class="px-3 py-3 hover:bg-zinc-50 cursor-pointer">
+          <div class="flex items-start justify-between gap-2 mb-1">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="size-7 rounded-full bg-blue-500 flex items-center justify-center text-white text-[11px] font-bold shrink-0">鈴</div>
+              <span class="text-xs font-semibold text-zinc-900 truncate">鈴木 一郎</span>
+            </div>
+            <span class="badge badge-blue shrink-0">アポ取得済</span>
+          </div>
+          <p class="text-xs text-zinc-500 truncate pl-9">骨董品の買取について</p>
+          <div class="flex items-center justify-between pl-9 mt-1">
+            <span class="text-[10px] text-zinc-400">4日前</span>
+            <span class="text-[10px] bg-blue-100 text-blue-700 rounded px-1.5 font-medium">フォーム</span>
+          </div>
+        </div>
+
+        <div class="px-3 py-3 hover:bg-zinc-50 cursor-pointer">
+          <div class="flex items-start justify-between gap-2 mb-1">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="size-7 rounded-full bg-purple-500 flex items-center justify-center text-white text-[11px] font-bold shrink-0">テ</div>
+              <span class="text-xs font-semibold text-zinc-900 truncate">テスト太郎</span>
+            </div>
+            <span class="badge badge-yellow shrink-0">対応中</span>
+          </div>
+          <p class="text-xs text-zinc-500 truncate pl-9">ブランド品査定希望</p>
+          <div class="flex items-center justify-between pl-9 mt-1">
+            <span class="text-[10px] text-zinc-400">2日前</span>
+            <span class="text-[10px] bg-green-100 text-green-700 rounded px-1.5 font-medium">LINE</span>
+          </div>
+        </div>
+
+        <div class="px-3 py-3 hover:bg-zinc-50 cursor-pointer">
+          <div class="flex items-start justify-between gap-2 mb-1">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="size-7 rounded-full bg-orange-500 flex items-center justify-center text-white text-[11px] font-bold shrink-0">せ</div>
+              <span class="text-xs font-semibold text-zinc-900 truncate">せきえもん</span>
+            </div>
+            <span class="badge badge-yellow shrink-0">対応中</span>
+          </div>
+          <p class="text-xs text-zinc-500 truncate pl-9">LINEメッセージ</p>
+          <div class="flex items-center justify-between pl-9 mt-1">
+            <span class="text-[10px] text-zinc-400">4日前</span>
+            <span class="text-[10px] bg-orange-100 text-orange-700 rounded px-1.5 font-medium flex items-center gap-1">⚠ 1h</span>
+          </div>
+        </div>
+
+        <div class="px-3 py-3 hover:bg-zinc-50 cursor-pointer">
+          <div class="flex items-start justify-between gap-2 mb-1">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="size-7 rounded-full bg-red-400 flex items-center justify-center text-white text-[11px] font-bold shrink-0">田</div>
+              <span class="text-xs font-semibold text-zinc-900 truncate">田中 花子</span>
+            </div>
+            <span class="badge badge-red shrink-0">失注</span>
+          </div>
+          <p class="text-xs text-zinc-500 truncate pl-9">テスト失注</p>
+          <div class="flex items-center justify-between pl-9 mt-1">
+            <span class="text-[10px] text-zinc-400">2日前</span>
+            <span class="text-[10px] bg-blue-100 text-blue-700 rounded px-1.5 font-medium">フォーム</span>
+          </div>
+        </div>
+
+        <div class="px-3 py-3 hover:bg-zinc-50 cursor-pointer">
+          <div class="flex items-start justify-between gap-2 mb-1">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="size-7 rounded-full bg-teal-500 flex items-center justify-center text-white text-[11px] font-bold shrink-0">中</div>
+              <span class="text-xs font-semibold text-zinc-900 truncate">中村 美咲</span>
+            </div>
+            <span class="badge badge-green shrink-0">新着</span>
+          </div>
+          <p class="text-xs text-zinc-500 truncate pl-9">ギターの買取希望</p>
+          <div class="flex items-center justify-between pl-9 mt-1">
+            <span class="text-[10px] text-zinc-400">4日前</span>
+            <span class="text-[10px] bg-orange-100 text-orange-700 rounded px-1.5 font-medium flex items-center gap-1">⚠ 97h</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 詳細パネル（A案：フル幅・メタデータ下部） -->
+    <div class="flex-1 min-w-0 flex flex-col bg-white">
+
+      <!-- 詳細ヘッダー：タイトル + インラインメタ -->
+      <div class="border-b border-zinc-200 px-5 py-3 flex items-center gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-0.5">
+            <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-100 text-green-700">LINE</span>
+            <span class="badge badge-yellow">対応中</span>
+            <span class="text-xs text-zinc-400">•</span>
+            <span class="text-xs text-zinc-500">田中 花子</span>
+            <span class="text-xs text-zinc-400">•</span>
+            <span class="text-xs text-zinc-400">05/07 23:08</span>
+          </div>
+          <h2 class="text-sm font-bold text-zinc-900 truncate">ブランド品査定希望</h2>
+        </div>
+        <!-- インラインアクション -->
+        <div class="flex items-center gap-2 shrink-0">
+          <select class="h-8 rounded-lg border border-zinc-200 bg-white px-2 text-xs text-zinc-600 outline-none focus:border-violet-300">
+            <option>対応中</option><option>新着</option><option>保留</option><option>アポ取得済</option>
+          </select>
+          <select class="h-8 rounded-lg border border-zinc-200 bg-white px-2 text-xs text-zinc-600 outline-none focus:border-violet-300">
+            <option>未アサイン</option><option>関 憲人</option><option>田中 スタッフ</option>
+          </select>
+          <button class="h-8 px-3 rounded-lg bg-violet-600 text-white text-xs font-semibold hover:bg-violet-700 flex items-center gap-1.5">
+            <svg class="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            アポ設定
+          </button>
+        </div>
+      </div>
+
+      <!-- メッセージスレッド -->
+      <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-zinc-50/40">
+        <div class="flex items-end gap-2.5">
+          <div class="size-7 rounded-full bg-zinc-300 flex items-center justify-center text-zinc-600 text-[11px] font-bold shrink-0">田</div>
+          <div class="max-w-[65%]">
+            <p class="text-[10px] text-zinc-400 mb-1">田中 花子 · 05/07 23:08</p>
+            <div class="msg-in px-3.5 py-2.5 text-sm text-zinc-800">こんにちは。ブランド品の査定をお願いしたいのですが、どのくらいの金額になりますか？</div>
+          </div>
+        </div>
+        <div class="flex items-end gap-2.5 flex-row-reverse">
+          <div class="size-7 rounded-full bg-violet-500 flex items-center justify-center text-white text-[11px] font-bold shrink-0">関</div>
+          <div class="max-w-[65%]">
+            <p class="text-[10px] text-zinc-400 mb-1 text-right">関 憲人 · 05/07 23:08</p>
+            <div class="msg-out px-3.5 py-2.5 text-sm">お問い合わせありがとうございます！品物の詳細（ブランド名・型番・状態）を教えていただけますか？</div>
+          </div>
+        </div>
+        <div class="flex items-end gap-2.5">
+          <div class="size-7 rounded-full bg-zinc-300 flex items-center justify-center text-zinc-600 text-[11px] font-bold shrink-0">田</div>
+          <div class="max-w-[65%]">
+            <p class="text-[10px] text-zinc-400 mb-1">田中 花子 · 05/07 23:10</p>
+            <div class="msg-in px-3.5 py-2.5 text-sm text-zinc-800">ルイヴィトンのモノグラム、型番はM41526です。使用感は少なめです。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 返信エリア（A案：全幅） -->
+      <div class="border-t border-zinc-200 bg-white px-4 py-3 space-y-3">
+        <!-- タグ + 内部メモ（折りたたみ式コンパクトバー） -->
+        <div class="flex items-center gap-3 pb-2 border-b border-zinc-100">
+          <div class="flex items-center gap-1.5 flex-wrap flex-1">
+            <span class="text-[10px] text-zinc-400 font-medium shrink-0">タグ</span>
+            <span class="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-[11px] text-zinc-600">ブランド品 <button class="text-zinc-400 hover:text-red-500">×</button></span>
+            <span class="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-[11px] text-zinc-600">高単価候補 <button class="text-zinc-400 hover:text-red-500">×</button></span>
+            <input class="h-6 w-28 rounded border border-dashed border-zinc-300 bg-transparent px-2 text-[11px] placeholder:text-zinc-400 outline-none" placeholder="+ タグ追加" />
+          </div>
+          <button class="text-[11px] text-zinc-400 hover:text-zinc-600 flex items-center gap-1 shrink-0 border border-zinc-200 rounded px-2 py-1">
+            <svg class="size-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            内部メモ
+          </button>
+        </div>
+        <!-- テキストエリア（全幅） -->
+        <textarea class="w-full h-20 resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 py-2.5 text-sm placeholder:text-zinc-400 outline-none focus:border-violet-300 focus:bg-white" placeholder="返信メッセージを入力（r キーでフォーカス）"></textarea>
+        <!-- ボタン行 -->
+        <div class="flex items-center gap-2">
+          <button class="h-8 gap-1.5 px-3 rounded-lg border border-violet-300 text-violet-600 text-xs font-medium hover:bg-violet-50 flex items-center">
+            <svg class="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg>
+            AI下書き
+          </button>
+          <button class="h-8 gap-1.5 px-3 rounded-lg border border-zinc-200 text-zinc-600 text-xs hover:bg-zinc-50 flex items-center">AIに質問</button>
+          <button class="h-8 gap-1.5 px-3 rounded-lg border border-zinc-200 text-zinc-600 text-xs hover:bg-zinc-50 flex items-center">テンプレート</button>
+          <button class="h-8 gap-1.5 px-3 rounded-lg border border-zinc-200 text-zinc-600 text-xs hover:bg-zinc-50 flex items-center">画像</button>
+          <div class="flex-1"></div>
+          <button class="h-8 px-4 rounded-lg bg-zinc-800 text-white text-xs font-semibold hover:bg-zinc-900 flex items-center gap-1.5">
+            <svg class="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M22 2 11 13M22 2 15 22l-4-9-9-4 20-7z"/></svg>
+            送信
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== B案 ========== -->
+<div id="panel-b" class="panel h-[calc(100vh-52px)] bg-white">
+
+  <!-- 左ナビ (共通) -->
+  <aside class="w-[200px] shrink-0 border-r border-zinc-200 bg-white flex flex-col">
+    <div class="h-12 flex items-center px-4 border-b border-zinc-200">
+      <span class="text-sm font-bold text-zinc-800">makxas-front</span>
+    </div>
+    <nav class="flex flex-col gap-0.5 p-2 flex-1">
+      <a class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs text-zinc-500 hover:bg-zinc-100">
+        <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        ダッシュボード
+      </a>
+      <a class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-violet-700 bg-violet-50">
+        <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4h16v12H4z" stroke-linejoin="round"/><path d="M4 8h16M8 4v4"/></svg>
+        インボックス
+        <span class="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">3</span>
+      </a>
+      <a class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs text-zinc-500 hover:bg-zinc-100">
+        <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        リード一覧
+      </a>
+      <a class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs text-zinc-500 hover:bg-zinc-100">
+        <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        アポ一覧
+      </a>
+      <a class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs text-zinc-500 hover:bg-zinc-100">
+        <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 1 0 4.93 19.07"/></svg>
+        設定
+      </a>
+    </nav>
+  </aside>
+
+  <!-- B案メイン：3カラム（フィルターあり） -->
+  <div class="flex flex-1 min-w-0 overflow-hidden">
+
+    <!-- フィルターサイドバー（現行と同様） -->
+    <div class="w-[180px] shrink-0 border-r border-zinc-200 overflow-y-auto bg-white">
+      <div class="p-3 space-y-4">
+        <div>
+          <p class="text-[9px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">店舗</p>
+          <div class="space-y-0.5">
+            <button class="w-full text-left rounded-md px-2.5 py-1.5 text-xs font-semibold text-violet-700 bg-violet-50">全店舗</button>
+            <button class="w-full text-left rounded-md px-2.5 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50">品川本店</button>
+            <button class="w-full text-left rounded-md px-2.5 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50">本部</button>
+          </div>
+        </div>
+        <div>
+          <p class="text-[9px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">担当者</p>
+          <div class="space-y-0.5">
+            <button class="w-full text-left rounded-md px-2.5 py-1.5 text-xs font-semibold text-violet-700 bg-violet-50">全員</button>
+            <button class="w-full text-left rounded-md px-2.5 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50">自分のみ</button>
+          </div>
+        </div>
+        <div>
+          <p class="text-[9px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">ステータス</p>
+          <div class="space-y-0.5">
+            <button class="w-full text-left rounded-md px-2.5 py-1.5 text-xs font-semibold text-violet-700 bg-violet-50">全て</button>
+            <button class="w-full text-left rounded-md px-2.5 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50">新着</button>
+            <button class="w-full text-left rounded-md px-2.5 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50">対応中</button>
+            <button class="w-full text-left rounded-md px-2.5 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50">保留</button>
+            <button class="w-full text-left rounded-md px-2.5 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50">アポ取得済</button>
+          </div>
+        </div>
+        <div>
+          <p class="text-[9px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">チャンネル</p>
+          <div class="space-y-0.5">
+            <button class="w-full text-left rounded-md px-2.5 py-1.5 text-xs font-semibold text-violet-700 bg-violet-50">全て</button>
+            <button class="w-full text-left rounded-md px-2.5 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50 flex items-center gap-2"><span class="size-1.5 rounded-full bg-green-500"></span>LINE</button>
+            <button class="w-full text-left rounded-md px-2.5 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50 flex items-center gap-2"><span class="size-1.5 rounded-full bg-blue-500"></span>フォーム</button>
+            <button class="w-full text-left rounded-md px-2.5 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50 flex items-center gap-2"><span class="size-1.5 rounded-full bg-purple-500"></span>メール</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 反響一覧 -->
+    <div class="w-[260px] shrink-0 border-r border-zinc-200 flex flex-col bg-white">
+      <div class="border-b border-zinc-100 px-3 py-2.5">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-semibold text-zinc-700">反響一覧</span>
+          <span class="text-[10px] text-zinc-400">8件</span>
+          <div class="ml-auto flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span><span class="text-[10px] text-zinc-400">Live</span></div>
+        </div>
+        <input class="mt-2 w-full h-7 rounded-md border border-zinc-200 bg-zinc-50 px-2.5 text-xs placeholder:text-zinc-400 outline-none" placeholder="件名・顧客名・電話で検索" />
+      </div>
+      <div class="flex-1 overflow-y-auto divide-y divide-zinc-100">
+        <div class="px-3 py-3 bg-violet-50 border-l-2 border-violet-500 cursor-pointer">
+          <div class="flex items-start justify-between gap-1 mb-0.5">
+            <span class="text-xs font-semibold text-zinc-900">田中 花子</span>
+            <span class="badge badge-yellow shrink-0">対応中</span>
+          </div>
+          <p class="text-[11px] text-zinc-600 truncate">ブランド品査定希望</p>
+          <p class="text-[10px] text-zinc-400 mt-1">4日前 · LINE</p>
+        </div>
+        <div class="px-3 py-3 hover:bg-zinc-50 cursor-pointer">
+          <div class="flex items-start justify-between gap-1 mb-0.5">
+            <span class="text-xs font-semibold text-zinc-900">鈴木 一郎</span>
+            <span class="badge badge-blue shrink-0">アポ取得済</span>
+          </div>
+          <p class="text-[11px] text-zinc-500 truncate">骨董品の買取について</p>
+          <p class="text-[10px] text-zinc-400 mt-1">4日前 · フォーム</p>
+        </div>
+        <div class="px-3 py-3 hover:bg-zinc-50 cursor-pointer">
+          <div class="flex items-start justify-between gap-1 mb-0.5">
+            <span class="text-xs font-semibold text-zinc-900">テスト太郎</span>
+            <span class="badge badge-yellow shrink-0">対応中</span>
+          </div>
+          <p class="text-[11px] text-zinc-500 truncate">ブランド品査定希望</p>
+          <p class="text-[10px] text-zinc-400 mt-1">2日前 · LINE · 買取マクサス本部</p>
+        </div>
+        <div class="px-3 py-3 hover:bg-zinc-50 cursor-pointer">
+          <div class="flex items-start justify-between gap-1 mb-0.5">
+            <span class="text-xs font-semibold text-zinc-900 flex items-center gap-1">せきえもん <span class="text-[9px] bg-orange-100 text-orange-600 rounded px-1">⚠ 1h</span></span>
+            <span class="badge badge-yellow shrink-0">対応中</span>
+          </div>
+          <p class="text-[11px] text-zinc-500 truncate">LINEメッセージ</p>
+          <p class="text-[10px] text-zinc-400 mt-1">4日前 · LINE</p>
+        </div>
+        <div class="px-3 py-3 hover:bg-zinc-50 cursor-pointer">
+          <div class="flex items-start justify-between gap-1 mb-0.5">
+            <span class="text-xs font-semibold text-zinc-900">中村 美咲</span>
+            <span class="badge badge-green shrink-0">新着</span>
+          </div>
+          <p class="text-[11px] text-zinc-500 truncate">ギターの買取希望</p>
+          <p class="text-[10px] text-zinc-400 mt-1">4日前 <span class="text-orange-500 font-medium">⚠ 97h</span></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 詳細パネル（B案：メタデータ上部統合） -->
+    <div class="flex-1 min-w-0 flex flex-col bg-white">
+
+      <!-- ヘッダー：タイトル + アポボタン -->
+      <div class="border-b border-zinc-200 px-5 py-2.5 flex items-center gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-0.5">
+            <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-100 text-green-700">LINE</span>
+            <span class="text-xs text-zinc-500">田中 花子 · 05/07 23:08</span>
+          </div>
+          <h2 class="text-sm font-bold text-zinc-900">ブランド品査定希望</h2>
+        </div>
+        <button class="h-8 px-3 rounded-lg bg-violet-600 text-white text-xs font-semibold hover:bg-violet-700 flex items-center gap-1.5 shrink-0">
+          <svg class="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          アポ設定
+        </button>
+      </div>
+
+      <!-- B案：メタデータバー（ステータス・担当者・タグを横1列に） -->
+      <div class="border-b border-zinc-100 bg-zinc-50/60 px-5 py-2 flex items-center gap-4 flex-wrap">
+        <div class="flex items-center gap-1.5">
+          <span class="text-[10px] text-zinc-400">ステータス</span>
+          <select class="h-7 rounded-md border border-zinc-200 bg-white px-2 text-xs text-zinc-700 outline-none focus:border-violet-300">
+            <option>対応中</option><option>新着</option><option>保留</option><option>アポ取得済</option>
+          </select>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="text-[10px] text-zinc-400">担当者</span>
+          <select class="h-7 rounded-md border border-zinc-200 bg-white px-2 text-xs text-zinc-700 outline-none focus:border-violet-300">
+            <option>未アサイン</option><option>関 憲人</option>
+          </select>
+        </div>
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <span class="text-[10px] text-zinc-400">タグ</span>
+          <span class="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-[11px] text-zinc-600">ブランド品 <button class="text-zinc-400 hover:text-red-500">×</button></span>
+          <span class="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-[11px] text-zinc-600">高単価候補 <button class="text-zinc-400 hover:text-red-500">×</button></span>
+          <input class="h-6 w-24 rounded border border-dashed border-zinc-300 bg-transparent px-2 text-[11px] placeholder:text-zinc-400 outline-none" placeholder="+ タグ" />
+        </div>
+        <div class="ml-auto">
+          <button class="h-7 px-2.5 rounded-md border border-zinc-200 bg-white text-[11px] text-zinc-500 hover:border-violet-300 hover:text-violet-600 flex items-center gap-1">
+            <svg class="size-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            内部メモ
+          </button>
+        </div>
+      </div>
+
+      <!-- メッセージスレッド -->
+      <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-zinc-50/40">
+        <div class="flex items-end gap-2.5">
+          <div class="size-7 rounded-full bg-zinc-300 flex items-center justify-center text-zinc-600 text-[11px] font-bold shrink-0">田</div>
+          <div class="max-w-[65%]">
+            <p class="text-[10px] text-zinc-400 mb-1">田中 花子 · 05/07 23:08</p>
+            <div class="msg-in px-3.5 py-2.5 text-sm text-zinc-800">こんにちは。ブランド品の査定をお願いしたいのですが、どのくらいの金額になりますか？</div>
+          </div>
+        </div>
+        <div class="flex items-end gap-2.5 flex-row-reverse">
+          <div class="size-7 rounded-full bg-violet-500 flex items-center justify-center text-white text-[11px] font-bold shrink-0">関</div>
+          <div class="max-w-[65%]">
+            <p class="text-[10px] text-zinc-400 mb-1 text-right">関 憲人 · 05/07 23:08</p>
+            <div class="msg-out px-3.5 py-2.5 text-sm">お問い合わせありがとうございます！品物の詳細（ブランド名・型番・状態）を教えていただけますか？</div>
+          </div>
+        </div>
+        <div class="flex items-end gap-2.5">
+          <div class="size-7 rounded-full bg-zinc-300 flex items-center justify-center text-zinc-600 text-[11px] font-bold shrink-0">田</div>
+          <div class="max-w-[65%]">
+            <p class="text-[10px] text-zinc-400 mb-1">田中 花子 · 05/07 23:10</p>
+            <div class="msg-in px-3.5 py-2.5 text-sm text-zinc-800">ルイヴィトンのモノグラム、型番はM41526です。使用感は少なめです。</div>
+          </div>
+        </div>
+        <div class="flex items-end gap-2.5 flex-row-reverse">
+          <div class="size-7 rounded-full bg-violet-500 flex items-center justify-center text-white text-[11px] font-bold shrink-0">関</div>
+          <div class="max-w-[65%]">
+            <p class="text-[10px] text-zinc-400 mb-1 text-right">関 憲人 · 05/07 23:12</p>
+            <div class="msg-out px-3.5 py-2.5 text-sm">ご連絡いただきありがとうございます。田中様<br><br>ルイヴィトンのモノグラム M41526 についてのご査定ですね。かしこまりました。<br><br>当店での買取相場としては <strong>¥25,000〜35,000 程度</strong>を想定しております。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 返信エリア（B案：全幅） -->
+      <div class="border-t border-zinc-200 bg-white px-4 py-3 space-y-2.5">
+        <textarea class="w-full h-20 resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 py-2.5 text-sm placeholder:text-zinc-400 outline-none focus:border-violet-300 focus:bg-white" placeholder="返信メッセージを入力（r キーでフォーカス）"></textarea>
+        <div class="flex items-center gap-2">
+          <button class="h-8 gap-1.5 px-3 rounded-lg border border-violet-300 text-violet-600 text-xs font-medium hover:bg-violet-50 flex items-center">
+            <svg class="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg>
+            AI下書き
+          </button>
+          <button class="h-8 gap-1.5 px-3 rounded-lg border border-zinc-200 text-zinc-600 text-xs hover:bg-zinc-50 flex items-center">AIに質問</button>
+          <button class="h-8 gap-1.5 px-3 rounded-lg border border-zinc-200 text-zinc-600 text-xs hover:bg-zinc-50 flex items-center">テンプレート</button>
+          <button class="h-8 gap-1.5 px-3 rounded-lg border border-zinc-200 text-zinc-600 text-xs hover:bg-zinc-50 flex items-center">画像</button>
+          <div class="flex-1"></div>
+          <button class="h-8 px-4 rounded-lg bg-zinc-800 text-white text-xs font-semibold hover:bg-zinc-900 flex items-center gap-1.5">
+            <svg class="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M22 2 11 13M22 2 15 22l-4-9-9-4 20-7z"/></svg>
+            送信
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function show(plan) {
+  document.getElementById('panel-a').classList.remove('active');
+  document.getElementById('panel-b').classList.remove('active');
+  document.getElementById('panel-' + plan).classList.add('active');
+  document.getElementById('label').textContent = plan === 'a' ? 'A案' : 'B案';
+  const btnA = document.getElementById('btn-a');
+  const btnB = document.getElementById('btn-b');
+  if (plan === 'a') {
+    btnA.className = 'tab-btn px-4 py-1.5 rounded-full text-sm font-semibold bg-violet-600 text-white shadow-sm';
+    btnB.className = 'tab-btn px-4 py-1.5 rounded-full text-sm font-medium text-zinc-500 border border-zinc-200 hover:border-violet-300 hover:text-violet-700';
+  } else {
+    btnB.className = 'tab-btn px-4 py-1.5 rounded-full text-sm font-semibold bg-violet-600 text-white shadow-sm';
+    btnA.className = 'tab-btn px-4 py-1.5 rounded-full text-sm font-medium text-zinc-500 border border-zinc-200 hover:border-violet-300 hover:text-violet-700';
+  }
+}
+</script>
+</body>
+</html>

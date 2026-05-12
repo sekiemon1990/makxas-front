@@ -8,6 +8,7 @@ import {
   Mail,
   Hash,
 } from "lucide-react";
+import { LeadContactsPanel } from "@/components/leads/LeadContactsPanel";
 
 import { AppShell } from "@/components/app-shell";
 import { ChannelBadge, StatusBadge } from "@/components/badges";
@@ -229,6 +230,11 @@ export default async function LeadDetailPage({
               ))}
             </div>
           ) : null}
+
+          {/* 連絡先（1:N） */}
+          <div className="mt-5 border-t border-zinc-100 pt-4">
+            <LeadContactsPanel leadId={id} />
+          </div>
 
           {/* 統計 */}
           <div className="mt-5 grid grid-cols-4 gap-3 border-t border-zinc-100 pt-5">

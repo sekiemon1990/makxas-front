@@ -386,6 +386,47 @@ export type Database = {
           },
         ];
       };
+      lead_contacts: {
+        Row: {
+          id: string;
+          lead_id: string;
+          type: "line" | "phone" | "email" | "other";
+          value: string;
+          label: string | null;
+          is_primary: boolean;
+          source: "auto" | "manual";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          lead_id: string;
+          type: "line" | "phone" | "email" | "other";
+          value: string;
+          label?: string | null;
+          is_primary?: boolean;
+          source?: "auto" | "manual";
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          lead_id?: string;
+          type?: "line" | "phone" | "email" | "other";
+          value?: string;
+          label?: string | null;
+          is_primary?: boolean;
+          source?: "auto" | "manual";
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "lead_contacts_lead_id_fkey";
+            columns: ["lead_id"];
+            isOneToOne: false;
+            referencedRelation: "leads";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       leads: {
         Row: {
           id: string;
@@ -396,6 +437,8 @@ export type Database = {
           line_tags: string[] | null;
           first_channel: Database["public"]["Enums"]["inquiry_channel"] | null;
           core_customer_id: string | null;
+          archived_at: string | null;
+          merged_into_lead_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -408,6 +451,8 @@ export type Database = {
           line_tags?: string[] | null;
           first_channel?: Database["public"]["Enums"]["inquiry_channel"] | null;
           core_customer_id?: string | null;
+          archived_at?: string | null;
+          merged_into_lead_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -420,6 +465,8 @@ export type Database = {
           line_tags?: string[] | null;
           first_channel?: Database["public"]["Enums"]["inquiry_channel"] | null;
           core_customer_id?: string | null;
+          archived_at?: string | null;
+          merged_into_lead_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -949,6 +996,7 @@ export type Database = {
 };
 
 export type Lead = Database["public"]["Tables"]["leads"]["Row"];
+export type LeadContact = Database["public"]["Tables"]["lead_contacts"]["Row"];
 export type Inquiry = Database["public"]["Tables"]["inquiries"]["Row"];
 export type Message = Database["public"]["Tables"]["messages"]["Row"];
 export type Appointment = Database["public"]["Tables"]["appointments"]["Row"];

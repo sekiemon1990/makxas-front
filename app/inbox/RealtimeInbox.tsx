@@ -25,6 +25,8 @@ import { ChannelBadge, StatusBadge } from "@/components/badges";
 import { AiSuggestPanel } from "@/components/inbox/AiSuggestPanel";
 import { AppointmentModal } from "@/components/inbox/AppointmentModal";
 import { InquiryItemsPanel } from "@/components/inbox/InquiryItemsPanel";
+import { LeadAssignModal } from "@/components/inbox/LeadAssignModal";
+import { LeadMergeModal } from "@/components/inbox/LeadMergeModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -162,8 +164,12 @@ export function RealtimeInbox({
   const [reminderNote, setReminderNote] = useState("");
   const [relatedInquiries, setRelatedInquiries] = useState<RelatedInquiry[]>([]);
   const [showRelatedHistory, setShowRelatedHistory] = useState(false); // ⑧ 折りたたみ
-  const [duplicateLeads, setDuplicateLeads] = useState<{ id: string; display_name: string | null; phone: string | null; first_channel: string | null }[]>([]);
+  const [duplicateLeads, setDuplicateLeads] = useState<{ id: string; display_name: string | null; phone: string | null; email: string | null; first_channel: string | null }[]>([]);
   const [showDuplicates, setShowDuplicates] = useState(false);
+  // リード変更モーダル
+  const [showLeadAssign, setShowLeadAssign] = useState(false);
+  // リードマージモーダル
+  const [showLeadMerge, setShowLeadMerge] = useState(false);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionStart, setMentionStart] = useState(0);
   const noteRef = useRef<HTMLTextAreaElement>(null);
@@ -485,7 +491,7 @@ export function RealtimeInbox({
       .catch(() => {});
     fetch(`/api/leads/${selectedInquiry.lead_id}/duplicates`)
       .then((r) => r.json())
-      .then((data: { duplicates?: { id: string; display_name: string | null; phone: string | null; first_channel: string | null }[] }) => {
+      .then((data: { duplicates?: { id: string; display_name: string | null; phone: string | null; email: string | null; first_channel: string | null }[] }) => {
         setDuplicateLeads(data.duplicates ?? []);
       })
       .catch(() => {});
@@ -1120,6 +1126,14 @@ export function RealtimeInbox({
                     ) : (
                       <span className="text-xs font-medium text-zinc-700">{getCustomerName(selectedInquiry)}</span>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => setShowLeadAssign(true)}
+                      className="rounded px-1.5 py-0.5 text-[10px] font-medium text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition-colors"
+                      title="リードを変更"
+                    >
+                      紐付け変更
+                    </button>
                       {(selectedInquiry.brands?.name ?? selectedInquiry.stores?.name) ? (
                         <span className="text-xs text-zinc-400">{selectedInquiry.brands?.name ?? selectedInquiry.stores?.name}</span>
                       ) : null}
@@ -1214,12 +1228,21 @@ export function RealtimeInbox({
                       : <ChevronRight className="size-3.5 -rotate-90 text-red-400" />}
                   </button>
                   {showDuplicates ? (
-                    <div className="border-t border-red-100 px-5 pb-2.5">
+                    <div className="border-t border-red-100 px-5 pb-3">
                       {duplicateLeads.map((d) => (
-                        <p key={d.id} className="py-1 text-xs text-red-700">
-                          {d.display_name ?? "名前なし"} ({d.first_channel ?? "—"}) {d.phone ?? ""}
-                        </p>
+                        <div key={d.id} className="flex items-center gap-2 py-1">
+                          <p className="flex-1 text-xs text-red-700">
+                            {d.display_name ?? "名前なし"} ({d.first_channel ?? "—"}) {d.phone ?? ""}
+                          </p>
+                        </div>
                       ))}
+                      <button
+                        type="button"
+                        onClick={() => setShowLeadMerge(true)}
+                        className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors"
+                      >
+                        リードを統合する
+                      </button>
                     </div>
                   ) : null}
                 </div>
@@ -1725,6 +1748,43 @@ export function RealtimeInbox({
         onSaved={(inquiry) => { replaceInquiry(inquiry); router.refresh(); }}
         open={appointmentOpen}
       />
+
+      {/* リード変更モーダル */}
+      {showLeadAssign && selectedInquiry ? (
+        <LeadAssignModal
+          inquiryId={selectedInquiry.id}
+          currentLeadId={selectedInquiry.lead_id}
+          currentLeadName={getCustomerName(selectedInquiry)}
+          onAssigned={(leadId, leadName) => {
+            // 反響のリードを更新（楽観的更新）
+            replaceInquiry({ ...selectedInquiry, lead_id: leadId, leads: { ...selectedInquiry.leads, display_name: leadName } as typeof selectedInquiry.leads });
+            setShowLeadAssign(false);
+            setToast({ title: "リードを変更しました", description: leadName });
+            router.refresh();
+          }}
+          onClose={() => setShowLeadAssign(false)}
+        />
+      ) : null}
+
+      {/* リードマージモーダル */}
+      {showLeadMerge && selectedInquiry?.leads ? (
+        <LeadMergeModal
+          primaryLead={{
+            id: selectedInquiry.lead_id!,
+            display_name: selectedInquiry.leads.display_name,
+            phone: selectedInquiry.leads.phone,
+          }}
+          duplicates={duplicateLeads}
+          onMerged={() => {
+            setShowLeadMerge(false);
+            setDuplicateLeads([]);
+            setShowDuplicates(false);
+            setToast({ title: "リードを統合しました" });
+            router.refresh();
+          }}
+          onClose={() => setShowLeadMerge(false)}
+        />
+      ) : null}
 
       {toast ? (
         <Toast description={toast.description} onClose={() => setToast(null)} title={toast.title} />
