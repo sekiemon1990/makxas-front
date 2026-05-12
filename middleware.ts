@@ -13,6 +13,7 @@ const PUBLIC_PREFIXES = [
   "/api/ai/learning/run",
   "/api/ai/analyze-edit",
   "/api/ai/extract-items",
+  "/phone-preview.html",
 ];
 
 export async function middleware(request: NextRequest) {
