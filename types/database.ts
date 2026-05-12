@@ -619,6 +619,7 @@ export type Database = {
           email: string;
           role: "super_admin" | "admin" | "operator" | "viewer";
           is_active: boolean;
+          requires_quote_review: boolean;
           created_at: string;
         };
         Insert: {
@@ -628,6 +629,7 @@ export type Database = {
           email: string;
           role?: "super_admin" | "admin" | "operator" | "viewer";
           is_active?: boolean;
+          requires_quote_review?: boolean;
           created_at?: string;
         };
         Update: {
@@ -637,6 +639,7 @@ export type Database = {
           email?: string;
           role?: "super_admin" | "admin" | "operator" | "viewer";
           is_active?: boolean;
+          requires_quote_review?: boolean;
           created_at?: string;
         };
         Relationships: [];
@@ -835,6 +838,10 @@ export type Database = {
           notes: string | null;
           ai_extracted: boolean;
           source_message_id: string | null;
+          quote_status: 'pending' | 'approved' | 'needs_correction';
+          quote_reviewed_by: string | null;
+          quote_reviewed_at: string | null;
+          quote_review_note: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -855,6 +862,10 @@ export type Database = {
           notes?: string | null;
           ai_extracted?: boolean;
           source_message_id?: string | null;
+          quote_status?: 'pending' | 'approved' | 'needs_correction';
+          quote_reviewed_by?: string | null;
+          quote_reviewed_at?: string | null;
+          quote_review_note?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -875,6 +886,10 @@ export type Database = {
           notes?: string | null;
           ai_extracted?: boolean;
           source_message_id?: string | null;
+          quote_status?: 'pending' | 'approved' | 'needs_correction';
+          quote_reviewed_by?: string | null;
+          quote_reviewed_at?: string | null;
+          quote_review_note?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -1066,6 +1081,10 @@ export type InquiryItem = {
   notes: string | null;
   ai_extracted: boolean;
   source_message_id: string | null;
+  quote_status: 'pending' | 'approved' | 'needs_correction';
+  quote_reviewed_by: string | null;
+  quote_reviewed_at: string | null;
+  quote_review_note: string | null;
   created_at: string;
   updated_at: string;
 };
