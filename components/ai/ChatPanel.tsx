@@ -3,8 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import { Bot, Loader2, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  appendAiChatMessage,
+  createAiChat,
+  type AiChatMessage,
+} from "@/lib/supabase/aiChats";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
+
+function toSavedMessage(m: ChatMessage): AiChatMessage {
+  return { ...m, createdAt: new Date().toISOString() };
+}
 
 export function ChatPanel({
   pageContext,
@@ -12,12 +21,24 @@ export function ChatPanel({
   fixedHeight = "500px",
   initialMessage,
   onSuggest,
+  context,
 }: {
   pageContext?: string;
   systemExtra?: string;
   fixedHeight?: string;
   initialMessage?: string;
   onSuggest?: (text: string) => void;
+  context?: {
+    subject?: string | null;
+    channel?: string;
+    status?: string;
+    customerName?: string | null;
+    storeName?: string | null;
+    brandName?: string | null;
+    recentMessages?: Array<{ direction: string; body: string }>;
+    internalNote?: string | null;
+    tags?: string[];
+  };
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState(initialMessage ?? "");
@@ -26,9 +47,40 @@ export function ChatPanel({
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Supabase保存用
+  const chatIdRef = useRef<string | null>(null);
+  const saveQueueRef = useRef<Promise<string | null>>(Promise.resolve(null));
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  /** チャットメッセージをSupabaseに非同期保存するキュー */
+  function enqueueSave(
+    message: AiChatMessage,
+    opts: { createIfMissing: boolean },
+  ): void {
+    const task = saveQueueRef.current
+      .then(async (queuedId) => {
+        const activeChatId = chatIdRef.current ?? queuedId;
+        if (activeChatId) {
+          await appendAiChatMessage(activeChatId, message);
+          return activeChatId;
+        }
+        if (!opts.createIfMissing) return null;
+        const newId = await createAiChat({
+          pageContext,
+          firstMessage: message,
+        });
+        chatIdRef.current = newId;
+        return newId;
+      })
+      .catch((e) => {
+        console.warn("[ChatPanel] save error:", e);
+        return chatIdRef.current;
+      });
+    saveQueueRef.current = task;
+  }
 
   const send = async () => {
     const text = input.trim();
@@ -39,15 +91,26 @@ export function ChatPanel({
     setInput("");
     setLoading(true);
     setError(null);
+
+    // ユーザーメッセージをSupabaseに保存（初回はcreate）
+    enqueueSave(toSavedMessage(userMsg), { createIfMissing: true });
+
     try {
       const res = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: next, pageContext, systemExtra }),
+        body: JSON.stringify({ messages: next, pageContext, systemExtra, context }),
       });
       const data = (await res.json()) as { reply?: string; error?: string };
       if (!res.ok || data.error) throw new Error(data.error ?? "エラーが発生しました");
-      setMessages([...next, { role: "assistant", content: data.reply ?? "" }]);
+      const assistantMsg: ChatMessage = {
+        role: "assistant",
+        content: data.reply ?? "",
+      };
+      setMessages([...next, assistantMsg]);
+
+      // AIの応答をSupabaseに保存（createIfMissing=falseでユーザーメッセージ後にのみ追記）
+      enqueueSave(toSavedMessage(assistantMsg), { createIfMissing: false });
     } catch (e) {
       setError(e instanceof Error ? e.message : "エラーが発生しました");
     } finally {
@@ -56,7 +119,10 @@ export function ChatPanel({
   };
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white" style={{ height: fixedHeight }}>
+    <div
+      className="flex flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white"
+      style={{ height: fixedHeight }}
+    >
       {/* メッセージエリア */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {messages.length === 0 && !loading ? (
@@ -67,7 +133,13 @@ export function ChatPanel({
         ) : null}
 
         {messages.map((msg, i) => (
-          <div key={i} className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
+          <div
+            key={i}
+            className={cn(
+              "flex",
+              msg.role === "user" ? "justify-end" : "justify-start",
+            )}
+          >
             {msg.role === "assistant" ? (
               <div className="flex items-start gap-2 max-w-[85%]">
                 <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-zinc-100 mt-0.5">
