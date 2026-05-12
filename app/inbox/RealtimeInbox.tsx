@@ -1579,7 +1579,7 @@ export function RealtimeInbox({
                       handleSendMessage();
                     }
                   }}
-                  placeholder="返信メッセージを入力（r キーでフォーカス）"
+                  placeholder="返信メッセージを入力（r フォーカス / ⌘+Enter 送信）"
                   value={replyBody}
                 />
                 {aiOriginalBody && replyBody !== aiOriginalBody ? (
