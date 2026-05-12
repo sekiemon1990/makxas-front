@@ -18,6 +18,8 @@ const MARGIN = 24;
 
 type Pos = { x: number; y: number };
 
+const DRAG_THRESHOLD = 5;
+
 function clamp(v: number, min: number, max: number) {
   return Math.min(Math.max(v, min), max);
 }
@@ -58,6 +60,9 @@ export function FloatingWidget({ pageContext: pageContextProp }: { pageContext?:
   const dragging = useRef(false);
   const dragOffset = useRef<Pos>({ x: 0, y: 0 });
   const posRef = useRef<Pos>({ x: 0, y: 0 });
+  const didDrag = useRef(false);
+  const dragStartPos = useRef<Pos>({ x: 0, y: 0 });
+  const justDragged = useRef(false);
 
   useEffect(() => {
     const saved = loadPos();
@@ -96,22 +101,49 @@ export function FloatingWidget({ pageContext: pageContextProp }: { pageContext?:
     });
   }, []);
 
-  const onDragStart = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if ((e.target as HTMLElement).closest("button,a")) return;
-      e.preventDefault();
-      dragging.current = true;
-      dragOffset.current = {
-        x: e.clientX - posRef.current.x,
-        y: e.clientY - posRef.current.y,
-      };
-    },
-    [],
-  );
+  // 閉じた状態のボタン用：mousedown でドラッグ開始を準備
+  const onButtonMouseDown = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    dragging.current = true;
+    didDrag.current = false;
+    dragStartPos.current = { x: e.clientX, y: e.clientY };
+    dragOffset.current = {
+      x: e.clientX - posRef.current.x,
+      y: e.clientY - posRef.current.y,
+    };
+  }, []);
+
+  // 閉じた状態のボタン用：ドラッグしていなければ開く
+  const onButtonClick = useCallback(() => {
+    if (justDragged.current) {
+      justDragged.current = false;
+      return;
+    }
+    handleOpen(true);
+  }, [handleOpen]);
+
+  // 開いた状態のヘッダー用：button/link 以外でドラッグ開始
+  const onHeaderMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest("button,a")) return;
+    e.preventDefault();
+    dragging.current = true;
+    didDrag.current = false;
+    dragStartPos.current = { x: e.clientX, y: e.clientY };
+    dragOffset.current = {
+      x: e.clientX - posRef.current.x,
+      y: e.clientY - posRef.current.y,
+    };
+  }, []);
 
   useEffect(() => {
     function onMouseMove(e: MouseEvent) {
       if (!dragging.current) return;
+      // 閾値未満の微小移動はドラッグとみなさない
+      if (!didDrag.current) {
+        const dx = e.clientX - dragStartPos.current.x;
+        const dy = e.clientY - dragStartPos.current.y;
+        if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+        didDrag.current = true;
+      }
       const next: Pos = {
         x: clamp(
           e.clientX - dragOffset.current.x,
@@ -130,10 +162,14 @@ export function FloatingWidget({ pageContext: pageContextProp }: { pageContext?:
     function onMouseUp() {
       if (!dragging.current) return;
       dragging.current = false;
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(posRef.current));
-      } catch {
-        /* ignore */
+      if (didDrag.current) {
+        justDragged.current = true;
+        didDrag.current = false;
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(posRef.current));
+        } catch {
+          /* ignore */
+        }
       }
     }
     window.addEventListener("mousemove", onMouseMove);
@@ -150,22 +186,18 @@ export function FloatingWidget({ pageContext: pageContextProp }: { pageContext?:
 
   return (
     <>
-      {/* フローティングボタン */}
+      {/* フローティングボタン（閉じた状態） */}
       {!open ? (
-        <div
-          className="fixed z-50"
-          onMouseDown={onDragStart}
+        <button
+          aria-label="AIアシスタントを開く"
+          className="fixed z-50 flex size-14 items-center justify-center rounded-full bg-zinc-950 text-white shadow-lg transition hover:bg-zinc-800 hover:scale-105"
+          onMouseDown={onButtonMouseDown}
+          onClick={onButtonClick}
           style={{ left: pos.x, top: pos.y, cursor: "grab" }}
+          type="button"
         >
-          <button
-            aria-label="AIアシスタントを開く"
-            className="flex size-14 items-center justify-center rounded-full bg-zinc-950 text-white shadow-lg transition hover:bg-zinc-800 hover:scale-105"
-            onClick={() => handleOpen(true)}
-            type="button"
-          >
-            <Bot className="size-6" />
-          </button>
-        </div>
+          <Bot className="size-6" />
+        </button>
       ) : null}
 
       {/* ウィジェット本体 */}
@@ -182,7 +214,7 @@ export function FloatingWidget({ pageContext: pageContextProp }: { pageContext?:
           {/* ヘッダー（ドラッグハンドル） */}
           <div
             className="flex items-center justify-between border-b border-zinc-200 bg-zinc-950 px-4 py-3 select-none shrink-0"
-            onMouseDown={onDragStart}
+            onMouseDown={onHeaderMouseDown}
             style={{ cursor: "grab" }}
           >
             <div className="flex items-center gap-2">
