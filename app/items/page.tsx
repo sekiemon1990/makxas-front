@@ -3,7 +3,9 @@ import { Package } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
 import { ChannelBadge } from "@/components/badges";
+import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { QuoteReviewTab } from "@/components/items/QuoteReviewTab";
 import type { InquiryItemCondition } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -65,10 +67,12 @@ type ItemRow = {
   quote_price_max: number | null;
   notes: string | null;
   ai_extracted: boolean;
+  quote_status: "pending" | "approved" | "needs_correction";
+  quote_review_note: string | null;
   created_at: string;
-  // joined
   inquiry_channel: string | null;
   inquiry_subject: string | null;
+  inquiry_assigned_name: string | null;
   lead_name: string | null;
   lead_phone: string | null;
 };
@@ -79,19 +83,35 @@ export default async function ItemsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
+  const activeTab = (typeof sp.tab === "string" ? sp.tab : "") || "all";
   const filterCondition = (typeof sp.condition === "string" ? sp.condition : "") || "";
   const filterQuote = sp.quote === "1";
   const filterSearch = (typeof sp.q === "string" ? sp.q : "") || "";
 
   const supabase = createServiceClient();
 
+  // 現在のログインユーザーのroleとstaff_idを取得
+  const authClient = await createClient();
+  const { data: { user } } = await authClient.auth.getUser();
+  let currentStaff: { id: string; role: string } | null = null;
+  if (user) {
+    const { data: staffRow } = await supabase
+      .from("staff")
+      .select("id, role")
+      .eq("auth_id", user.id)
+      .single();
+    currentStaff = staffRow;
+  }
+  const isAdmin = currentStaff?.role === "admin" || currentStaff?.role === "super_admin";
+
   // inquiry_items と inquiry・lead を JOIN して取得
   const { data: rawItems } = await supabase
     .from("inquiry_items")
     .select(
       `*,
-      inquiries(id, channel, subject, lead_id,
-        leads(id, display_name, phone, email)
+      inquiries(id, channel, subject, lead_id, assigned_to,
+        leads(id, display_name, phone, email),
+        staff:assigned_to(id, name)
       )`
     )
     .order("created_at", { ascending: false });
@@ -103,7 +123,9 @@ export default async function ItemsPage({
       channel: string;
       subject: string | null;
       lead_id: string | null;
+      assigned_to: string | null;
       leads: { id: string; display_name: string | null; phone: string | null; email: string | null } | null;
+      staff: { id: string; name: string } | null;
     } | null;
     const lead = inq?.leads ?? null;
     return {
@@ -121,15 +143,41 @@ export default async function ItemsPage({
       quote_price_max: r.quote_price_max,
       notes: r.notes,
       ai_extracted: r.ai_extracted,
+      quote_status: (r.quote_status as "pending" | "approved" | "needs_correction") ?? "pending",
+      quote_review_note: r.quote_review_note ?? null,
       created_at: r.created_at,
       inquiry_channel: inq?.channel ?? null,
       inquiry_subject: inq?.subject ?? null,
+      inquiry_assigned_name: inq?.staff?.name ?? null,
       lead_name: lead?.display_name ?? lead?.phone ?? lead?.email ?? null,
       lead_phone: lead?.phone ?? null,
     };
   });
 
-  // フィルタリング
+  // 事前査定確認タブ: requires_quote_review=true のスタッフが担当している反響の査定のみ
+  // staffデータを取得してrequires_quote_review=trueのIDセットを作成
+  const { data: reviewStaff } = await supabase
+    .from("staff")
+    .select("id")
+    .eq("requires_quote_review", true);
+  const reviewStaffIds = new Set((reviewStaff ?? []).map((s) => s.id));
+
+  // 事前査定確認タブ用: quote_price_min が設定済み かつ 担当スタッフが要確認フラグON
+  const reviewItems = items.filter(
+    (item) =>
+      item.quote_price_min != null &&
+      item.inquiry_assigned_name !== null && // 担当者あり
+      // inquiriesのassigned_toを使う必要があるため rawItems から引く
+      (() => {
+        const raw = (rawItems ?? []).find((r) => r.id === item.id);
+        const assignedTo = (raw?.inquiries as { assigned_to?: string | null } | null)?.assigned_to;
+        return assignedTo ? reviewStaffIds.has(assignedTo) : false;
+      })()
+  );
+
+  const pendingReviewCount = reviewItems.filter((i) => i.quote_status === "pending").length;
+
+  // 全商品タブ: フィルタリング
   const filtered = items.filter((item) => {
     if (filterCondition && item.condition !== filterCondition) return false;
     if (filterQuote && !item.quote_type) return false;
@@ -150,9 +198,6 @@ export default async function ItemsPage({
   const totalItems = items.length;
   const quotedItems = items.filter((i) => !!i.quote_type).length;
   const aiItems = items.filter((i) => i.ai_extracted).length;
-
-  // ブランド一覧（フィルター用）
-  const brands = [...new Set(items.map((i) => i.brand).filter(Boolean))] as string[];
 
   return (
     <AppShell>
@@ -186,177 +231,221 @@ export default async function ItemsPage({
           </div>
         </div>
 
-        {/* ── フィルターバー ───────────────────────────────── */}
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          {/* 検索 */}
-          <form method="GET" className="flex gap-2 flex-1 min-w-[200px] max-w-xs">
-            <input
-              type="text"
-              name="q"
-              defaultValue={filterSearch}
-              placeholder="商品名・ブランド・顧客名で検索"
-              className="h-8 flex-1 rounded-lg border border-zinc-200 bg-white px-3 text-xs placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-violet-400"
-            />
-            {filterCondition && <input type="hidden" name="condition" value={filterCondition} />}
-            {filterQuote && <input type="hidden" name="quote" value="1" />}
-            <button type="submit" className="h-8 rounded-lg bg-zinc-900 px-3 text-xs font-medium text-white hover:bg-zinc-700">
-              検索
-            </button>
-          </form>
-
-          {/* 状態フィルター */}
-          <div className="flex flex-wrap gap-1.5">
-            {filterCondition || filterQuote || filterSearch ? (
-              <Link
-                href="/items"
-                className="flex items-center gap-1 rounded-full border border-zinc-300 bg-white px-2.5 py-1 text-[11px] text-zinc-600 hover:bg-zinc-50"
-              >
-                ✕ フィルター解除
-              </Link>
-            ) : null}
-            {(["N","S","A","B","C","D","J"] as InquiryItemCondition[]).map((c) => (
-              <Link
-                key={c}
-                href={`/items?condition=${c}${filterSearch ? `&q=${encodeURIComponent(filterSearch)}` : ""}`}
-                className={`rounded-full px-2.5 py-1 text-[11px] font-medium border transition ${
-                  filterCondition === c
-                    ? CONDITION_COLORS[c] + " border-current"
-                    : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
-                }`}
-              >
-                {c}
-              </Link>
-            ))}
+        {/* ── タブ ────────────────────────────────────────── */}
+        <div className="mb-4 flex items-center gap-1 border-b border-zinc-200">
+          <Link
+            href="/items"
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              activeTab !== "review"
+                ? "border-zinc-900 text-zinc-900"
+                : "border-transparent text-zinc-500 hover:text-zinc-700"
+            }`}
+          >
+            全商品
+          </Link>
+          {isAdmin && (
             <Link
-              href={`/items?quote=1${filterSearch ? `&q=${encodeURIComponent(filterSearch)}` : ""}`}
-              className={`rounded-full px-2.5 py-1 text-[11px] font-medium border transition ${
-                filterQuote
-                  ? "border-emerald-400 bg-emerald-50 text-emerald-700"
-                  : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
+              href="/items?tab=review"
+              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                activeTab === "review"
+                  ? "border-amber-500 text-amber-700"
+                  : "border-transparent text-zinc-500 hover:text-zinc-700"
               }`}
             >
-              💰 事前査定あり
+              事前査定確認
+              {pendingReviewCount > 0 && (
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+                  {pendingReviewCount}
+                </span>
+              )}
             </Link>
-          </div>
+          )}
         </div>
 
-        {/* ── 結果件数 ─────────────────────────────────────── */}
-        <p className="mb-3 text-xs text-zinc-500">
-          {filtered.length} 件表示
-          {filtered.length < totalItems ? ` / 全 ${totalItems} 件` : ""}
-        </p>
-
-        {/* ── 商品テーブル ─────────────────────────────────── */}
-        {filtered.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-zinc-300 bg-white p-10 text-center text-sm text-zinc-500">
-            商品が見つかりませんでした
-          </div>
+        {/* ── 事前査定確認タブ ──────────────────────────── */}
+        {activeTab === "review" && isAdmin ? (
+          <QuoteReviewTab
+            items={reviewItems.map((item) => ({
+              ...item,
+              reviewer_staff_id: currentStaff?.id ?? "",
+            }))}
+            reviewerStaffId={currentStaff?.id ?? ""}
+          />
         ) : (
-          <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-100 bg-zinc-50 text-xs text-zinc-500">
-                  <th className="px-4 py-2.5 text-left font-medium">商品名</th>
-                  <th className="px-4 py-2.5 text-left font-medium">状態</th>
-                  <th className="px-4 py-2.5 text-left font-medium hidden sm:table-cell">ブランド / 型番</th>
-                  <th className="px-4 py-2.5 text-left font-medium hidden md:table-cell">事前査定額</th>
-                  <th className="px-4 py-2.5 text-left font-medium hidden lg:table-cell">顧客</th>
-                  <th className="px-4 py-2.5 text-left font-medium hidden lg:table-cell">チャネル</th>
-                  <th className="px-4 py-2.5 text-right font-medium">日付</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {filtered.map((item) => {
-                  const quoteStr = formatQuote(
-                    item.quote_type as QuoteType | null,
-                    item.quote_price_min,
-                    item.quote_price_max,
-                  );
-                  const condVal = item.condition as InquiryItemCondition | null;
+          <>
+            {/* ── フィルターバー ───────────────────────────────── */}
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              {/* 検索 */}
+              <form method="GET" className="flex gap-2 flex-1 min-w-[200px] max-w-xs">
+                <input
+                  type="text"
+                  name="q"
+                  defaultValue={filterSearch}
+                  placeholder="商品名・ブランド・顧客名で検索"
+                  className="h-8 flex-1 rounded-lg border border-zinc-200 bg-white px-3 text-xs placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-violet-400"
+                />
+                {filterCondition && <input type="hidden" name="condition" value={filterCondition} />}
+                {filterQuote && <input type="hidden" name="quote" value="1" />}
+                <button type="submit" className="h-8 rounded-lg bg-zinc-900 px-3 text-xs font-medium text-white hover:bg-zinc-700">
+                  検索
+                </button>
+              </form>
 
-                  return (
-                    <tr key={item.id} className="hover:bg-zinc-50/60 transition-colors">
-                      {/* 商品名 */}
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-zinc-800">{item.item_name}</div>
-                        {item.accessories && (
-                          <div className="text-[11px] text-zinc-400 mt-0.5">📦 {item.accessories}</div>
-                        )}
-                        {item.ai_extracted && (
-                          <span className="mt-0.5 inline-block rounded bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-600">AI</span>
-                        )}
-                      </td>
+              {/* 状態フィルター */}
+              <div className="flex flex-wrap gap-1.5">
+                {filterCondition || filterQuote || filterSearch ? (
+                  <Link
+                    href="/items"
+                    className="flex items-center gap-1 rounded-full border border-zinc-300 bg-white px-2.5 py-1 text-[11px] text-zinc-600 hover:bg-zinc-50"
+                  >
+                    ✕ フィルター解除
+                  </Link>
+                ) : null}
+                {(["N","S","A","B","C","D","J"] as InquiryItemCondition[]).map((c) => (
+                  <Link
+                    key={c}
+                    href={`/items?condition=${c}${filterSearch ? `&q=${encodeURIComponent(filterSearch)}` : ""}`}
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-medium border transition ${
+                      filterCondition === c
+                        ? CONDITION_COLORS[c] + " border-current"
+                        : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
+                    }`}
+                  >
+                    {c}
+                  </Link>
+                ))}
+                <Link
+                  href={`/items?quote=1${filterSearch ? `&q=${encodeURIComponent(filterSearch)}` : ""}`}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-medium border transition ${
+                    filterQuote
+                      ? "border-emerald-400 bg-emerald-50 text-emerald-700"
+                      : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
+                  }`}
+                >
+                  💰 事前査定あり
+                </Link>
+              </div>
+            </div>
 
-                      {/* 状態 */}
-                      <td className="px-4 py-3">
-                        {condVal ? (
-                          <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${CONDITION_COLORS[condVal]}`}>
-                            {condVal}
-                            <span className="ml-1 font-normal hidden xl:inline">{CONDITION_LABELS[condVal]}</span>
-                          </span>
-                        ) : (
-                          <span className="text-zinc-300">—</span>
-                        )}
-                      </td>
+            {/* ── 結果件数 ─────────────────────────────────────── */}
+            <p className="mb-3 text-xs text-zinc-500">
+              {filtered.length} 件表示
+              {filtered.length < totalItems ? ` / 全 ${totalItems} 件` : ""}
+            </p>
 
-                      {/* ブランド/型番 */}
-                      <td className="px-4 py-3 hidden sm:table-cell">
-                        <div className="text-xs text-zinc-700">{item.brand ?? "—"}</div>
-                        {item.model_number && (
-                          <div className="text-[11px] text-zinc-400">{item.model_number}</div>
-                        )}
-                      </td>
-
-                      {/* 事前査定額 */}
-                      <td className="px-4 py-3 hidden md:table-cell">
-                        {quoteStr ? (
-                          <span className="text-sm font-medium text-emerald-700">{quoteStr}</span>
-                        ) : (
-                          <span className="text-zinc-300 text-xs">未査定</span>
-                        )}
-                      </td>
-
-                      {/* 顧客 */}
-                      <td className="px-4 py-3 hidden lg:table-cell">
-                        {item.lead_id ? (
-                          <Link
-                            href={`/leads/${item.lead_id}`}
-                            className="text-xs text-violet-700 hover:underline font-medium"
-                          >
-                            {item.lead_name ?? "名前未登録"}
-                          </Link>
-                        ) : (
-                          <span className="text-zinc-400 text-xs">—</span>
-                        )}
-                      </td>
-
-                      {/* チャネル */}
-                      <td className="px-4 py-3 hidden lg:table-cell">
-                        {item.inquiry_channel ? (
-                          <Link href={`/inbox?id=${item.inquiry_id}`} className="inline-flex items-center gap-1 hover:opacity-80">
-                            <ChannelBadge channel={item.inquiry_channel as Parameters<typeof ChannelBadge>[0]["channel"]} />
-                            {item.inquiry_subject && (
-                              <span className="text-[11px] text-zinc-500 truncate max-w-[100px]">{item.inquiry_subject}</span>
-                            )}
-                          </Link>
-                        ) : null}
-                      </td>
-
-                      {/* 日付 */}
-                      <td className="px-4 py-3 text-right text-[11px] text-zinc-400 whitespace-nowrap">
-                        {new Intl.DateTimeFormat("ja-JP", {
-                          month: "2-digit",
-                          day: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        }).format(new Date(item.created_at))}
-                      </td>
+            {/* ── 商品テーブル ─────────────────────────────────── */}
+            {filtered.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-zinc-300 bg-white p-10 text-center text-sm text-zinc-500">
+                商品が見つかりませんでした
+              </div>
+            ) : (
+              <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-zinc-100 bg-zinc-50 text-xs text-zinc-500">
+                      <th className="px-4 py-2.5 text-left font-medium">商品名</th>
+                      <th className="px-4 py-2.5 text-left font-medium">状態</th>
+                      <th className="px-4 py-2.5 text-left font-medium hidden sm:table-cell">ブランド / 型番</th>
+                      <th className="px-4 py-2.5 text-left font-medium hidden md:table-cell">事前査定額</th>
+                      <th className="px-4 py-2.5 text-left font-medium hidden lg:table-cell">顧客</th>
+                      <th className="px-4 py-2.5 text-left font-medium hidden lg:table-cell">チャネル</th>
+                      <th className="px-4 py-2.5 text-right font-medium">日付</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100">
+                    {filtered.map((item) => {
+                      const quoteStr = formatQuote(
+                        item.quote_type as QuoteType | null,
+                        item.quote_price_min,
+                        item.quote_price_max,
+                      );
+                      const condVal = item.condition as InquiryItemCondition | null;
+
+                      return (
+                        <tr key={item.id} className="hover:bg-zinc-50/60 transition-colors">
+                          {/* 商品名 */}
+                          <td className="px-4 py-3">
+                            <div className="font-medium text-zinc-800">{item.item_name}</div>
+                            {item.accessories && (
+                              <div className="text-[11px] text-zinc-400 mt-0.5">📦 {item.accessories}</div>
+                            )}
+                            {item.ai_extracted && (
+                              <span className="mt-0.5 inline-block rounded bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-600">AI</span>
+                            )}
+                          </td>
+
+                          {/* 状態 */}
+                          <td className="px-4 py-3">
+                            {condVal ? (
+                              <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${CONDITION_COLORS[condVal]}`}>
+                                {condVal}
+                                <span className="ml-1 font-normal hidden xl:inline">{CONDITION_LABELS[condVal]}</span>
+                              </span>
+                            ) : (
+                              <span className="text-zinc-300">—</span>
+                            )}
+                          </td>
+
+                          {/* ブランド/型番 */}
+                          <td className="px-4 py-3 hidden sm:table-cell">
+                            <div className="text-xs text-zinc-700">{item.brand ?? "—"}</div>
+                            {item.model_number && (
+                              <div className="text-[11px] text-zinc-400">{item.model_number}</div>
+                            )}
+                          </td>
+
+                          {/* 事前査定額 */}
+                          <td className="px-4 py-3 hidden md:table-cell">
+                            {quoteStr ? (
+                              <span className="text-sm font-medium text-emerald-700">{quoteStr}</span>
+                            ) : (
+                              <span className="text-zinc-300 text-xs">未査定</span>
+                            )}
+                          </td>
+
+                          {/* 顧客 */}
+                          <td className="px-4 py-3 hidden lg:table-cell">
+                            {item.lead_id ? (
+                              <Link
+                                href={`/leads/${item.lead_id}`}
+                                className="text-xs text-violet-700 hover:underline font-medium"
+                              >
+                                {item.lead_name ?? "名前未登録"}
+                              </Link>
+                            ) : (
+                              <span className="text-zinc-400 text-xs">—</span>
+                            )}
+                          </td>
+
+                          {/* チャネル */}
+                          <td className="px-4 py-3 hidden lg:table-cell">
+                            {item.inquiry_channel ? (
+                              <Link href={`/inbox?id=${item.inquiry_id}`} className="inline-flex items-center gap-1 hover:opacity-80">
+                                <ChannelBadge channel={item.inquiry_channel as Parameters<typeof ChannelBadge>[0]["channel"]} />
+                                {item.inquiry_subject && (
+                                  <span className="text-[11px] text-zinc-500 truncate max-w-[100px]">{item.inquiry_subject}</span>
+                                )}
+                              </Link>
+                            ) : null}
+                          </td>
+
+                          {/* 日付 */}
+                          <td className="px-4 py-3 text-right text-[11px] text-zinc-400 whitespace-nowrap">
+                            {new Intl.DateTimeFormat("ja-JP", {
+                              month: "2-digit",
+                              day: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            }).format(new Date(item.created_at))}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </div>
     </AppShell>

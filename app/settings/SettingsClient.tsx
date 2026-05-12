@@ -463,6 +463,10 @@ function StaffAccessList({
 }) {
   const [teamSaving, setTeamSaving] = useState<string | null>(null);
   const [calSyncing, setCalSyncing] = useState<string | null>(null);
+  const [quoteReviewSaving, setQuoteReviewSaving] = useState<string | null>(null);
+  const [quoteReviewFlags, setQuoteReviewFlags] = useState<Record<string, boolean>>(
+    Object.fromEntries(staff.map((s) => [s.id, s.requires_quote_review ?? false]))
+  );
   const [staffTeams, setStaffTeams] = useState<Record<string, string>>(
     Object.fromEntries(staff.map((s) => [s.id, (s as Staff & { team?: string }).team ?? "IS"]))
   );
@@ -486,6 +490,17 @@ function StaffAccessList({
       body: JSON.stringify({ staff_id: staffId }),
     });
     setCalSyncing(null);
+  };
+
+  const handleQuoteReviewToggle = async (staffId: string, value: boolean) => {
+    setQuoteReviewSaving(staffId);
+    setQuoteReviewFlags((prev) => ({ ...prev, [staffId]: value }));
+    await fetch("/api/settings/staff-quote-review", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ staff_id: staffId, requires_quote_review: value }),
+    });
+    setQuoteReviewSaving(null);
   };
 
   return (
@@ -548,6 +563,27 @@ function StaffAccessList({
                     <option value="FS">FS（フィールドセールス）</option>
                   </select>
                   {teamSaving === member.id ? <Loader2 className="size-3 animate-spin text-zinc-400" /> : null}
+                </div>
+                {/* 査定要確認トグル */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-zinc-400">査定要確認:</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={quoteReviewFlags[member.id] ?? false}
+                    disabled={quoteReviewSaving === member.id}
+                    onClick={() => void handleQuoteReviewToggle(member.id, !(quoteReviewFlags[member.id] ?? false))}
+                    className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none disabled:opacity-50 ${
+                      quoteReviewFlags[member.id] ? "bg-amber-500" : "bg-zinc-300"
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
+                        quoteReviewFlags[member.id] ? "translate-x-3" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                  {quoteReviewSaving === member.id ? <Loader2 className="size-3 animate-spin text-zinc-400" /> : null}
                 </div>
                 {/* ブランドアクセス */}
                 <div className="flex flex-wrap justify-end gap-1.5">
