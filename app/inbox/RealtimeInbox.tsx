@@ -1166,8 +1166,7 @@ export function RealtimeInbox({
                     </Select>
                     <Button size="sm" className="shrink-0 h-8" onClick={() => setAppointmentOpen(true)}>
                       <CalendarPlus className="size-3.5" aria-hidden="true" />
-                      <span className="hidden xs:inline">アポ設定</span>
-                      <span className="xs:hidden">アポ</span>
+                      アポ設定
                     </Button>
                   </div>
                 </div>
