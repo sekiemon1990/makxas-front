@@ -167,7 +167,7 @@ export function AiSuggestPanel({
 
   return (
     <div
-      className="absolute right-0 top-0 bottom-0 z-20 flex w-[340px] flex-col bg-white border-l border-zinc-200 shadow-xl"
+      className="absolute right-0 top-0 bottom-0 z-20 flex w-full max-w-[340px] flex-col bg-white border-l border-zinc-200 shadow-xl"
       style={{
         transform: open ? "translateX(0)" : "translateX(100%)",
         transition: "transform 200ms ease-in-out",
@@ -318,7 +318,7 @@ export function AiSuggestPanel({
         <div className="flex gap-2">
           <Textarea
             ref={inputRef}
-            className="min-h-0 h-9 resize-none bg-white text-xs py-2"
+            className="min-h-0 h-9 resize-none bg-white text-base md:text-xs py-2"
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {

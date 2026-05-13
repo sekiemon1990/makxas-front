@@ -804,7 +804,7 @@ export function RealtimeInbox({
           onClick={() => setShowShortcuts(false)}
         >
           <div
-            className="w-80 rounded-xl border border-zinc-200 bg-white p-5 shadow-xl"
+            className="w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-zinc-200 bg-white p-5 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
@@ -1113,8 +1113,8 @@ export function RealtimeInbox({
         <section className={cn("relative flex min-w-0 flex-col bg-white overflow-hidden", mobilePanel !== "detail" && "hidden md:flex")}>
           {selectedInquiry ? (
             <>
-              <div className="sticky top-0 z-10 border-b border-zinc-200 bg-white px-4 py-2.5">
-                <div className="flex items-center gap-3">
+              <div className="sticky top-0 z-10 border-b border-zinc-200 bg-white px-3 py-2.5 md:px-4">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <ChannelBadge channel={selectedInquiry.channel} showLabel />
@@ -1146,9 +1146,9 @@ export function RealtimeInbox({
                       {selectedInquiry.subject ?? "件名なし"}
                     </h2>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 md:shrink-0">
                     <Select value={selectedInquiry.status} onValueChange={(value) => handleStatusChange(value as InquiryStatus)}>
-                      <SelectTrigger className="h-8 w-28 bg-white text-xs"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-8 flex-1 bg-white text-xs md:w-28 md:flex-none"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {statusFilters.filter((filter) => filter.value !== "all").map((filter) => (
                           <SelectItem key={filter.value} value={filter.value}>{filter.label}</SelectItem>
@@ -1156,7 +1156,7 @@ export function RealtimeInbox({
                       </SelectContent>
                     </Select>
                     <Select value={selectedInquiry.assigned_to ?? "unassigned"} onValueChange={handleAssignChange}>
-                      <SelectTrigger className="h-8 w-24 bg-white text-xs"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-8 flex-1 bg-white text-xs md:w-24 md:flex-none"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="unassigned">未アサイン</SelectItem>
                         {staff.map((member) => (
@@ -1166,7 +1166,8 @@ export function RealtimeInbox({
                     </Select>
                     <Button size="sm" className="shrink-0 h-8" onClick={() => setAppointmentOpen(true)}>
                       <CalendarPlus className="size-3.5" aria-hidden="true" />
-                      アポ設定
+                      <span className="hidden xs:inline">アポ設定</span>
+                      <span className="xs:hidden">アポ</span>
                     </Button>
                   </div>
                 </div>
@@ -1252,7 +1253,7 @@ export function RealtimeInbox({
               ) : null}
 
               {/* メッセージスレッド */}
-              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+              <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 md:px-4 md:py-4">
                 <div className="space-y-3">
                   {messages.map((message) => {
                     const isOut = message.direction === "outbound";
@@ -1321,7 +1322,7 @@ export function RealtimeInbox({
               </div>
 
               {/* 商品情報パネル */}
-              <div className="border-t border-zinc-200 px-4 pt-3">
+              <div className="border-t border-zinc-200 px-3 pt-3 md:px-4">
                 <InquiryItemsPanel
                   inquiryId={selectedInquiry.id}
                   leadId={selectedInquiry.lead_id}
@@ -1330,7 +1331,7 @@ export function RealtimeInbox({
               </div>
 
               {/* 返信・操作エリア */}
-              <div className="border-t border-zinc-200 bg-zinc-50/80 px-4 py-3 space-y-2.5">
+              <div className="border-t border-zinc-200 bg-zinc-50/80 px-3 py-3 space-y-2.5 md:px-4">
                 {/* タグ + 内部メモ・リマインダートグルバー */}
                 <div className="flex items-center gap-2 flex-wrap border-b border-zinc-100 pb-2">
                   <Tag className="size-3 text-zinc-400 shrink-0" aria-hidden="true" />
@@ -1595,7 +1596,7 @@ export function RealtimeInbox({
                 {/* 返信テキストエリア（全幅） */}
                 <Textarea
                   ref={replyRef}
-                  className="min-h-[80px] resize-none bg-white text-sm"
+                  className="min-h-[80px] resize-none bg-white text-base md:text-sm"
                   onChange={(e) => {
                     setReplyBody(e.target.value);
                     setAiOriginalBody(null);
