@@ -99,9 +99,23 @@ export const channelFilters: InquiryChannel[] = [
 ];
 
 export const categoryOptions = [
+  "貴金属",
+  "時計",
   "ブランド品",
   "骨董品",
-  "貴金属",
+  "スマートフォン",
+  "PC・タブレット",
+  "ゲーム機",
+  "カメラ",
   "楽器",
   "その他",
 ];
+
+/** 高価古物カテゴリ（追加買取の最優先ターゲット） */
+export const HIGH_VALUE_CATEGORIES = ["貴金属", "時計", "ブランド品", "骨董品"] as const;
+
+/** この金額以上（円）の事前査定・見込み金額は ⭐ 高単価バッジを表示 */
+export const HIGH_VALUE_PRICE_THRESHOLD = 30000;
+
+/** 追加買取の提案対象とする中古価格の最低ライン（円）—— これ未満の商材は提案しない */
+export const BUYOUT_MIN_THRESHOLD = 5000;

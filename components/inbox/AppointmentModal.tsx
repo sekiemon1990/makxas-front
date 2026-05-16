@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -21,18 +22,36 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { categoryOptions } from "@/lib/inquiry-options";
+import type { CustomerProfile } from "@/components/inbox/InquiryItemsPanel";
 import type { InquiryWithLead } from "@/types/database";
+
+// 顧客属性別の確認チェックリスト
+function getChecklistItems(profile: CustomerProfile | null): string[] {
+  if (!profile || profile.age_group === "unknown") {
+    return ["貴金属・金製品", "時計（高級品）", "ブランドバッグ・財布", "スマートフォン", "PC・タブレット", "ゲーム機", "カメラ"];
+  }
+  if (profile.age_group === "middle_senior") {
+    if (profile.income_level === "affluent") {
+      return ["貴金属・金製品", "時計（高級品）", "ブランドバッグ・財布", "骨董品・美術品", "宝石・ダイヤ"];
+    }
+    return ["貴金属・金製品", "ブランドバッグ・財布", "カメラ", "楽器", "着物・帯"];
+  }
+  // young
+  return ["スマートフォン", "PC・タブレット", "ゲーム機", "イヤホン・ヘッドホン", "カメラ"];
+}
 
 export function AppointmentModal({
   inquiry,
   onOpenChange,
   onSaved,
   open,
+  customerProfile,
 }: {
   inquiry: InquiryWithLead | null;
   onOpenChange: (open: boolean) => void;
   onSaved: (inquiry: InquiryWithLead) => void;
   open: boolean;
+  customerProfile?: CustomerProfile | null;
 }) {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
@@ -42,6 +61,11 @@ export function AppointmentModal({
   const [method, setMethod] = useState<"visit" | "delivery">("visit");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // 追加品チェックリスト
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
+  const checklistItems = getChecklistItems(customerProfile ?? null);
 
   // FS スタッフの稼働状況（日付選択時に取得）
   type FsEvent = { id: string; title: string | null; start_at: string; end_at: string; all_day: boolean; staff?: { name: string } | null };
@@ -80,6 +104,10 @@ export function AppointmentModal({
     setSaving(true);
     setError(null);
 
+    const confirmedItems = Object.entries(checkedItems)
+      .filter(([, v]) => v)
+      .map(([k]) => k);
+
     const response = await fetch("/api/appointments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -91,6 +119,7 @@ export function AppointmentModal({
         address,
         preferred_method: method,
         staff_id: inquiry.assigned_to,
+        additional_items_confirmed: confirmedItems.length > 0 ? confirmedItems : null,
       }),
     });
 
@@ -216,6 +245,47 @@ export function AppointmentModal({
               </SelectContent>
             </Select>
           </Field>
+          {/* 追加品確認チェックリスト */}
+          <div className="rounded-lg border border-amber-200 bg-amber-50 overflow-hidden">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between px-3 py-2 text-left"
+              onClick={() => setChecklistOpen((v) => !v)}
+            >
+              <span className="text-xs font-semibold text-amber-800">
+                💡 追加査定品の確認チェックリスト
+                {Object.values(checkedItems).filter(Boolean).length > 0 && (
+                  <span className="ml-1.5 rounded-full bg-amber-200 px-1.5 py-0.5 text-[10px] text-amber-900">
+                    {Object.values(checkedItems).filter(Boolean).length}件確認済み
+                  </span>
+                )}
+              </span>
+              {checklistOpen ? (
+                <ChevronUp className="size-4 text-amber-600" />
+              ) : (
+                <ChevronDown className="size-4 text-amber-600" />
+              )}
+            </button>
+            {checklistOpen && (
+              <div className="border-t border-amber-200 bg-white px-3 py-2 space-y-1.5">
+                <p className="text-[10px] text-zinc-500">FSスタッフに確認してほしい追加品目にチェックを入れてください</p>
+                {checklistItems.map((item) => (
+                  <label key={item} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="size-3.5 rounded accent-amber-500"
+                      checked={!!checkedItems[item]}
+                      onChange={(e) =>
+                        setCheckedItems((prev) => ({ ...prev, [item]: e.target.checked }))
+                      }
+                    />
+                    <span className="text-xs text-zinc-700">{item}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
           {error ? <p className="text-sm text-rose-600">{error}</p> : null}
         </div>
 
