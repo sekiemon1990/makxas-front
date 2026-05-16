@@ -1,14 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bot, GripHorizontal, MessageSquarePlus, X } from "lucide-react";
+import { Bot, GripHorizontal, MessageSquarePlus, X, History, ChevronLeft, Loader2 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useWidgetPageContext } from "@/contexts/WidgetPageContext";
 import { ChatPanel } from "./ChatPanel";
 import { FeedbackForm } from "./FeedbackForm";
+import { useAiChats, type AiChat } from "@/lib/supabase/aiChats";
 
-type Tab = "chat" | "feedback";
+type Tab = "chat" | "history" | "feedback";
 
 const STORAGE_KEY = "makxas-widget-pos";
 const PANEL_W = 380;
@@ -45,11 +46,28 @@ function defaultPos(open: boolean): Pos {
   };
 }
 
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
+  if (diffDays === 0) return d.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+  if (diffDays === 1) return "昨日";
+  if (diffDays < 7) return `${diffDays}日前`;
+  return d.toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" });
+}
+
 export function FloatingWidget({ pageContext: pageContextProp }: { pageContext?: string }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("chat");
   const pathname = usePathname();
   const { widgetPageInfo } = useWidgetPageContext();
+
+  // この画面の履歴
+  const { chats, isLoading: chatsLoading } = useAiChats();
+  const pageChats = chats.filter((c) => c.pageContext.includes(pathname));
+
+  // 選択中チャットの詳細
+  const [selectedChat, setSelectedChat] = useState<AiChat | null>(null);
 
   // ページコンテキスト: propsで渡された値 > WidgetPageContext > パスから生成
   const pageContext =
@@ -119,6 +137,7 @@ export function FloatingWidget({ pageContext: pageContextProp }: { pageContext?:
           return c;
         });
       }
+      setSelectedChat(null);
     }
   }, []);
 
@@ -257,39 +276,103 @@ export function FloatingWidget({ pageContext: pageContextProp }: { pageContext?:
 
           {/* タブ */}
           <div className="flex border-b border-zinc-200 shrink-0">
-            <button
-              className={cn(
-                "flex flex-1 items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition",
-                tab === "chat"
-                  ? "border-b-2 border-zinc-950 text-zinc-950"
-                  : "text-zinc-500 hover:text-zinc-700",
-              )}
-              onClick={() => setTab("chat")}
-              type="button"
-            >
-              <Bot className="size-3.5" />
-              AIチャット
-            </button>
-            <button
-              className={cn(
-                "flex flex-1 items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition",
-                tab === "feedback"
-                  ? "border-b-2 border-zinc-950 text-zinc-950"
-                  : "text-zinc-500 hover:text-zinc-700",
-              )}
-              onClick={() => setTab("feedback")}
-              type="button"
-            >
-              <MessageSquarePlus className="size-3.5" />
-              フィードバック
-            </button>
+            {(["chat", "history", "feedback"] as Tab[]).map((t) => (
+              <button
+                key={t}
+                type="button"
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition",
+                  tab === t
+                    ? "border-b-2 border-zinc-950 text-zinc-950"
+                    : "text-zinc-500 hover:text-zinc-700",
+                )}
+                onClick={() => { setTab(t); setSelectedChat(null); }}
+              >
+                {t === "chat" && <><Bot className="size-3.5" />AIチャット</>}
+                {t === "history" && <><History className="size-3.5" />この画面の履歴</>}
+                {t === "feedback" && <><MessageSquarePlus className="size-3.5" />フィードバック</>}
+              </button>
+            ))}
           </div>
 
           {/* コンテンツ */}
           <div className="min-h-0 flex-1 overflow-hidden">
-            {tab === "chat" ? (
+            {/* チャット */}
+            {tab === "chat" && (
               <ChatPanel fixedHeight="100%" pageContext={pageContext} />
-            ) : (
+            )}
+
+            {/* この画面の履歴 */}
+            {tab === "history" && (
+              <div className="h-full flex flex-col overflow-hidden">
+                {selectedChat ? (
+                  /* 選択チャットの詳細 */
+                  <div className="flex flex-col h-full">
+                    <div className="flex items-center gap-2 px-3 py-2 border-b border-zinc-200 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedChat(null)}
+                        className="text-zinc-400 hover:text-zinc-700 transition-colors"
+                        aria-label="一覧に戻る"
+                      >
+                        <ChevronLeft className="size-4" />
+                      </button>
+                      <span className="text-xs text-zinc-500 flex-1 truncate">{selectedChat.firstQuestion}</span>
+                    </div>
+                    <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-3">
+                      {selectedChat.messages.map((msg, i) => (
+                          <div key={i} className={`flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
+                            <div className={cn(
+                              "max-w-[85%] rounded-2xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap",
+                              msg.role === "user"
+                                ? "bg-zinc-950 text-white rounded-tr-sm"
+                                : "bg-zinc-100 text-zinc-800 rounded-tl-sm",
+                            )}>
+                              {msg.content}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                ) : (
+                  /* チャット一覧 */
+                  <div className="h-full overflow-y-auto">
+                    {chatsLoading ? (
+                      <div className="flex items-center justify-center py-8 text-zinc-400">
+                        <Loader2 className="size-4 animate-spin mr-2" />
+                        <span className="text-xs">読み込み中…</span>
+                      </div>
+                    ) : pageChats.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 gap-2 text-zinc-400">
+                        <History className="size-7 opacity-30" />
+                        <p className="text-xs text-center">この画面でのチャット履歴はまだありません</p>
+                      </div>
+                    ) : (
+                      <ul className="divide-y divide-zinc-100">
+                        {pageChats.map((chat) => (
+                          <li key={chat.chatId}>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedChat(chat)}
+                              className="w-full text-left px-4 py-3 hover:bg-zinc-50 transition-colors"
+                            >
+                              <p className="text-xs font-medium text-zinc-800 truncate">{chat.firstQuestion || "（質問なし）"}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[10px] text-zinc-400">{formatTime(chat.createdAt)}</span>
+                                <span className="text-[10px] text-zinc-400">{chat.messages.length}件のメッセージ</span>
+                              </div>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* フィードバック */}
+            {tab === "feedback" && (
               <div className="h-full overflow-y-auto">
                 <FeedbackForm />
               </div>
