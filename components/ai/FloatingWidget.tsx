@@ -39,9 +39,8 @@ function loadPos(): Pos | null {
 
 function defaultPos(open: boolean): Pos {
   if (typeof window === "undefined") return { x: 0, y: 0 };
-  // 左下をデフォルトにすることで右下の送信ボタンなどと被らないようにする
   return {
-    x: MARGIN,
+    x: window.innerWidth - (open ? PANEL_W : BUTTON_SIZE) - MARGIN,
     y: window.innerHeight - (open ? PANEL_H : BUTTON_SIZE) - MARGIN,
   };
 }
@@ -70,23 +69,12 @@ export function FloatingWidget({ pageContext: pageContextProp }: { pageContext?:
   useEffect(() => {
     const saved = loadPos();
     if (saved) {
-      // 旧デフォルト（右下）に保存されている場合は新デフォルト（左下）へ移行
-      // 右下コーナー付近（画面右端 -100px 以内）に保存されていたら位置リセット
-      const isOldDefault =
-        saved.x > window.innerWidth - BUTTON_SIZE - MARGIN - 100;
-      if (isOldDefault) {
-        const p = defaultPos(false);
-        posRef.current = p;
-        setPos(p);
-        try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
-      } else {
-        const c: Pos = {
-          x: clamp(saved.x, 0, window.innerWidth - BUTTON_SIZE),
-          y: clamp(saved.y, 0, window.innerHeight - BUTTON_SIZE),
-        };
-        posRef.current = c;
-        setPos(c);
-      }
+      const c: Pos = {
+        x: clamp(saved.x, 0, window.innerWidth - BUTTON_SIZE),
+        y: clamp(saved.y, 0, window.innerHeight - BUTTON_SIZE),
+      };
+      posRef.current = c;
+      setPos(c);
     } else {
       const p = defaultPos(false);
       posRef.current = p;
