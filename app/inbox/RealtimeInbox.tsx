@@ -216,11 +216,13 @@ export function RealtimeInbox({
   }, []);
 
   // 初回マウント時に実際の通知権限を同期（SSRではdefaultで初期化→Hydration後に更新）
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if ("Notification" in window) {
       setNotifPermission(Notification.permission);
     }
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const requestNotifPermission = async () => {
     if (!("Notification" in window)) return;

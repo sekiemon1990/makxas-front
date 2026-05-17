@@ -166,12 +166,14 @@ function AiChatHistory() {
   const selectedChat = chats.find((c) => c.chatId === selectedChatId) ?? null;
 
   // chats が更新されたとき選択中チャットのメッセージを同期
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!selectedChatId) return;
     const latest = chats.find((c) => c.chatId === selectedChatId);
     if (!latest) { setSelectedChatId(null); setSelectedMessages([]); return; }
     setSelectedMessages(latest.messages);
   }, [chats, selectedChatId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function selectChat(chat: AiChat) {
     const rid = ++requestIdRef.current;

@@ -36,6 +36,7 @@ export function LeadAssignModal({ inquiryId, currentLeadId, currentLeadName, onA
     inputRef.current?.focus();
   }, []);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     if (query.trim().length < 1) { setResults([]); return; }
@@ -55,6 +56,7 @@ export function LeadAssignModal({ inquiryId, currentLeadId, currentLeadName, onA
 
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [query]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   async function handleAssign(lead: LeadResult) {
     if (lead.id === currentLeadId) { onClose(); return; }

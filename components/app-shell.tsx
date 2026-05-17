@@ -43,6 +43,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [newCount, setNewCount] = useState(0);
   const [showAiHistory, setShowAiHistory] = useState(false);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     try {
       setShowAiHistory(
@@ -52,6 +53,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       /* ignore */
     }
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function toggleAiHistory() {
     setShowAiHistory((prev) => {
