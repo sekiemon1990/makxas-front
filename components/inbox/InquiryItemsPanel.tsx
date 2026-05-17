@@ -167,25 +167,23 @@ export function InquiryItemsPanel({
       if (res.ok) {
         const data = await res.json() as InquiryItem[];
         setItems(data);
+        if (data.length > 0) setOpen(true); // アイテムがあれば自動オープン
       }
     } finally {
       setLoading(false);
     }
   };
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    void fetchItems();
-    // 反響が切り替わったらプロファイルをリセット
+    // 反響が切り替わったらプロファイルをリセットしてデータを再取得
     setCustomerProfile(null);
     setSuggestedItems([]);
     setApproachHint("");
+    void fetchItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inquiryId]);
-
-  // アイテムがあれば自動オープン
-  useEffect(() => {
-    if (items.length > 0) setOpen(true);
-  }, [items.length]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleAiExtract = async () => {
     setExtracting(true);

@@ -74,12 +74,15 @@ export function AppointmentModal({
   const [fsLoading, setFsLoading] = useState(false);
 
   // 日付が変わったら FS スタッフの予定を取得
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (!date) { setFsAvailability([]); return; }
+    if (!date) return;
     setFsLoading(true);
+    let cancelled = false;
     void fetch(`/api/calendar/events?from=${date}&to=${date}`)
       .then((r) => r.json())
       .then((d: { events?: (FsEvent & { staff?: { id: string; name: string; team: string } | null })[] }) => {
+        if (cancelled) return;
         // FS スタッフごとにグループ化
         const map = new Map<string, FsStaff>();
         for (const ev of d.events ?? []) {
@@ -91,9 +94,10 @@ export function AppointmentModal({
         }
         setFsAvailability([...map.values()]);
       })
-      .finally(() => setFsLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+      .finally(() => { if (!cancelled) setFsLoading(false); });
+    return () => { cancelled = true; setFsAvailability([]); };
   }, [date]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleSave = async () => {
     if (!inquiry || !date || !time) {
