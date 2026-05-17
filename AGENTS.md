@@ -173,7 +173,7 @@ Supabase Pro昇格の判断基準: DB容量400MB超 / 同時接続上限頻発 /
 | 3 | LINE Channel Secret / Access Token の取得 | 高（Phase 1実装時） |
 | 4 | Google Sheetsの書き出し先シートID（フォールバック用・任意） | 低（core-rails API が完成すれば不要） |
 | 5 | Gmail OAuth 設定（`GOOGLE_EMAIL_CLIENT_ID` / `GOOGLE_EMAIL_CLIENT_SECRET`）→ Vercel 環境変数に追加 | 高（Phase 2 比較サイト対応のため） |
-| 6 | Settings UI に Gmail 接続ボタン追加（PR#73 のフォローアップ） | 中 |
+| 6 | ~~Settings UI に Gmail 接続ボタン追加（PR#73 のフォローアップ）~~ → ✅ 完了（`SettingsClient.tsx` の `EmailAccountsList` に接続ボタン・状態表示を追加） | 中 |
 | 7 | `http://localhost:3456/auth/callback` を Supabase Auth の許可 URL に追加（ローカル開発用） | 低 |
 
 ---
