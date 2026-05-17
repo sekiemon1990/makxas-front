@@ -144,7 +144,7 @@ export function AppointmentModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[640px] rounded-lg">
+      <DialogContent className="max-w-[640px] rounded-lg max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>アポ設定</DialogTitle>
           <DialogDescription>
@@ -152,7 +152,7 @@ export function AppointmentModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4">
+        <div className="grid gap-4 overflow-y-auto flex-1 pr-1">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
             <Field label="査定日">
               <Input
