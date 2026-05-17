@@ -24,7 +24,7 @@ import {
 import { ChannelBadge, StatusBadge } from "@/components/badges";
 import { AiSuggestPanel } from "@/components/inbox/AiSuggestPanel";
 import { AppointmentModal } from "@/components/inbox/AppointmentModal";
-import { InquiryItemsPanel } from "@/components/inbox/InquiryItemsPanel";
+import { InquiryItemsPanel, type CustomerProfile } from "@/components/inbox/InquiryItemsPanel";
 import { LeadAssignModal } from "@/components/inbox/LeadAssignModal";
 import { LeadMergeModal } from "@/components/inbox/LeadMergeModal";
 import { Badge } from "@/components/ui/badge";
@@ -145,6 +145,7 @@ export function RealtimeInbox({
   const [replyBody, setReplyBody] = useState("");
   const [replySubject, setReplySubject] = useState("");
   const [appointmentOpen, setAppointmentOpen] = useState(false);
+  const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
   const [tagInput, setTagInput] = useState("");
   const [allTags, setAllTags] = useState<string[]>([]);
   const [showTagSuggestions, setShowTagSuggestions] = useState(false);
@@ -444,6 +445,8 @@ export function RealtimeInbox({
     setAiPanelDraft(null);
     setAiPanelThemeName(null);
     setReplyBody("");
+    // 顧客プロファイルリセット
+    setCustomerProfile(null);
 
     // AI提案は自動実行しない。ユーザーが「AI下書きを生成」ボタンを押した時のみ実行する。
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1322,6 +1325,7 @@ export function RealtimeInbox({
                 <InquiryItemsPanel
                   inquiryId={selectedInquiry.id}
                   leadId={selectedInquiry.lead_id}
+                  onProfileExtracted={(profile) => setCustomerProfile(profile)}
                 />
               </div>
 
@@ -1747,6 +1751,7 @@ export function RealtimeInbox({
         onOpenChange={setAppointmentOpen}
         onSaved={(inquiry) => { replaceInquiry(inquiry); router.refresh(); }}
         open={appointmentOpen}
+        customerProfile={customerProfile}
       />
 
       {/* リード変更モーダル */}

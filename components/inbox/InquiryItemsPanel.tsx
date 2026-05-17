@@ -5,9 +5,11 @@ import {
   Bot,
   ChevronDown,
   ChevronUp,
+  Lightbulb,
   Package,
   Pencil,
   Plus,
+  Star,
   Trash2,
   X,
 } from "lucide-react";
@@ -17,8 +19,31 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { HIGH_VALUE_CATEGORIES, HIGH_VALUE_PRICE_THRESHOLD } from "@/lib/inquiry-options";
 import { cn } from "@/lib/utils";
 import type { InquiryItem, InquiryItemCondition, InquiryItemQuoteType } from "@/types/database";
+
+export type CustomerProfile = {
+  age_group: "middle_senior" | "young" | "unknown";
+  income_level: "affluent" | "general" | "unknown";
+  sell_motivation: "estate" | "moving" | "declutter" | "replacement" | "unknown";
+  motivation_strength: "strong" | "medium" | "weak" | "unknown";
+};
+
+const MOTIVATION_LABELS: Record<CustomerProfile["sell_motivation"], string> = {
+  estate: "遺品整理",
+  moving: "引越し",
+  declutter: "片付け",
+  replacement: "買い換え",
+  unknown: "不明",
+};
+
+const MOTIVATION_STRENGTH_LABELS: Record<CustomerProfile["motivation_strength"], string> = {
+  strong: "強",
+  medium: "中",
+  weak: "弱",
+  unknown: "不明",
+};
 
 const CONDITION_LABELS: Record<InquiryItemCondition, string> = {
   N: "新品未使用",
@@ -113,15 +138,22 @@ export function InquiryItemsPanel({
   inquiryId,
   leadId,
   className,
+  onProfileExtracted,
 }: {
   inquiryId: string;
   leadId?: string | null;
   className?: string;
+  onProfileExtracted?: (profile: CustomerProfile, suggestedItems: string[], approachHint: string) => void;
 }) {
   const [items, setItems] = useState<InquiryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [open, setOpen] = useState(false);
+
+  // 追加買取サジェスト
+  const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
+  const [suggestedItems, setSuggestedItems] = useState<string[]>([]);
+  const [approachHint, setApproachHint] = useState<string>("");
 
   // 編集中アイテム（id=新規 or 既存ID）
   const [editId, setEditId] = useState<string | "new" | null>(null);
@@ -135,21 +167,23 @@ export function InquiryItemsPanel({
       if (res.ok) {
         const data = await res.json() as InquiryItem[];
         setItems(data);
+        if (data.length > 0) setOpen(true); // アイテムがあれば自動オープン
       }
     } finally {
       setLoading(false);
     }
   };
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
+    // 反響が切り替わったらプロファイルをリセットしてデータを再取得
+    setCustomerProfile(null);
+    setSuggestedItems([]);
+    setApproachHint("");
     void fetchItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inquiryId]);
-
-  // アイテムがあれば自動オープン
-  useEffect(() => {
-    if (items.length > 0) setOpen(true);
-  }, [items.length]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleAiExtract = async () => {
     setExtracting(true);
@@ -160,10 +194,25 @@ export function InquiryItemsPanel({
         body: JSON.stringify({ inquiry_id: inquiryId, lead_id: leadId }),
       });
       if (res.ok) {
-        const data = await res.json() as { saved: InquiryItem[] };
+        const data = await res.json() as {
+          saved: InquiryItem[];
+          customer_profile?: CustomerProfile;
+          suggested_items?: string[];
+          approach_hint?: string;
+        };
         if (data.saved.length > 0) {
           await fetchItems();
           setOpen(true);
+        }
+        if (data.customer_profile) {
+          setCustomerProfile(data.customer_profile);
+          setSuggestedItems(data.suggested_items ?? []);
+          setApproachHint(data.approach_hint ?? "");
+          onProfileExtracted?.(
+            data.customer_profile,
+            data.suggested_items ?? [],
+            data.approach_hint ?? "",
+          );
         }
       }
     } finally {
@@ -237,6 +286,26 @@ export function InquiryItemsPanel({
     setForm(EMPTY_FORM);
   };
 
+  /** 商品名・ブランド名に高価古物キーワードが含まれるか判定 */
+  const isHighValueItem = (item: InquiryItem) => {
+    const nameText = `${item.item_name} ${item.brand ?? ""}`.toLowerCase();
+    return HIGH_VALUE_CATEGORIES.some((cat) => nameText.includes(cat.toLowerCase()));
+  };
+
+  // 高単価アイテムを先頭にソート
+  const sortedItems = [...items].sort((a, b) => {
+    const aHighCat = isHighValueItem(a);
+    const bHighCat = isHighValueItem(b);
+    const aHighPrice = (a.quote_price_min ?? a.estimated_price_min ?? 0) >= HIGH_VALUE_PRICE_THRESHOLD;
+    const bHighPrice = (b.quote_price_min ?? b.estimated_price_min ?? 0) >= HIGH_VALUE_PRICE_THRESHOLD;
+    const aScore = (aHighCat ? 2 : 0) + (aHighPrice ? 1 : 0);
+    const bScore = (bHighCat ? 2 : 0) + (bHighPrice ? 1 : 0);
+    return bScore - aScore;
+  });
+
+  const motivationLabel = customerProfile ? MOTIVATION_LABELS[customerProfile.sell_motivation] : null;
+  const motivationStrengthLabel = customerProfile ? MOTIVATION_STRENGTH_LABELS[customerProfile.motivation_strength] : null;
+
   return (
     <div className={cn("border border-zinc-200 rounded-lg overflow-hidden", className)}>
       {/* ヘッダー */}
@@ -281,16 +350,51 @@ export function InquiryItemsPanel({
         </div>
       </div>
 
+      {/* 追加買取サジェストバナー */}
+      {customerProfile && suggestedItems.length > 0 && (
+        <div className="border-b border-amber-100 bg-amber-50 px-3 py-2 space-y-1">
+          <div className="flex items-center gap-1.5">
+            <Lightbulb className="size-3 text-amber-600 shrink-0" aria-hidden="true" />
+            <span className="text-[10px] font-semibold text-amber-800">追加買取サジェスト</span>
+            {motivationLabel && (
+              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700">
+                動機: {motivationLabel}（{motivationStrengthLabel}）
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {suggestedItems.map((item) => (
+              <span
+                key={item}
+                className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800"
+              >
+                {item}
+              </span>
+            ))}
+          </div>
+          {approachHint && (
+            <p className="text-[10px] text-amber-700 leading-4">{approachHint}</p>
+          )}
+        </div>
+      )}
+
       {/* コンテンツ */}
       {open && (
         <div className="divide-y divide-zinc-100">
           {items.length === 0 && editId !== "new" && (
-            <p className="px-3 py-3 text-center text-[11px] text-zinc-400">
-              商品情報がありません。「AI抽出」または「追加」から登録してください。
-            </p>
+            <div className="px-3 py-3 text-center space-y-1.5">
+              <p className="text-[11px] text-zinc-400">
+                商品情報がありません。「AI抽出」または「追加」から登録してください。
+              </p>
+              {!customerProfile && (
+                <p className="text-[10px] text-violet-500">
+                  💡 AI抽出で顧客プロファイルと追加買取候補も確認できます
+                </p>
+              )}
+            </div>
           )}
 
-          {items.map((item) =>
+          {sortedItems.map((item) =>
             editId === item.id ? (
               <ItemForm
                 key={item.id}
@@ -335,6 +439,11 @@ function ItemRow({
   onDelete: () => void;
 }) {
   const quoteStr = formatQuote(item);
+  const nameText = `${item.item_name} ${item.brand ?? ""}`.toLowerCase();
+  const isHighValueCat = HIGH_VALUE_CATEGORIES.some((cat) => nameText.includes(cat.toLowerCase()));
+  const effectivePrice = item.quote_price_min ?? item.estimated_price_min ?? 0;
+  const isHighValuePrice = effectivePrice >= HIGH_VALUE_PRICE_THRESHOLD;
+  const isHighValue = isHighValueCat || isHighValuePrice;
 
   return (
     <div className="group flex items-start gap-2 px-3 py-2.5 hover:bg-zinc-50/80">
@@ -344,6 +453,12 @@ function ItemRow({
           {item.condition && (
             <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium", CONDITION_COLORS[item.condition])}>
               {item.condition}
+            </span>
+          )}
+          {isHighValue && (
+            <span className="flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+              <Star className="size-2.5" />
+              高単価
             </span>
           )}
           {item.ai_extracted && (

@@ -110,9 +110,46 @@ Supabase Pro昇格の判断基準: DB容量400MB超 / 同時接続上限頻発 /
 - `email_accounts`: メールアカウント設定（Phase 2〜）
 
 ## マクサスコア連携
-- Phase 1 暫定: アポ取得時にGoogle Sheetsへ書き出し
-- Phase 2 正式: マクサスコアAPIへREST POST（APIなければWebhookエンドポイント作成依頼）
-- フィードバック受信エンドポイント: POST /api/webhooks/core/result
+
+### API 接続情報（2026-05 確認済み）
+- **認証**: `Authorization: Token <CORE_API_TOKEN>` (HTTP Token Auth)
+- **トークン**: `core-rails/config/initializers/002_constants.rb` の `MAKXAS_CORE_API_TOKEN`（.env.local の `CORE_API_TOKEN` に設定済み）
+- **ローカルURL**: `http://localhost:3000`（env var: `CORE_RAILS_URL`）
+- **疎通確認**: `GET /api/banks` → 200 OK（トークン認証動作確認済み）
+
+### 既存 API エンドポイントの注意点
+- `POST /api/projects` → **sokkin（ヤマト宅配集荷）専用**。IS→FS アポ連携には使えない
+- `GET /api/banks` / `GET /api/bank_branches` → 銀行マスタ（参照のみ）
+- `POST /api/movements` / `PUT /api/stocks/:id` → 在庫操作（不要）
+
+### IS→FS アポ連携に必要な新エンドポイント（小湊さん依頼事項）
+**`POST /api/front/appointments`** を作成してもらう必要あり。
+
+期待するリクエスト仕様:
+- 認証: `Authorization: Token <MAKXAS_CORE_API_TOKEN>`
+- Content-Type: `application/json`
+- リクエストボディ:
+  - `appointment.sourceId` (string) - makxas-front 側の appointment.id
+  - `appointment.sourceType` = "inside_sales"
+  - `appointment.scheduledAt` (ISO 8601)
+  - `appointment.itemCategory` (string | null)
+  - `appointment.itemDescription` (string | null)
+  - `appointment.address` (string | null)
+  - `appointment.preferredMethod` = "visit" | "delivery"
+  - `appointment.additionalItemsConfirmed` (object | null) - アポモーダルの追加品確認チェック結果
+  - `lead.displayName`, `lead.phone`, `lead.email`, `lead.lineUserId`
+  - `inquiry.id`, `inquiry.channel`, `inquiry.internalNote`, `inquiry.sourceSite`, `inquiry.frontUrl`
+- レスポンス: `{ coreAppointmentId: string, coreProjectUrl: string }`
+
+### 現在の連携フロー
+- **優先**: `POST /api/front/appointments`（エンドポイント作成後に即時切替）
+- **フォールバック**: Google Sheets 書き出し（CORE_SYNC_SHEET_ID が設定されている場合）
+- 実装: `lib/core/sync.ts` の `syncAppointmentToCore()`
+- ログ: `core_sync_log` テーブルに結果を記録（成功/失敗・エラーメッセージ）
+
+### フィードバック受信
+- 受信エンドポイント: `POST /api/webhooks/core/result`
+- 受信データ: `{ core_appointment_id, result: "won|lost", amount, memo }`
 
 ## ブランチ運用
 - main 直接 push 禁止（PR ベース）
@@ -121,10 +158,10 @@ Supabase Pro昇格の判断基準: DB容量400MB超 / 同時接続上限頻発 /
 ## 未決事項
 | # | 内容 | 優先度 |
 |---|---|---|
-| 1 | マクサスコアにAPIがあるか確認（なければWebhookエンドポイント作成依頼） | 高 |
-| 2 | コアへ渡す項目の最終確認 | 高 |
+| 1 | ~~マクサスコアにAPIがあるか確認~~ → ✅ 確認済み。既存 `POST /api/projects` は sokkin 専用で使えない。**`POST /api/front/appointments` の新規作成を小湊さんに依頼する必要あり** | 高 |
+| 2 | コアへ渡す項目の最終確認（AGENTS.md「IS→FS アポ連携に必要な新エンドポイント」の仕様を小湊さんと確認） | 高 |
 | 3 | LINE Channel Secret / Access Token の取得 | 高（Phase 1実装時） |
-| 4 | Google Sheetsの書き出し先シートID | 中（アポ設定実装時） |
+| 4 | Google Sheetsの書き出し先シートID（フォールバック用・任意） | 低（core-rails API が完成すれば不要） |
 
 ---
 
