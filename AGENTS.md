@@ -19,6 +19,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - 個人情報: 取り扱いあり（リード氏名・電話・メール・LINE ID）
 - 顧客接点: あり（/inquiry 公開Webフォームは一般公開）
 - 業務クリティカル度: **高**（顧客接点あり・個人情報あり）
+- 社内コミュニケーション: **Chatwork**（スタッフ間連絡・通知・問い合わせ対応はすべてChatwork）
 - 関連システム: マクサスコア（基幹システム / makxascore.com）← アポ取得時に双方向連携
 
 ## ロール分担
