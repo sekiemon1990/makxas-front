@@ -19,6 +19,10 @@
     {
       "path": "/api/cron/calendar-sync",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/email-poll",
+      "schedule": "*/5 * * * *"
     }
   ]
 }
