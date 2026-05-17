@@ -51,7 +51,9 @@ export function LeadContactsPanel({ leadId }: Props) {
     setLoading(false);
   }
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => { void load(); }, [leadId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   async function handleAdd() {
     if (!newValue.trim()) return;

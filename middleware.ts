@@ -21,6 +21,12 @@ export async function middleware(request: NextRequest) {
     request,
   });
 
+  // デモモード（NEXT_PUBLIC_DEMO_MODE=true）の場合は認証チェックを完全にスキップ。
+  // Phase 1.5（実運用開始）までの暫定。Vercel の Preview 環境のみ ON にする想定。
+  if (process.env.NEXT_PUBLIC_DEMO_MODE === "true") {
+    return response;
+  }
+
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

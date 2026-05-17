@@ -41,15 +41,29 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
     data: { user },
   } = await authClient.auth.getUser();
   const supabase = createServiceClient();
-  const { data: currentStaff } = user
+  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+  let { data: currentStaff } = user
     ? await supabase
         .from("staff")
         .select("*")
         .eq("auth_id", user.id)
         .maybeSingle()
     : { data: null };
+  // デモモードでは認証スキップなので user=null。先頭の有効スタッフをフォールバックとして使用。
+  if (!currentStaff && isDemoMode) {
+    const { data: demoStaff } = await supabase
+      .from("staff")
+      .select("*")
+      .eq("is_active", true)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    currentStaff = demoStaff;
+  }
   const canUseAllStores =
-    currentStaff?.role === "super_admin" || currentStaff?.role === "admin";
+    isDemoMode ||
+    currentStaff?.role === "super_admin" ||
+    currentStaff?.role === "admin";
 
   const { data: allStores } = await supabase
     .from("stores")

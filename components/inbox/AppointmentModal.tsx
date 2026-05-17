@@ -153,7 +153,7 @@ export function AppointmentModal({
         </DialogHeader>
 
         <div className="grid gap-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
             <Field label="査定日">
               <Input
                 onChange={(event) => setDate(event.target.value)}
@@ -184,8 +184,8 @@ export function AppointmentModal({
               ) : (
                 <div className="space-y-1.5">
                   {fsAvailability.map((fs) => (
-                    <div key={fs.id} className="flex items-start gap-2">
-                      <span className="w-20 shrink-0 text-xs font-medium text-zinc-700">{fs.name}</span>
+                    <div key={fs.id} className="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-2">
+                      <span className="text-xs font-medium text-zinc-700 sm:w-20 sm:shrink-0">{fs.name}</span>
                       <div className="flex flex-wrap gap-1">
                         {fs.events.length === 0 ? (
                           <span className="rounded bg-green-100 px-1.5 py-0.5 text-[10px] text-green-700">予定なし（稼働可）</span>

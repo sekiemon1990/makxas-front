@@ -43,6 +43,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [newCount, setNewCount] = useState(0);
   const [showAiHistory, setShowAiHistory] = useState(false);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     try {
       setShowAiHistory(
@@ -52,6 +53,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       /* ignore */
     }
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function toggleAiHistory() {
     setShowAiHistory((prev) => {
@@ -168,6 +170,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="flex min-w-0 flex-1 flex-col overflow-y-auto pb-16 md:pb-0">
+          {process.env.NEXT_PUBLIC_DEMO_MODE === "true" ? (
+            <div className="border-b border-amber-300 bg-amber-100 px-3 py-1.5 text-center text-[11px] font-medium text-amber-900">
+              ⚠️ デモモード（認証バイパス中） — Phase 1.5 実運用開始までの暫定。本番では必ず無効化してください。
+            </div>
+          ) : null}
           {children}
         </main>
         {pathname !== "/ai" && <FloatingWidget />}

@@ -539,7 +539,7 @@ function ItemForm({
       </div>
 
       {/* ブランド・型番 */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <div>
           <label className="text-[10px] text-zinc-500 font-medium">ブランド</label>
           <Input
@@ -608,7 +608,7 @@ function ItemForm({
       {/* 事前査定金額 */}
       <div>
         <label className="text-[10px] text-zinc-500 font-medium">事前査定金額</label>
-        <div className="flex gap-1.5 mt-0.5">
+        <div className="flex flex-wrap gap-1.5 mt-0.5">
           <Select
             value={form.quote_type}
             onValueChange={(v) => set("quote_type", v)}
@@ -624,7 +624,7 @@ function ItemForm({
             </SelectContent>
           </Select>
           <Input
-            className="h-7 text-xs"
+            className="h-7 text-xs min-w-0 flex-1"
             type="number"
             value={form.quote_price_min}
             onChange={(e) => set("quote_price_min", e.target.value)}
@@ -632,7 +632,7 @@ function ItemForm({
           />
           {form.quote_type === "range" && (
             <Input
-              className="h-7 text-xs"
+              className="h-7 text-xs min-w-0 flex-1"
               type="number"
               value={form.quote_price_max}
               onChange={(e) => set("quote_price_max", e.target.value)}

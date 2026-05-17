@@ -84,6 +84,7 @@ export function FloatingWidget({ pageContext: pageContextProp }: { pageContext?:
   // 開く前のボタン位置を保存（閉じた時に元の位置に戻すため）
   const buttonPosBeforeOpen = useRef<Pos | null>(null);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const saved = loadPos();
     if (saved) {
@@ -99,6 +100,7 @@ export function FloatingWidget({ pageContext: pageContextProp }: { pageContext?:
       setPos(p);
     }
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleOpen = useCallback((nextOpen: boolean) => {
     setOpen(nextOpen);
