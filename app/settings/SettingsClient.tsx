@@ -394,19 +394,54 @@ function EmailAccountsList({
         <CardDescription>問い合わせ受信・返信に使うメール</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
-        {accounts.map((account) => (
-          <Row key={account.id}>
-            <div>
-              <p className="font-medium">{account.email}</p>
-              <p className="mt-1 text-xs text-zinc-500">
-                {account.brands?.name ?? "ブランド未設定"} /{" "}
-                {account.stores?.name ?? "店舗未設定"} /{" "}
-                {account.purpose === "reply" ? "返信用" : "問い合わせ用"}
-              </p>
-            </div>
-            <Status isActive={account.is_active} />
-          </Row>
-        ))}
+        {accounts.map((account) => {
+          const isGmail = account.provider === "gmail";
+          const tokens = account.oauth_tokens as Record<string, unknown> | null;
+          const gmailConnected = isGmail && !!tokens?.refresh_token;
+          return (
+            <Row key={account.id}>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium">{account.email}</p>
+                <p className="mt-1 text-xs text-zinc-500">
+                  {account.brands?.name ?? "ブランド未設定"} /{" "}
+                  {account.stores?.name ?? "店舗未設定"} /{" "}
+                  {account.purpose === "reply" ? "返信用" : "問い合わせ用"}
+                </p>
+                {isGmail && (
+                  <p className="mt-1 flex items-center gap-1 text-xs">
+                    {gmailConnected ? (
+                      <span className="text-emerald-600">✓ Gmail接続済み</span>
+                    ) : (
+                      <span className="text-amber-600">⚠ Gmail未接続</span>
+                    )}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {isGmail && !gmailConnected && (
+                  <a
+                    className="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                    href={`/api/gmail/connect?email_account_id=${account.id}`}
+                  >
+                    <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M20 4H4C2.9 4 2 4.9 2 6v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" />
+                    </svg>
+                    Gmail接続
+                  </a>
+                )}
+                {isGmail && gmailConnected && (
+                  <a
+                    className="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-500 hover:bg-zinc-50"
+                    href={`/api/gmail/connect?email_account_id=${account.id}`}
+                  >
+                    再接続
+                  </a>
+                )}
+                <Status isActive={account.is_active} />
+              </div>
+            </Row>
+          );
+        })}
         {accounts.length === 0 ? <EmptyText /> : null}
       </CardContent>
     </Card>
