@@ -99,6 +99,15 @@ Supabase Pro昇格の判断基準: DB容量400MB超 / 同時接続上限頻発 /
 | GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY | 同上 | Google Cloud Console |
 | CORE_SYNC_SHEET_ID | 書き出し先スプレッドシートID | Google Sheets URL |
 
+## 環境変数（Phase 2 追加分）
+| 変数名 | 用途 | 取得元 |
+|---|---|---|
+| GOOGLE_EMAIL_CLIENT_ID | Gmail OAuth（比較サイトメール受信） | Google Cloud Console → OAuth 2.0 クライアント |
+| GOOGLE_EMAIL_CLIENT_SECRET | 同上 | 同上 |
+| GOOGLE_EMAIL_REDIRECT_URI | OAuth コールバック先 | `https://makxas-front.vercel.app/api/gmail/callback` |
+| ANTHROPIC_API_KEY | 比較サイトメール構造化（Claude Haiku）・AI返信アシスト | Anthropic Console |
+| RESEND_API_KEY | メール送信（replies） | Resend ダッシュボード |
+
 ## DBスキーマ（主要テーブル）
 - `leads`: リード（LINE ID / 電話 / メール / 氏名）
 - `inquiries`: 反響本体（チャネル / ステータス / 担当者 / 内部メモ）
@@ -163,6 +172,9 @@ Supabase Pro昇格の判断基準: DB容量400MB超 / 同時接続上限頻発 /
 | 2 | コアへ渡す項目の最終確認（AGENTS.md「IS→FS アポ連携に必要な新エンドポイント」の仕様を小湊さんと確認） | 高 |
 | 3 | LINE Channel Secret / Access Token の取得 | 高（Phase 1実装時） |
 | 4 | Google Sheetsの書き出し先シートID（フォールバック用・任意） | 低（core-rails API が完成すれば不要） |
+| 5 | Gmail OAuth 設定（`GOOGLE_EMAIL_CLIENT_ID` / `GOOGLE_EMAIL_CLIENT_SECRET`）→ Vercel 環境変数に追加 | 高（Phase 2 比較サイト対応のため） |
+| 6 | Settings UI に Gmail 接続ボタン追加（PR#73 のフォローアップ） | 中 |
+| 7 | `http://localhost:3456/auth/callback` を Supabase Auth の許可 URL に追加（ローカル開発用） | 低 |
 
 ---
 
