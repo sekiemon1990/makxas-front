@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { CheckCircle2, Send } from "lucide-react";
 
-import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -30,8 +29,24 @@ export default function InquiryPage() {
   const [error, setError] = useState<string | null>(null);
 
   return (
-    <AppShell>
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 p-8">
+    <div className="min-h-screen bg-zinc-50">
+      {/* 顧客向け公開ページのため、社内サイドバーは出さない */}
+      <header className="border-b border-zinc-200 bg-white">
+        <div className="mx-auto flex max-w-[720px] items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-semibold tracking-tight text-zinc-900">買取マクサス</span>
+          </div>
+          <a
+            className="text-sm text-zinc-500 hover:text-zinc-700"
+            href="https://kaitorimakxas.com"
+            rel="noopener"
+            target="_blank"
+          >
+            公式サイト →
+          </a>
+        </div>
+      </header>
+      <div className="flex items-center justify-center p-8">
         {submitted ? (
           <Card className="w-full max-w-[560px] rounded-lg border-zinc-200 text-center shadow-sm">
             <CardHeader className="items-center">
@@ -138,7 +153,7 @@ export default function InquiryPage() {
           </Card>
         )}
       </div>
-    </AppShell>
+    </div>
   );
 }
 

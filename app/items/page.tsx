@@ -327,10 +327,11 @@ export default async function ItemsPage({
               </div>
             </div>
 
-            {/* ── 結果件数 ─────────────────────────────────────── */}
+            {/* ── 結果件数（件数表記は「N 件」で全画面統一） ───── */}
             <p className="mb-3 text-xs text-zinc-500">
-              {filtered.length} 件表示
-              {filtered.length < totalItems ? ` / 全 ${totalItems} 件` : ""}
+              {filtered.length < totalItems
+                ? `表示中 ${filtered.length} 件 / 全 ${totalItems} 件`
+                : `全 ${totalItems} 件`}
             </p>
 
             {/* ── 商品テーブル ─────────────────────────────────── */}
