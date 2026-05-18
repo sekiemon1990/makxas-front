@@ -1327,6 +1327,18 @@ export function RealtimeInbox({
                 <InquiryItemsPanel
                   inquiryId={selectedInquiry.id}
                   leadId={selectedInquiry.lead_id}
+                  initialCustomerProfile={
+                    (selectedInquiry as unknown as { customer_profile?: CustomerProfile | null })
+                      .customer_profile ?? null
+                  }
+                  initialSuggestedItems={
+                    (selectedInquiry as unknown as { suggested_items?: string[] | null })
+                      .suggested_items ?? []
+                  }
+                  initialApproachHint={
+                    (selectedInquiry as unknown as { approach_hint?: string | null })
+                      .approach_hint ?? ""
+                  }
                   onProfileExtracted={(profile) => setCustomerProfile(profile)}
                 />
               </div>

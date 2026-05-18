@@ -139,21 +139,28 @@ export function InquiryItemsPanel({
   leadId,
   className,
   onProfileExtracted,
+  initialCustomerProfile,
+  initialSuggestedItems,
+  initialApproachHint,
 }: {
   inquiryId: string;
   leadId?: string | null;
   className?: string;
   onProfileExtracted?: (profile: CustomerProfile, suggestedItems: string[], approachHint: string) => void;
+  /** DBに永続化済みの顧客プロファイル（あれば再抽出せず表示） */
+  initialCustomerProfile?: CustomerProfile | null;
+  initialSuggestedItems?: string[];
+  initialApproachHint?: string;
 }) {
   const [items, setItems] = useState<InquiryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [open, setOpen] = useState(false);
 
-  // 追加買取サジェスト
-  const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
-  const [suggestedItems, setSuggestedItems] = useState<string[]>([]);
-  const [approachHint, setApproachHint] = useState<string>("");
+  // 追加買取サジェスト（DB永続化済みの値があれば初期値として使用）
+  const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(initialCustomerProfile ?? null);
+  const [suggestedItems, setSuggestedItems] = useState<string[]>(initialSuggestedItems ?? []);
+  const [approachHint, setApproachHint] = useState<string>(initialApproachHint ?? "");
 
   // 編集中アイテム（id=新規 or 既存ID）
   const [editId, setEditId] = useState<string | "new" | null>(null);
@@ -176,10 +183,11 @@ export function InquiryItemsPanel({
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    // 反響が切り替わったらプロファイルをリセットしてデータを再取得
-    setCustomerProfile(null);
-    setSuggestedItems([]);
-    setApproachHint("");
+    // 反響が切り替わったら、DBに永続化済みのプロファイルがあればそれを採用、
+    // なければクリアする（無いままでも extractボタンで再生成可能）
+    setCustomerProfile(initialCustomerProfile ?? null);
+    setSuggestedItems(initialSuggestedItems ?? []);
+    setApproachHint(initialApproachHint ?? "");
     void fetchItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inquiryId]);

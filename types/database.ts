@@ -265,6 +265,10 @@ export type Database = {
           first_response_at: string | null;
           ai_suggested_reply: string | null;
           msg_category: string | null;
+          customer_profile: Json | null;
+          suggested_items: string[] | null;
+          approach_hint: string | null;
+          profile_extracted_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -288,6 +292,10 @@ export type Database = {
           first_response_at?: string | null;
           ai_suggested_reply?: string | null;
           msg_category?: string | null;
+          customer_profile?: Json | null;
+          suggested_items?: string[] | null;
+          approach_hint?: string | null;
+          profile_extracted_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -311,6 +319,10 @@ export type Database = {
           first_response_at?: string | null;
           ai_suggested_reply?: string | null;
           msg_category?: string | null;
+          customer_profile?: Json | null;
+          suggested_items?: string[] | null;
+          approach_hint?: string | null;
+          profile_extracted_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
