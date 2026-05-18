@@ -26,6 +26,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { channelFilters, channelMeta } from "@/lib/inquiry-options";
 import { createServiceClient } from "@/lib/supabase/service";
+import { cn } from "@/lib/utils";
 import type { InquiryChannel, InquiryWithLead, Shift } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -110,10 +111,10 @@ export default async function DashboardPage() {
       .gte("scheduled_at", monthStart.toISOString())
       .lt("scheduled_at", monthEnd.toISOString())
       .neq("status", "cancelled"),
-    // 今月の反響（チャネル別）
+    // 今月の反響（チャネル別 + 顧客プロファイル集計用）
     supabase
       .from("inquiries")
-      .select("id, channel, status")
+      .select("id, channel, status, customer_profile, suggested_items, approach_hint")
       .gte("created_at", monthStart.toISOString()),
     // 先月のアポ数
     supabase
@@ -236,9 +237,64 @@ export default async function DashboardPage() {
     ? (((leadApptRows ?? []).length) / uniqueLeadsWithAppt).toFixed(1)
     : "—";
 
-  // チャネル別アポ率（今月）
-  type InqRow = { id: string; channel: string; status: string };
+  // チャネル別アポ率（今月）+ 顧客プロファイル集計用
+  type CustomerProfileJson = {
+    age_group?: string;
+    income_level?: string;
+    sell_motivation?: string;
+    motivation_strength?: string;
+  };
+  type InqRow = {
+    id: string;
+    channel: string;
+    status: string;
+    customer_profile: CustomerProfileJson | null;
+    suggested_items: string[] | null;
+    approach_hint: string | null;
+  };
   const monthlyInquiries = (monthlyInquiryRows ?? []) as InqRow[];
+
+  // --- AI 抽出活用率・売却動機分布 ---
+  const profiledInquiries = monthlyInquiries.filter(
+    (i) => i.customer_profile && typeof i.customer_profile === "object",
+  );
+  const aiUtilizationRate = monthlyInquiries.length > 0
+    ? Math.round((profiledInquiries.length / monthlyInquiries.length) * 100)
+    : 0;
+
+  // 売却動機分布（estate/moving/declutter/replacement/unknown）
+  const motivationLabels: Record<string, string> = {
+    estate: "遺品整理",
+    moving: "引越し",
+    declutter: "片付け",
+    replacement: "買い換え",
+    unknown: "不明",
+  };
+  const motivationCounts: Record<string, number> = {};
+  for (const inq of profiledInquiries) {
+    const m = inq.customer_profile?.sell_motivation ?? "unknown";
+    motivationCounts[m] = (motivationCounts[m] ?? 0) + 1;
+  }
+  const motivationDistribution = Object.entries(motivationCounts)
+    .map(([key, count]) => ({
+      key,
+      label: motivationLabels[key] ?? key,
+      count,
+      share: profiledInquiries.length > 0
+        ? Math.round((count / profiledInquiries.length) * 100)
+        : 0,
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  // 高単価層（中高年×高所得）の割合 — レバー2の最有望ターゲット
+  const highValueProfileCount = profiledInquiries.filter(
+    (i) =>
+      i.customer_profile?.age_group === "middle_senior" &&
+      i.customer_profile?.income_level === "affluent",
+  ).length;
+  const highValueProfileRate = profiledInquiries.length > 0
+    ? Math.round((highValueProfileCount / profiledInquiries.length) * 100)
+    : 0;
   const channelApptRate: Record<string, { total: number; appt: number }> = {};
   for (const inq of monthlyInquiries) {
     if (!channelApptRate[inq.channel]) channelApptRate[inq.channel] = { total: 0, appt: 0 };
@@ -725,6 +781,69 @@ export default async function DashboardPage() {
                     </p>
                   </div>
                 </div>
+
+                {/* 顧客プロファイル分析（AI抽出済み反響の集計） */}
+                {profiledInquiries.length > 0 ? (
+                  <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {/* 売却動機分布 */}
+                    <div className="rounded-lg border border-amber-200 bg-white p-4">
+                      <div className="mb-3 flex items-baseline justify-between">
+                        <p className="text-xs font-medium text-zinc-500">売却動機分布（顧客ニーズ）</p>
+                        <p className="text-[10px] text-zinc-400">
+                          AI抽出 {profiledInquiries.length} 件
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        {motivationDistribution.map(({ key, label, count, share }) => {
+                          // 動機の強さで色分け（強い順: estate > moving > declutter > replacement）
+                          const color =
+                            key === "estate" ? "bg-rose-500"
+                            : key === "moving" ? "bg-amber-500"
+                            : key === "declutter" ? "bg-sky-500"
+                            : key === "replacement" ? "bg-zinc-400"
+                            : "bg-zinc-300";
+                          return (
+                            <div key={key} className="space-y-1">
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="font-medium text-zinc-700">{label}</span>
+                                <span className="text-zinc-500">
+                                  {count}件 <span className="text-xs text-zinc-400">({share}%)</span>
+                                </span>
+                              </div>
+                              <div className="h-1.5 w-full rounded-full bg-zinc-100">
+                                <div className={cn("h-1.5 rounded-full transition-all", color)} style={{ width: `${share}%` }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* 高単価層比率 + AI抽出活用率 */}
+                    <div className="space-y-3">
+                      <div className="rounded-lg border border-amber-200 bg-white p-4">
+                        <p className="text-xs font-medium text-zinc-500">高単価層（中高年×高所得）</p>
+                        <p className="mt-1 text-2xl font-semibold text-amber-700">{highValueProfileRate}%</p>
+                        <p className="mt-1 text-xs text-zinc-500">
+                          AI抽出済 {highValueProfileCount} / {profiledInquiries.length} 件 — 貴金属・時計・ブランド・骨董の最有望層
+                        </p>
+                        <div className="mt-2 h-1.5 w-full rounded-full bg-zinc-100">
+                          <div className="h-1.5 rounded-full bg-rose-500 transition-all" style={{ width: `${highValueProfileRate}%` }} />
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-zinc-200 bg-white p-4">
+                        <p className="text-xs font-medium text-zinc-500">AI抽出活用率</p>
+                        <p className="mt-1 text-2xl font-semibold text-zinc-700">{aiUtilizationRate}%</p>
+                        <p className="mt-1 text-xs text-zinc-500">
+                          今月反響 {profiledInquiries.length} / {monthlyInquiries.length} 件で顧客プロファイル抽出済
+                        </p>
+                        <div className="mt-2 h-1.5 w-full rounded-full bg-zinc-100">
+                          <div className="h-1.5 rounded-full bg-zinc-600 transition-all" style={{ width: `${aiUtilizationRate}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
 
                 {/* 追加品カテゴリ別ヒット */}
                 {additionalCategoryRanking.length > 0 ? (
