@@ -1,9 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
+import { logAiUsage } from "@/lib/ai/usage";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { InquiryItem } from "@/types/database";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const EXTRACT_MODEL = "claude-haiku-4-5-20251001";
 
 export async function POST(request: Request) {
   const body = await request.json() as {
@@ -155,10 +157,20 @@ sell_motivation に基づいて「どう声をかけるか」のスタッフ向�
 
   try {
     const response = await anthropic.messages.create({
-      model: "claude-haiku-4-5",
+      model: EXTRACT_MODEL,
       max_tokens: 2048,
       system: systemPrompt,
       messages: [{ role: "user", content: messageContent }],
+    });
+
+    // コスト追跡
+    await logAiUsage({
+      category: "extract-items",
+      model: EXTRACT_MODEL,
+      usage: response.usage,
+      endpoint: "/api/ai/extract-items",
+      inquiryId: body.inquiry_id,
+      messageId: body.message_id ?? null,
     });
 
     const text = response.content.find((c) => c.type === "text")?.text ?? "{}";

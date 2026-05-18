@@ -967,6 +967,54 @@ export type Database = {
           },
         ];
       };
+      api_usage_logs: {
+        Row: {
+          id: string;
+          category: string;
+          model: string;
+          input_tokens: number;
+          output_tokens: number;
+          cache_creation_tokens: number;
+          cache_read_tokens: number;
+          cost_usd: number;
+          endpoint: string;
+          inquiry_id: string | null;
+          message_id: string | null;
+          meta: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          category: string;
+          model: string;
+          input_tokens?: number;
+          output_tokens?: number;
+          cache_creation_tokens?: number;
+          cache_read_tokens?: number;
+          cost_usd?: number;
+          endpoint: string;
+          inquiry_id?: string | null;
+          message_id?: string | null;
+          meta?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          category?: string;
+          model?: string;
+          input_tokens?: number;
+          output_tokens?: number;
+          cache_creation_tokens?: number;
+          cache_read_tokens?: number;
+          cost_usd?: number;
+          endpoint?: string;
+          inquiry_id?: string | null;
+          message_id?: string | null;
+          meta?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
