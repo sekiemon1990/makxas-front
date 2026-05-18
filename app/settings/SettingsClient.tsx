@@ -53,6 +53,21 @@ const tabs: Array<{ value: Tab; label: string }> = [
   { value: "feedback", label: "フィードバック" },
 ];
 
+/**
+ * カテゴリ別グルーピング（UI/UXレビュー A1 対応）
+ * 11個の横並びタブが2行に改行されて見づらい問題を、左サイドナビ＋
+ * 4カテゴリのグループ化で解消する。
+ */
+const tabGroups: Array<{
+  label: string;
+  items: Tab[];
+}> = [
+  { label: "組織", items: ["brands", "stores", "staff"] },
+  { label: "チャネル", items: ["line", "email", "comparison"] },
+  { label: "業務設定", items: ["templates", "goals", "business_hours"] },
+  { label: "AI", items: ["ai", "feedback"] },
+];
+
 export function SettingsClient({
   brands,
   comparisonAccounts,
@@ -160,7 +175,7 @@ export function SettingsClient({
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 p-8">
+    <div className="min-h-screen bg-zinc-50 p-6 md:p-8">
       <div className="mx-auto max-w-6xl">
         <div className="flex items-end justify-between gap-4">
           <div>
@@ -177,24 +192,40 @@ export function SettingsClient({
           ) : null}
         </div>
 
-        <div className="mt-8 flex gap-2 border-b border-zinc-200">
-          {tabs.map((tab) => (
-            <button
-              className={
-                activeTab === tab.value
-                  ? "border-b-2 border-zinc-950 px-3 pb-3 text-sm font-semibold text-zinc-950"
-                  : "px-3 pb-3 text-sm font-medium text-zinc-500 transition hover:text-zinc-950"
-              }
-              key={tab.value}
-              onClick={() => setActiveTab(tab.value)}
-              type="button"
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* UI/UXレビュー A1: 11個の横並びタブをカテゴリ別サイドナビに再構成 */}
+        <div className="mt-8 grid gap-6 md:grid-cols-[200px_1fr]">
+          <aside className="space-y-5">
+            {tabGroups.map((group) => (
+              <div key={group.label}>
+                <p className="mb-1.5 px-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+                  {group.label}
+                </p>
+                <div className="space-y-0.5">
+                  {group.items.map((value) => {
+                    const tab = tabs.find((t) => t.value === value);
+                    if (!tab) return null;
+                    const isActive = activeTab === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setActiveTab(value)}
+                        className={
+                          isActive
+                            ? "flex w-full items-center rounded-md bg-zinc-900 px-3 py-2 text-left text-sm font-medium text-white"
+                            : "flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900"
+                        }
+                      >
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </aside>
 
-        <div className="mt-6">
+          <div>
           {activeTab === "brands" ? <BrandsList brands={brands} /> : null}
           {activeTab === "stores" ? <StoresList stores={stores} /> : null}
           {activeTab === "line" ? (
@@ -239,6 +270,7 @@ export function SettingsClient({
           {activeTab === "business_hours" ? <BusinessHoursSection /> : null}
           {activeTab === "ai" ? <AiConfigSection /> : null}
           {activeTab === "feedback" ? <FeedbackSection /> : null}
+          </div>
         </div>
       </div>
 
