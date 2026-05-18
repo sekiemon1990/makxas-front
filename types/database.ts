@@ -269,6 +269,10 @@ export type Database = {
           suggested_items: string[] | null;
           approach_hint: string | null;
           profile_extracted_at: string | null;
+          ai_priority: "high" | "medium" | "low" | null;
+          ai_priority_score: number | null;
+          ai_priority_reason: string | null;
+          ai_priority_set_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -296,6 +300,10 @@ export type Database = {
           suggested_items?: string[] | null;
           approach_hint?: string | null;
           profile_extracted_at?: string | null;
+          ai_priority?: "high" | "medium" | "low" | null;
+          ai_priority_score?: number | null;
+          ai_priority_reason?: string | null;
+          ai_priority_set_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -323,6 +331,10 @@ export type Database = {
           suggested_items?: string[] | null;
           approach_hint?: string | null;
           profile_extracted_at?: string | null;
+          ai_priority?: "high" | "medium" | "low" | null;
+          ai_priority_score?: number | null;
+          ai_priority_reason?: string | null;
+          ai_priority_set_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
