@@ -24,6 +24,7 @@ import {
 import { ChannelBadge, StatusBadge } from "@/components/badges";
 import { PriorityBadge } from "@/components/inquiry/PriorityBadge";
 import { InquiryPriorityRow } from "@/components/inquiry/InquiryPriorityRow";
+import { BatchPriorityButton } from "@/components/inquiry/BatchPriorityButton";
 import { AiSuggestPanel } from "@/components/inbox/AiSuggestPanel";
 import { AppointmentModal } from "@/components/inbox/AppointmentModal";
 import { InquiryItemsPanel, type CustomerProfile } from "@/components/inbox/InquiryItemsPanel";
@@ -952,6 +953,24 @@ export function RealtimeInbox({
               type="search"
               value={searchQuery}
             />
+            <BatchPriorityButton
+              inquiries={items}
+              onResults={(updates) => {
+                setItems((current) =>
+                  current.map((it) => {
+                    const u = updates.get(it.id);
+                    if (!u || !u.priority) return it;
+                    return {
+                      ...it,
+                      ai_priority: u.priority,
+                      ai_priority_score: u.score ?? null,
+                      ai_priority_reason: u.reason ?? null,
+                      ai_priority_set_at: u.setAt ?? new Date().toISOString(),
+                    };
+                  }),
+                );
+              }}
+            />
             {/* フィルターチップ */}
             <div className="flex flex-wrap gap-1.5">
               <Select value={initialStatus} onValueChange={(v) => updateQuery({ status: v, id: null })}>
@@ -1100,16 +1119,23 @@ export function RealtimeInbox({
                   <div className="mt-2 flex items-center justify-between text-xs text-zinc-400">
                     <div className="flex items-center gap-1.5">
                       <span>{formatElapsed(item.created_at)}</span>
-                      {getStaleLevel(item) !== "none" ? (
-                        <span className={cn(
-                          "rounded-full px-1.5 py-0.5 font-semibold",
-                          getStaleLevel(item) === "urgent"
-                            ? "bg-red-100 text-red-700"
-                            : "bg-orange-100 text-orange-700",
-                        )}>
-                          ⚠ {getStaleHours(item)}h
-                        </span>
-                      ) : null}
+                      {getStaleLevel(item) !== "none" ? (() => {
+                        // UI/UXレビュー B3: 「170h」のような数字だけの表示を
+                        // 「7日未返信」「3時間未返信」のような日本語に変換する
+                        const badge = formatUnansweredBadge(getStaleHours(item));
+                        return (
+                          <span
+                            className={cn(
+                              "rounded-full px-1.5 py-0.5 font-semibold",
+                              badge.bg,
+                              badge.text,
+                            )}
+                            title={`最後の更新から ${getStaleHours(item)} 時間経過`}
+                          >
+                            ⚠ {badge.label}
+                          </span>
+                        );
+                      })() : null}
                     </div>
                     <span className="flex items-center gap-1 truncate">
                       {(item.brands?.name ?? item.stores?.name) ? (
