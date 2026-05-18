@@ -25,17 +25,17 @@ import { cn } from "@/lib/utils";
 const AI_HISTORY_STORAGE_KEY = "makxas-show-ai-history";
 
 const navItems = [
-  { href: "/dashboard", label: "ダッシュボード", icon: Gauge },
-  { href: "/inbox", label: "インボックス", icon: Inbox, badge: "inbox" },
-  { href: "/leads", label: "リード一覧", icon: ListChecks },
-  { href: "/items", label: "商品一覧", icon: Package },
-  { href: "/appointments", label: "アポ一覧", icon: CalendarDays },
-  { href: "/shifts", label: "シフト管理", icon: Clock },
-  { href: "/ai", label: "AIアシスタント", icon: Bot },
-  { href: "/settings", label: "設定", icon: Settings },
-  { href: "/admin", label: "管理", icon: ShieldCheck, divider: true as const, exactMatch: true as const },
-  { href: "/admin/ai", label: "AI学習・自動化", icon: BrainCircuit, indent: true as const },
-  { href: "/admin/ai-chats", label: "AI履歴管理", icon: HistoryIcon, indent: true as const, aiHistoryOnly: true as const },
+  { href: "/dashboard", label: "ダッシュボード", mobileLabel: "ダッシュ", icon: Gauge },
+  { href: "/inbox", label: "インボックス", mobileLabel: "受信", icon: Inbox, badge: "inbox" },
+  { href: "/leads", label: "リード一覧", mobileLabel: "リード", icon: ListChecks },
+  { href: "/items", label: "商品一覧", mobileLabel: "商品", icon: Package },
+  { href: "/appointments", label: "アポ一覧", mobileLabel: "アポ", icon: CalendarDays },
+  { href: "/shifts", label: "シフト管理", mobileLabel: "シフト", icon: Clock },
+  { href: "/ai", label: "AIアシスタント", mobileLabel: "AI", icon: Bot },
+  { href: "/settings", label: "設定", mobileLabel: "設定", icon: Settings },
+  { href: "/admin", label: "管理", mobileLabel: "管理", icon: ShieldCheck, divider: true as const, exactMatch: true as const },
+  { href: "/admin/ai", label: "AI学習・自動化", mobileLabel: "学習", icon: BrainCircuit, indent: true as const },
+  { href: "/admin/ai-chats", label: "AI履歴管理", mobileLabel: "履歴", icon: HistoryIcon, indent: true as const, aiHistoryOnly: true as const },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -99,10 +99,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
             {visibleNavItems.map((item) => {
               const Icon = item.icon;
+              // 修正: /admin/ai と /admin/ai-chats が両方アクティブ判定される問題を解消。
+              // 「区切り `/` 付きの startsWith」にすることで /admin/ai と /admin/ai-chats を分離する。
               const active = item.exactMatch
                 ? pathname === item.href
                 : pathname === item.href ||
-                  (item.href !== "/" && pathname.startsWith(item.href));
+                  (item.href !== "/" && pathname.startsWith(item.href + "/"));
               const count = item.badge === "inbox" ? newCount : 0;
 
               return (
@@ -192,8 +194,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  aria-label={item.label}
+                  title={item.label}
                   className={cn(
-                    "relative flex flex-1 flex-col items-center gap-1 py-2 text-[10px] font-medium text-zinc-500 transition-colors",
+                    "relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[9px] font-medium text-zinc-500 transition-colors",
                     active && "text-zinc-950",
                   )}
                 >
@@ -206,8 +210,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       {count > 99 ? "99+" : count}
                     </span>
                   ) : null}
-                  <span className="hidden xs:block">
-                    {item.label.replace("一覧", "")}
+                  {/* 常時短縮ラベル表示（モバイルでアイコンだけだと意味が分からない問題の解消） */}
+                  <span className="block leading-tight">
+                    {item.mobileLabel ?? item.label}
                   </span>
                 </Link>
               );
