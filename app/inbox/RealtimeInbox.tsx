@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 
 import { ChannelBadge, StatusBadge } from "@/components/badges";
+import { PriorityBadge } from "@/components/inquiry/PriorityBadge";
+import { InquiryPriorityRow } from "@/components/inquiry/InquiryPriorityRow";
 import { AiSuggestPanel } from "@/components/inbox/AiSuggestPanel";
 import { AppointmentModal } from "@/components/inbox/AppointmentModal";
 import { InquiryItemsPanel, type CustomerProfile } from "@/components/inbox/InquiryItemsPanel";
@@ -1084,7 +1086,16 @@ export function RealtimeInbox({
                         </p>
                       </div>
                     </div>
-                    <StatusBadge status={item.status} />
+                    <div className="flex items-center gap-1 shrink-0">
+                      {item.ai_priority === "high" || item.ai_priority === "medium" || item.ai_priority === "low" ? (
+                        <PriorityBadge
+                          priority={item.ai_priority}
+                          score={item.ai_priority_score ?? null}
+                          compact
+                        />
+                      ) : null}
+                      <StatusBadge status={item.status} />
+                    </div>
                   </div>
                   <div className="mt-2 flex items-center justify-between text-xs text-zinc-400">
                     <div className="flex items-center gap-1.5">
@@ -1201,6 +1212,7 @@ export function RealtimeInbox({
                     <h2 className="mt-0.5 truncate text-sm font-bold tracking-tight text-zinc-900">
                       {selectedInquiry.subject ?? "件名なし"}
                     </h2>
+                    <InquiryPriorityRow inquiry={selectedInquiry} onUpdate={replaceInquiry} />
                   </div>
                   <div className="flex items-center gap-2 md:shrink-0">
                     <Select value={selectedInquiry.status} onValueChange={(value) => handleStatusChange(value as InquiryStatus)}>
