@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useWidgetPageContext } from "@/contexts/WidgetPageContext";
 import { ChatPanel } from "./ChatPanel";
+import { AiCapabilityIntro } from "./AiCapabilityIntro";
+import { FRONT_CAPABILITIES_COMPACT } from "./frontCapabilities";
 import { FeedbackForm } from "./FeedbackForm";
 import { useAiChats, type AiChat } from "@/lib/supabase/aiChats";
 
@@ -301,7 +303,18 @@ export function FloatingWidget({ pageContext: pageContextProp }: { pageContext?:
           <div className="min-h-0 flex-1 overflow-hidden">
             {/* チャット */}
             {tab === "chat" && (
-              <ChatPanel fixedHeight="100%" pageContext={pageContext} />
+              <ChatPanel
+                fixedHeight="100%"
+                pageContext={pageContext}
+                emptyStateContent={
+                  <AiCapabilityIntro
+                    title="AIに何ができる？"
+                    lead="例をクリックすると入力欄に挿入されます。"
+                    categories={FRONT_CAPABILITIES_COMPACT}
+                    compact
+                  />
+                }
+              />
             )}
 
             {/* この画面の履歴 */}

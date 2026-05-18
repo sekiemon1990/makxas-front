@@ -12,6 +12,8 @@ import {
   Zap,
 } from "lucide-react";
 import { ChatPanel } from "@/components/ai/ChatPanel";
+import { AiCapabilityIntro } from "@/components/ai/AiCapabilityIntro";
+import { FRONT_CAPABILITIES } from "@/components/ai/frontCapabilities";
 import { FeedbackForm } from "@/components/ai/FeedbackForm";
 import { AppShell } from "@/components/app-shell";
 import { useAiChats, type AiChat, type AiChatMessage } from "@/lib/supabase/aiChats";
@@ -105,6 +107,9 @@ export default function AiPage() {
                     key={chatKey}
                     fixedHeight="100%"
                     pageContext="AIアシスタントページ"
+                    emptyStateContent={
+                      <AiCapabilityIntro categories={FRONT_CAPABILITIES} />
+                    }
                   />
                 </div>
               </div>
