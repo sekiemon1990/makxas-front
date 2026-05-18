@@ -38,6 +38,39 @@ type AnalyticsData = {
   overall_edit_rate: number | null;
 };
 
+/** /api/ai/usage が返す集計レスポンス */
+type UsageBucket = {
+  total_calls: number;
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_tokens: number;
+  cache_read_tokens: number;
+  cost_usd: number;
+};
+type UsageData = {
+  period_days: number;
+  since: string;
+  overall: UsageBucket;
+  by_category: Record<string, UsageBucket>;
+  by_model: Record<string, UsageBucket>;
+  by_day: Record<string, UsageBucket>;
+};
+
+/** モデル別単価 (USD per 1M tokens) - UI 表示用 */
+const MODEL_COST: Record<string, { input: number; output: number }> = {
+  "claude-haiku-4-5-20251001": { input: 1.0, output: 5.0 },
+  "claude-sonnet-4-6": { input: 3.0, output: 15.0 },
+  "claude-opus-4-7": { input: 5.0, output: 25.0 },
+};
+
+const USAGE_CATEGORY_LABELS: Record<string, string> = {
+  suggest: "返信サジェスト",
+  chat: "AIチャット",
+  "extract-items": "商品抽出",
+  "analyze-edit": "修正理由分析",
+  learning: "プロンプト学習",
+};
+
 type Tab = "analytics" | "auto_send" | "prompts" | "history" | "examples" | "ops_guide";
 
 type ReplyExample = {
@@ -54,6 +87,7 @@ type ReplyExample = {
 export default function AiAdminPage() {
   const [tab, setTab] = useState<Tab>("analytics");
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [usage, setUsage] = useState<UsageData | null>(null);
   const [rules, setRules] = useState<AutoSendRule[]>([]);
   const [prompts, setPrompts] = useState<PromptVersion[]>([]);
   const [examples, setExamples] = useState<ReplyExample[]>([]);
@@ -70,9 +104,23 @@ export default function AiAdminPage() {
   const loadAnalytics = useCallback(async () => {
     setLoadingAnalytics(true);
     try {
-      const res = await fetch("/api/ai/analytics");
-      const data = await res.json() as AnalyticsData;
-      setAnalytics(data);
+      // analytics と usage を並列取得 (usage 失敗時もダッシュボードは動作継続)
+      const [analyticsResult, usageResult] = await Promise.allSettled([
+        fetch("/api/ai/analytics").then(async (r) => {
+          if (!r.ok) throw new Error(await r.text());
+          return (await r.json()) as AnalyticsData;
+        }),
+        fetch("/api/ai/usage?days=30").then(async (r) => {
+          if (!r.ok) throw new Error(`usage ${r.status}`);
+          return (await r.json()) as UsageData;
+        }),
+      ]);
+      if (analyticsResult.status === "fulfilled") setAnalytics(analyticsResult.value);
+      if (usageResult.status === "fulfilled") {
+        setUsage(usageResult.value);
+      } else {
+        console.info("[admin/ai] usage unavailable:", usageResult.reason);
+      }
     } catch {
       /* ignore */
     } finally {
@@ -246,6 +294,9 @@ export default function AiAdminPage() {
                       </CardContent>
                     </Card>
                   </div>
+
+                  {/* AI API コスト & キャッシュ効率セクション (Issue: recording から横展開) */}
+                  {usage && <UsageCostSection usage={usage} />}
 
                   <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
                     <CardHeader>
@@ -735,5 +786,116 @@ export default function AiAdminPage() {
         </div>
       )}
     </AppShell>
+  );
+}
+
+/**
+ * AI API コスト & キャッシュ効率セクション
+ *
+ * recording (makxas-ast) の UsageCostSection を front 用にスタイル調整して移植。
+ * 表示する指標:
+ *   - 期間内総コスト (USD) / API 呼出回数
+ *   - 入出力トークン
+ *   - キャッシュヒット率 = cache_read / (input + cache_read + cache_creation)
+ *   - キャッシュ削減コスト目安 (モデル別単価で逆算)
+ *   - カテゴリ別の内訳テーブル
+ */
+function UsageCostSection({ usage }: { usage: UsageData }) {
+  const o = usage.overall;
+  const totalInputUnits =
+    o.input_tokens + o.cache_read_tokens + o.cache_creation_tokens;
+  const cacheHitRate =
+    totalInputUnits > 0
+      ? Math.round((o.cache_read_tokens / totalInputUnits) * 1000) / 10
+      : 0;
+
+  // 削減コスト概算: モデル別単価で「もし cache 一切無しだった場合の理論コスト」を計算
+  const FALLBACK = MODEL_COST["claude-sonnet-4-6"];
+  let nominalUsd = 0;
+  for (const [model, bucket] of Object.entries(usage.by_model)) {
+    const rate = MODEL_COST[model] ?? FALLBACK;
+    const inputUnits =
+      bucket.input_tokens +
+      bucket.cache_read_tokens +
+      bucket.cache_creation_tokens;
+    nominalUsd +=
+      (inputUnits * rate.input + bucket.output_tokens * rate.output) /
+      1_000_000;
+  }
+  const savedUsd = Math.max(0, nominalUsd - o.cost_usd);
+
+  return (
+    <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
+      <CardHeader>
+        <CardTitle className="text-sm">
+          AI API コスト & キャッシュ効率（過去{usage.period_days}日）
+        </CardTitle>
+        <CardDescription className="text-xs">
+          Anthropic API 呼出のトークン消費・コスト・キャッシュヒット率を集計
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <div className="rounded-lg border border-zinc-200 p-3">
+            <p className="text-[10px] uppercase tracking-wider text-zinc-500">総コスト</p>
+            <p className="text-xl font-semibold tabular-nums">${o.cost_usd.toFixed(4)}</p>
+            <p className="text-[10px] text-zinc-500 mt-1">API呼出 {o.total_calls}回</p>
+          </div>
+          <div className="rounded-lg border border-zinc-200 p-3">
+            <p className="text-[10px] uppercase tracking-wider text-zinc-500">入力トークン</p>
+            <p className="text-xl font-semibold tabular-nums">{o.input_tokens.toLocaleString()}</p>
+            <p className="text-[10px] text-zinc-500 mt-1">出力 {o.output_tokens.toLocaleString()}</p>
+          </div>
+          <div className="rounded-lg border border-zinc-200 p-3">
+            <p className="text-[10px] uppercase tracking-wider text-zinc-500">キャッシュヒット率</p>
+            <p className="text-xl font-semibold tabular-nums">{cacheHitRate}%</p>
+            <p className="text-[10px] text-zinc-500 mt-1">
+              read {o.cache_read_tokens.toLocaleString()} / create {o.cache_creation_tokens.toLocaleString()}
+            </p>
+          </div>
+          <div className="rounded-lg border border-zinc-200 p-3">
+            <p className="text-[10px] uppercase tracking-wider text-zinc-500">キャッシュ削減コスト(目安)</p>
+            <p className="text-xl font-semibold tabular-nums">${savedUsd.toFixed(4)}</p>
+            <p className="text-[10px] text-zinc-500 mt-1">モデル別単価で換算</p>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-zinc-100">
+                <th className="py-2 pl-2 pr-3 text-left font-semibold text-zinc-500">カテゴリ</th>
+                <th className="py-2 pr-3 text-right font-semibold text-zinc-500">呼出</th>
+                <th className="py-2 pr-3 text-right font-semibold text-zinc-500">入力</th>
+                <th className="py-2 pr-3 text-right font-semibold text-zinc-500">出力</th>
+                <th className="py-2 pr-3 text-right font-semibold text-zinc-500">cache read</th>
+                <th className="py-2 pr-3 text-right font-semibold text-zinc-500">cache create</th>
+                <th className="py-2 pr-2 text-right font-semibold text-zinc-500">コスト</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(usage.by_category)
+                .sort(([, a], [, b]) => b.cost_usd - a.cost_usd)
+                .map(([cat, b]) => (
+                  <tr key={cat} className="border-b border-zinc-50 last:border-0">
+                    <td className="py-2 pl-2 pr-3">{USAGE_CATEGORY_LABELS[cat] ?? cat}</td>
+                    <td className="py-2 pr-3 tabular-nums text-right">{b.total_calls}</td>
+                    <td className="py-2 pr-3 tabular-nums text-right">{b.input_tokens.toLocaleString()}</td>
+                    <td className="py-2 pr-3 tabular-nums text-right">{b.output_tokens.toLocaleString()}</td>
+                    <td className="py-2 pr-3 tabular-nums text-right">{b.cache_read_tokens.toLocaleString()}</td>
+                    <td className="py-2 pr-3 tabular-nums text-right">{b.cache_creation_tokens.toLocaleString()}</td>
+                    <td className="py-2 pr-2 tabular-nums text-right">${b.cost_usd.toFixed(4)}</td>
+                  </tr>
+                ))}
+              {Object.keys(usage.by_category).length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-4 text-center text-zinc-400">利用がありません</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

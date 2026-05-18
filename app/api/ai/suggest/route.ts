@@ -1,12 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { logAiUsage } from "@/lib/ai/usage";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-const MODEL = "claude-haiku-4-5";
+const MODEL = "claude-haiku-4-5-20251001";
 
 export const THEMES = [
   { key: "photo", label: "📸 写真を依頼する" },
@@ -93,6 +94,16 @@ export async function POST(req: NextRequest) {
           role: "user",
           content: `顧客名: ${leadName}\n\n会話履歴:\n${convHistory || "（なし）"}\n\n指示: ${themeInstructions[forceTheme as ThemeKey] ?? themeInstructions.info}`,
         }],
+      });
+
+      // コスト追跡: トークン使用量を api_usage_logs に保存
+      await logAiUsage({
+        category: "suggest",
+        model: MODEL,
+        usage: response.usage,
+        endpoint: "/api/ai/suggest",
+        inquiryId: body.inquiry_id,
+        meta: { phase: "force-theme", forceTheme },
       });
 
       const replyBody = response.content[0]?.type === "text" ? response.content[0].text.trim() : null;
@@ -195,6 +206,16 @@ ${lastInbound.body}`;
       max_tokens: 1024,
       system: systemPrompt,
       messages: [{ role: "user", content: userContent }],
+    });
+
+    // コスト追跡
+    await logAiUsage({
+      category: "suggest",
+      model: MODEL,
+      usage: response.usage,
+      endpoint: "/api/ai/suggest",
+      inquiryId: body.inquiry_id,
+      meta: { phase: "main" },
     });
 
     const text = response.content[0]?.type === "text" ? response.content[0].text : "";
