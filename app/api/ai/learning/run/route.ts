@@ -1,6 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse, type NextRequest } from "next/server";
+import { logAiUsage } from "@/lib/ai/usage";
 import { createServiceClient } from "@/lib/supabase/service";
+
+const ANALYZE_MODEL = "claude-haiku-4-5-20251001";
+const IMPROVE_MODEL = "claude-sonnet-4-6";
 
 const CATEGORY_LABELS: Record<string, string> = {
   price_inquiry: "価格照会",
@@ -96,10 +100,21 @@ ${m.body.slice(0, 500)}
 {"label":"修正理由を表す短いラベル（5〜15文字の日本語、自由に命名可）","detail":"具体的に何を修正したか（50文字以内）","severity":"minor または major"}`;
 
           const res = await anthropic.messages.create({
-            model: "claude-haiku-4-5",
+            model: ANALYZE_MODEL,
             max_tokens: 256,
             messages: [{ role: "user", content: prompt }],
           });
+
+          // コスト追跡 (analyze-edit 補完フェーズ)
+          await logAiUsage({
+            category: "analyze-edit",
+            model: ANALYZE_MODEL,
+            usage: res.usage,
+            endpoint: "/api/ai/learning/run",
+            messageId: m.id,
+            meta: { phase: "backfill" },
+          });
+
           const text = res.content[0]?.type === "text" ? res.content[0].text.trim() : "";
           const match = text.match(/\{[\s\S]+?\}/);
           if (match) {
@@ -288,9 +303,18 @@ ${currentPrompt?.content ?? "（初期プロンプト使用中）"}
 {"analysis":"修正が多い理由の要約（2〜3文）","improved_prompt":"改善されたシステムプロンプト全文（日本語）"}`;
 
         const response = await client.messages.create({
-          model: "claude-sonnet-4-6",
+          model: IMPROVE_MODEL,
           max_tokens: 1024,
           messages: [{ role: "user", content: analysisPrompt }],
+        });
+
+        // コスト追跡 (learning 改善フェーズ)
+        await logAiUsage({
+          category: "learning",
+          model: IMPROVE_MODEL,
+          usage: response.usage,
+          endpoint: "/api/ai/learning/run",
+          meta: { phase: "improve-prompt", category, theme },
         });
 
         const text = response.content[0]?.type === "text" ? response.content[0].text : "";

@@ -9,10 +9,13 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse, type NextRequest } from "next/server";
+import { logAiUsage } from "@/lib/ai/usage";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
+
+const ANALYZE_MODEL = "claude-haiku-4-5-20251001";
 
 type AnalyzeEditBody = {
   message_id: string;
@@ -67,9 +70,18 @@ labelの例（固定ではありません、状況に合わせて自由に命名
 
   try {
     const response = await client.messages.create({
-      model: "claude-haiku-4-5",
+      model: ANALYZE_MODEL,
       max_tokens: 256,
       messages: [{ role: "user", content: prompt }],
+    });
+
+    // コスト追跡
+    await logAiUsage({
+      category: "analyze-edit",
+      model: ANALYZE_MODEL,
+      usage: response.usage,
+      endpoint: "/api/ai/analyze-edit",
+      messageId: body.message_id,
     });
 
     const text = response.content[0]?.type === "text" ? response.content[0].text.trim() : "";
