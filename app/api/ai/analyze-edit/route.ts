@@ -10,6 +10,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse, type NextRequest } from "next/server";
 import { logAiUsage } from "@/lib/ai/usage";
+import { requireApiAuth } from "@/lib/auth/requireApiAuth";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export const runtime = "nodejs";
@@ -31,6 +32,13 @@ type EditReasonResult = {
 };
 
 export async function POST(req: NextRequest) {
+  // 認証: ログイン管理者 (operator 以上) または cron/learning パイプライン内部呼出
+  const auth = await requireApiAuth(req, {
+    requiredRole: "operator",
+    allowCronSecret: true,
+  });
+  if (!auth.ok) return auth.response;
+
   const body = await req.json().catch(() => null) as AnalyzeEditBody | null;
   if (!body?.message_id || !body.original_body || !body.edited_body) {
     return NextResponse.json({ error: "message_id, original_body, edited_body are required" }, { status: 400 });
