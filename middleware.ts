@@ -10,6 +10,9 @@ const PUBLIC_PREFIXES = [
   "/api/auth/google",
   "/api/webhooks",
   "/api/cron",
+  // 以下 3 つは middleware の cookie 認証をスキップする代わりに、
+  // route.ts 内で requireApiAuth() による CRON_SECRET / staff role 認証を行う。
+  // (cron / 内部 fetch では cookie がないため middleware では通せない)
   "/api/ai/learning/run",
   "/api/ai/analyze-edit",
   "/api/ai/extract-items",

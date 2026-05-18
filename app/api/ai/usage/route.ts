@@ -11,6 +11,7 @@
  */
 import { NextResponse, type NextRequest } from "next/server";
 
+import { requireApiAuth } from "@/lib/auth/requireApiAuth";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export const runtime = "nodejs";
@@ -58,6 +59,10 @@ function round(b: AggregateBucket): AggregateBucket {
 }
 
 export async function GET(req: NextRequest) {
+  // コスト集計は admin 以上限定 (経営情報のため)
+  const auth = await requireApiAuth(req, { requiredRole: "admin" });
+  if (!auth.ok) return auth.response;
+
   const url = new URL(req.url);
   const days = Math.max(
     1,

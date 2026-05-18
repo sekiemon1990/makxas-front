@@ -1,13 +1,22 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { logAiUsage } from "@/lib/ai/usage";
+import { requireApiAuth } from "@/lib/auth/requireApiAuth";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { InquiryItem } from "@/types/database";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const EXTRACT_MODEL = "claude-haiku-4-5-20251001";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  // 認証: ログイン管理者 (operator 以上) または cron 内部呼出
+  // Vision/Anthropic コストが走るので未認証ユーザーには開放しない
+  const auth = await requireApiAuth(request, {
+    requiredRole: "operator",
+    allowCronSecret: true,
+  });
+  if (!auth.ok) return auth.response;
+
   const body = await request.json() as {
     inquiry_id: string;
     lead_id?: string | null;

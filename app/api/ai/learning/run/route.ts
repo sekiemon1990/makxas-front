@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse, type NextRequest } from "next/server";
 import { logAiUsage } from "@/lib/ai/usage";
+import { requireApiAuth } from "@/lib/auth/requireApiAuth";
 import { createServiceClient } from "@/lib/supabase/service";
 
 const ANALYZE_MODEL = "claude-haiku-4-5-20251001";
@@ -53,6 +54,14 @@ type PromptVersionRow = {
 };
 
 export async function POST(req: NextRequest) {
+  // 認証: admin 以上、または CRON_SECRET (cron/ai-learning から呼び出し)
+  // Anthropic 課金が走るので role 制限を厳格化。
+  const auth = await requireApiAuth(req, {
+    requiredRole: "admin",
+    allowCronSecret: true,
+  });
+  if (!auth.ok) return auth.response;
+
   const body = await req.json().catch(() => ({})) as { trigger?: string };
   const trigger = body.trigger ?? "manual";
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
