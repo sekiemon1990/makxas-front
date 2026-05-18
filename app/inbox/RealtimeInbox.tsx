@@ -201,6 +201,8 @@ export function RealtimeInbox({
   // ⑬ モバイルスワイプ
   const swipeStartX = useRef<number | null>(null);
   const swipeStartY = useRef<number | null>(null);
+  // AI下書き自動生成のトリガー済みフラグ（1反響=1回）
+  const autoAiTriggeredRef = useRef<string | null>(null);
 
   const currentStaff = useMemo(
     () => staff.find((s) => s.id === currentStaffId) ?? null,
@@ -449,10 +451,62 @@ export function RealtimeInbox({
     setReplyBody("");
     // 顧客プロファイルリセット
     setCustomerProfile(null);
+    // 自動AI下書きトリガーフラグもリセット（同じ反響を再度開いた時に再生成可）
+    autoAiTriggeredRef.current = null;
 
-    // AI提案は自動実行しない。ユーザーが「AI下書きを生成」ボタンを押した時のみ実行する。
+    // AI提案は新しいuseEffectで自動実行する（下記参照）
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedInquiry?.id]);
+
+  // 反響を開いたとき、未返信のインバウンドメッセージがあれば自動でAI下書きを生成する
+  // - スタッフが返信する前にAI下書きを準備して応答時間を短縮（MAKXAS_PHILOSOPHY: 顧客満足度の最大化）
+  // - 既にaiSuggestがある／スタッフが入力中／クローズ済みなどはスキップ
+  // - 1反響あたり1回のみ実行（messages変更で再トリガーしない）
+  useEffect(() => {
+    if (!selectedInquiry) return;
+    // 既に同じinquiryでトリガー済みならスキップ
+    if (autoAiTriggeredRef.current === selectedInquiry.id) return;
+
+    // ステータスチェック: 新規・対応中のみ
+    if (
+      selectedInquiry.status !== "new" &&
+      selectedInquiry.status !== "in_progress"
+    ) return;
+
+    // メッセージが0件なら何もしない（messagesロード待ち）
+    if (messages.length === 0) return;
+
+    // 最後のメッセージがinboundでなければスキップ（既に返信済み）
+    const lastMessage = messages[messages.length - 1];
+    if (!lastMessage || lastMessage.direction !== "inbound") return;
+
+    // スタッフが入力中（返信欄に文字あり）ならスキップ
+    if (replyBody.trim().length > 0) return;
+
+    // 既にAI下書きを生成済みならスキップ
+    if (aiSuggest || aiPanelDraft) return;
+
+    // ローディング中ならスキップ
+    if (aiLoading) return;
+
+    // 自動実行
+    autoAiTriggeredRef.current = selectedInquiry.id;
+    setAiLoading(true);
+    fetch("/api/ai/suggest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inquiry_id: selectedInquiry.id }),
+    })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data: import("@/app/api/ai/suggest/route").AiSuggestResult | null) => {
+        if (data) setAiSuggest(data);
+      })
+      .catch(() => {
+        // 失敗は無視（ボタンクリックで手動実行可能）
+      })
+      .finally(() => setAiLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedInquiry?.id, messages.length]);
 
   useEffect(() => {
     fetch("/api/tags")
