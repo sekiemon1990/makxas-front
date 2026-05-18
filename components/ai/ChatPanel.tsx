@@ -22,6 +22,7 @@ export function ChatPanel({
   initialMessage,
   onSuggest,
   context,
+  emptyStateContent,
 }: {
   pageContext?: string;
   systemExtra?: string;
@@ -39,6 +40,8 @@ export function ChatPanel({
     internalNote?: string | null;
     tags?: string[];
   };
+  /** 空チャット状態時に表示するカスタム UI（AI 紹介など） */
+  emptyStateContent?: React.ReactNode;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState(initialMessage ?? "");
@@ -125,12 +128,14 @@ export function ChatPanel({
     >
       {/* メッセージエリア */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {messages.length === 0 && !loading ? (
-          <div className="flex flex-col items-center justify-center h-full text-zinc-400 gap-2">
-            <Bot className="size-10 text-zinc-300" />
-            <p className="text-sm">何でも聞いてください</p>
-          </div>
-        ) : null}
+        {messages.length === 0 && !loading
+          ? emptyStateContent ?? (
+              <div className="flex flex-col items-center justify-center h-full text-zinc-400 gap-2">
+                <Bot className="size-10 text-zinc-300" />
+                <p className="text-sm">何でも聞いてください</p>
+              </div>
+            )
+          : null}
 
         {messages.map((msg, i) => (
           <div
