@@ -103,10 +103,10 @@ export default async function DashboardPage() {
       .eq("status", "in_progress")
       .lt("created_at", sevenDaysAgo.toISOString())
       .gte("created_at", fourteenDaysAgo.toISOString()),
-    // 今月確定アポ
+    // 今月確定アポ（追加買取KPI集計用に additional_items_confirmed も取得）
     supabase
       .from("appointments")
-      .select("id, item_category, staff:staff_id(name), lead_id")
+      .select("id, item_category, staff:staff_id(name), lead_id, additional_items_confirmed")
       .gte("scheduled_at", monthStart.toISOString())
       .lt("scheduled_at", monthEnd.toISOString())
       .neq("status", "cancelled"),
@@ -152,9 +152,63 @@ export default async function DashboardPage() {
   } catch { /* テーブル未作成の場合スキップ */ }
 
   // --- 今月のアポ集計 ---
-  type ApptRow = { id: string; item_category: string | null; staff: { name: string | null } | null; lead_id: string | null };
+  type ApptRow = {
+    id: string;
+    item_category: string | null;
+    staff: { name: string | null } | null;
+    lead_id: string | null;
+    additional_items_confirmed: Record<string, boolean> | null;
+  };
   const appts = (monthlyApptRows ?? []) as ApptRow[];
   const thisMonthApptCount = appts.length;
+
+  // --- 追加買取（レバー2）KPI 集計 ---
+  // 高単価カテゴリ定義（MAKXAS_PHILOSOPHY: レバー2優先カテゴリ）
+  const HIGH_VALUE_CATEGORIES = new Set(["貴金属", "時計", "ブランド品", "骨董品"]);
+
+  // 1. 追加品確認率: additional_items_confirmed に1つ以上 true がある割合
+  const apptsWithAdditionalCheck = appts.filter((a) => {
+    const conf = a.additional_items_confirmed;
+    if (!conf || typeof conf !== "object") return false;
+    return Object.values(conf).some((v) => v === true);
+  }).length;
+  const additionalCheckRate = thisMonthApptCount > 0
+    ? Math.round((apptsWithAdditionalCheck / thisMonthApptCount) * 100)
+    : 0;
+
+  // 2. 高単価カテゴリ比率: 今月アポの品目カテゴリが高単価4種のものの割合
+  const highValueApptCount = appts.filter((a) =>
+    a.item_category ? HIGH_VALUE_CATEGORIES.has(a.item_category) : false,
+  ).length;
+  const highValueRate = thisMonthApptCount > 0
+    ? Math.round((highValueApptCount / thisMonthApptCount) * 100)
+    : 0;
+
+  // 3. 平均追加確認カテゴリ数: 確認実施済みアポの平均チェック数
+  let totalAdditionalChecks = 0;
+  for (const a of appts) {
+    const conf = a.additional_items_confirmed;
+    if (!conf || typeof conf !== "object") continue;
+    totalAdditionalChecks += Object.values(conf).filter((v) => v === true).length;
+  }
+  const avgAdditionalChecksPerAppt = apptsWithAdditionalCheck > 0
+    ? (totalAdditionalChecks / apptsWithAdditionalCheck).toFixed(1)
+    : "0";
+
+  // 4. 追加買取カテゴリ別ヒット数（チェックされた追加品の集計）
+  const additionalCategoryHits: Record<string, number> = {};
+  for (const a of appts) {
+    const conf = a.additional_items_confirmed;
+    if (!conf || typeof conf !== "object") continue;
+    for (const [cat, checked] of Object.entries(conf)) {
+      if (checked === true) {
+        additionalCategoryHits[cat] = (additionalCategoryHits[cat] ?? 0) + 1;
+      }
+    }
+  }
+  const additionalCategoryRanking = Object.entries(additionalCategoryHits)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6);
 
   // 担当者別アポ数ランキング
   const staffApptMap: Record<string, number> = {};
@@ -604,6 +658,104 @@ export default async function DashboardPage() {
                         </div>
                       );
                     })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* 追加買取（レバー2）KPI セクション ★ MAKXAS思想必須指標 */}
+          <div className="mt-6">
+            <Card className="rounded-lg border-amber-200 bg-amber-50/40 shadow-sm">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-1.5">
+                      <span className="text-base">💡</span>
+                      追加買取（レバー2）
+                    </CardTitle>
+                    <CardDescription>{monthLabel}：MAKXAS最重要指標 — レバー2が天井のない利益源</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  {/* 追加品確認率 */}
+                  <div className="rounded-lg border border-amber-200 bg-white p-4">
+                    <p className="text-xs font-medium text-zinc-500">追加品確認率</p>
+                    <p className="mt-1 text-2xl font-semibold text-amber-700">{additionalCheckRate}%</p>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      アポ {apptsWithAdditionalCheck} / {thisMonthApptCount} 件で追加品をチェック
+                    </p>
+                    <div className="mt-2 h-1.5 w-full rounded-full bg-zinc-100">
+                      <div
+                        className="h-1.5 rounded-full bg-amber-500 transition-all"
+                        style={{ width: `${additionalCheckRate}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 高単価カテゴリ比率 */}
+                  <div className="rounded-lg border border-amber-200 bg-white p-4">
+                    <p className="text-xs font-medium text-zinc-500">高単価カテゴリ比率</p>
+                    <p className="mt-1 text-2xl font-semibold text-amber-700">{highValueRate}%</p>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      貴金属・時計・ブランド・骨董 {highValueApptCount} / {thisMonthApptCount} 件
+                    </p>
+                    <div className="mt-2 h-1.5 w-full rounded-full bg-zinc-100">
+                      <div
+                        className="h-1.5 rounded-full bg-amber-500 transition-all"
+                        style={{ width: `${highValueRate}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 平均確認カテゴリ数 */}
+                  <div className="rounded-lg border border-amber-200 bg-white p-4">
+                    <p className="text-xs font-medium text-zinc-500">平均確認カテゴリ数</p>
+                    <p className="mt-1 text-2xl font-semibold text-amber-700">
+                      {avgAdditionalChecksPerAppt}
+                      <span className="ml-1 text-sm font-normal text-zinc-400">カテゴリ/アポ</span>
+                    </p>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      確認実施済みアポ {apptsWithAdditionalCheck} 件の平均
+                    </p>
+                    <p className="mt-2 text-[10px] text-zinc-400">
+                      ※ 確認カテゴリ数が多いほど追加買取の機会創出が増える
+                    </p>
+                  </div>
+                </div>
+
+                {/* 追加品カテゴリ別ヒット */}
+                {additionalCategoryRanking.length > 0 ? (
+                  <div className="mt-4 rounded-lg border border-amber-200 bg-white p-4">
+                    <p className="mb-3 text-xs font-medium text-zinc-500">追加品確認カテゴリ TOP6</p>
+                    <div className="space-y-2">
+                      {additionalCategoryRanking.map(([cat, cnt]) => {
+                        const max = additionalCategoryRanking[0]?.[1] ?? 1;
+                        const pct = Math.round((cnt / max) * 100);
+                        return (
+                          <div key={cat} className="space-y-1">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="font-medium text-zinc-700">{cat}</span>
+                              <span className="text-zinc-500">{cnt}件</span>
+                            </div>
+                            <div className="h-1.5 w-full rounded-full bg-zinc-100">
+                              <div className="h-1.5 rounded-full bg-amber-500 transition-all" style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-lg border border-dashed border-amber-200 bg-white p-4 text-center">
+                    <p className="text-sm text-zinc-500">
+                      まだ追加品確認データがありません
+                    </p>
+                    <p className="mt-1 text-xs text-zinc-400">
+                      アポ設定モーダルの「💡 追加査定品の確認チェックリスト」で追加品をチェックすると、ここに集計されます
+                    </p>
                   </div>
                 )}
               </CardContent>
