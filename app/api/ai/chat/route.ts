@@ -141,7 +141,9 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const systemPrompt = [
+  // 静的なシステムプロンプト (リクエスト間で同一 → Anthropic prompt caching 対象)
+  // Sonnet 4.6 の最小キャッシュ要件 2048 tokens を満たす想定。
+  const staticSystemPrompt = [
     "あなたは買取マクサスのインサイドセールスチームをサポートするAIアシスタントです。",
     "買取マクサス・銀座リパール・ブックリバー・カグウルなど複数の買取ブランドを運営する会社の、",
     "LINE・Webフォーム・メール・電話・比較サイトからの反響を管理し、アポイントメント（査定予約）取得を支援するシステムです。",
@@ -172,13 +174,27 @@ export async function POST(request: NextRequest) {
     "",
     "4. 返信文に追加買取のヒントを自然な形で含める（押し売りは禁止）",
     "   - 顧客が後悔しない取引を最優先にしながら、声掛けの機会を作る",
-    "",
-    body.pageContext ? `【現在のページ】${body.pageContext}` : "",
-    body.systemExtra ? `【業務コンテキスト】\n${body.systemExtra}` : "",
-    contextLines.length > 0 ? `\n【現在の反響情報】\n${contextLines.join("\n")}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
+  ].join("\n");
+
+  // 動的部分 (リクエスト毎に変動 → キャッシュ対象外)
+  const dynamicSystemParts: string[] = [];
+  if (body.pageContext) dynamicSystemParts.push(`【現在のページ】${body.pageContext}`);
+  if (body.systemExtra) dynamicSystemParts.push(`【業務コンテキスト】\n${body.systemExtra}`);
+  if (contextLines.length > 0)
+    dynamicSystemParts.push(`\n【現在の反響情報】\n${contextLines.join("\n")}`);
+
+  // system は配列形式: 静的部分に cache_control: ephemeral を付け、
+  // 動的部分は別ブロックに分離 (これにより cache_read として再利用される)。
+  const systemBlocks: Anthropic.TextBlockParam[] = [
+    {
+      type: "text",
+      text: staticSystemPrompt,
+      cache_control: { type: "ephemeral" },
+    },
+    ...(dynamicSystemParts.length > 0
+      ? [{ type: "text" as const, text: dynamicSystemParts.join("\n") }]
+      : []),
+  ];
 
   try {
     const anthropic = new Anthropic({ apiKey });
@@ -192,10 +208,23 @@ export async function POST(request: NextRequest) {
       const response = await anthropic.messages.create({
         model: MODEL,
         max_tokens: 1024,
-        system: systemPrompt,
+        system: systemBlocks,
         tools,
         messages,
       });
+
+      // キャッシュ効率の可視化 (Vercel logs から確認)
+      // 初回呼び出しは cache_creation > 0、5分以内の再呼び出しで cache_read > 0 を期待
+      const u = response.usage;
+      console.info(
+        `[ai/chat] usage iter=${i + 1}`,
+        JSON.stringify({
+          input: u.input_tokens,
+          output: u.output_tokens,
+          cache_creation: u.cache_creation_input_tokens ?? 0,
+          cache_read: u.cache_read_input_tokens ?? 0,
+        }),
+      );
 
       // コスト追跡: tool_use ループの各 iteration を記録
       await logAiUsage({
