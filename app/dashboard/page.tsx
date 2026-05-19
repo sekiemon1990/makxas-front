@@ -442,8 +442,14 @@ export default async function DashboardPage() {
             </Link>
           </div>
 
+          {/* === 階層1: 今日のサマリー === */}
+          {/* UI/UXレビュー B1: ダッシュボード3階層化 — 今日見るべき指標 */}
+          <div className="mt-8 mb-3 flex items-baseline gap-3">
+            <h2 className="text-sm font-semibold text-zinc-700">今日のサマリー</h2>
+            <p className="text-xs text-zinc-400">まず確認すべき指標</p>
+          </div>
           {/* サマリーカード */}
-          <div className="mt-8 grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             {summaryCards.map((card) => {
               const Icon = card.icon;
               const t = card.trend;
@@ -519,6 +525,12 @@ export default async function DashboardPage() {
             </div>
           ) : null}
 
+          {/* === 階層2: 今月の状況 === */}
+          {/* UI/UXレビュー B1: ダッシュボード3階層化 — 今月のチャネル/担当者/カテゴリ別状況 */}
+          <div className="mt-8 mb-3 flex items-baseline gap-3">
+            <h2 className="text-sm font-semibold text-zinc-700">今月の状況</h2>
+            <p className="text-xs text-zinc-400">チャネル・担当者・カテゴリ別の傾向</p>
+          </div>
           {/* チャネル別 + トレンド */}
           <div className="mt-6 grid grid-cols-[360px_1fr] gap-6">
             <div className="space-y-6">
@@ -913,6 +925,14 @@ export default async function DashboardPage() {
             </div>
           ) : null}
 
+          {/* === 階層3: 分析・詳細 === */}
+          {/* UI/UXレビュー B1: ダッシュボード3階層化 — 折りたたみ可能な詳細分析 */}
+          <details className="mt-8 group" open>
+            <summary className="mb-3 flex cursor-pointer items-baseline gap-3 list-none [&::-webkit-details-marker]:hidden">
+              <span className="inline-block text-zinc-400 transition-transform group-open:rotate-90">▶</span>
+              <h2 className="text-sm font-semibold text-zinc-700">分析・詳細</h2>
+              <p className="text-xs text-zinc-400">失注タグ・生産性レポート（折りたたみ可）</p>
+            </summary>
           {/* 失注タグ分析 */}
           {topLostTags.length > 0 ? (
             <div className="mt-6">
@@ -1031,6 +1051,8 @@ export default async function DashboardPage() {
               </div>
             </div>
           )}
+
+          </details>
 
           {/* 目標未設定の場合のCTA */}
           {goals.length === 0 ? (
