@@ -488,10 +488,12 @@ export default async function DashboardPage() {
                     </CardTitle>
                     <CardDescription>設定した月次目標に対する達成状況</CardDescription>
                   </div>
+                  {/* UI/UXレビュー C6: 「目標を編集」をボタン化して導線を明確に */}
                   <Link
                     href="/settings?tab=goals"
-                    className="text-xs text-zinc-400 hover:text-zinc-600"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300"
                   >
+                    <Target className="size-3" />
                     目標を編集
                   </Link>
                 </CardHeader>
