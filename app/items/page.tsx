@@ -301,10 +301,20 @@ export default async function ItemsPage({
                     ✕ フィルター解除
                   </Link>
                 ) : null}
-                {(["N","S","A","B","C","D","J"] as InquiryItemCondition[]).map((c) => (
+                {/* UI/UXレビュー B7: 状態ランクにtitle属性で解説を追加 */}
+                {([
+                  ["N", "新品・未使用"],
+                  ["S", "未使用に近い"],
+                  ["A", "目立つ傷や汚れなし"],
+                  ["B", "使用感あり・小傷"],
+                  ["C", "使用感大・傷や汚れ目立つ"],
+                  ["D", "難あり・要修理"],
+                  ["J", "ジャンク・動作不可"],
+                ] as [InquiryItemCondition, string][]).map(([c, desc]) => (
                   <Link
                     key={c}
                     href={`/items?condition=${c}${filterSearch ? `&q=${encodeURIComponent(filterSearch)}` : ""}`}
+                    title={`${c}: ${desc}`}
                     className={`rounded-full px-2.5 py-1 text-[11px] font-medium border transition ${
                       filterCondition === c
                         ? CONDITION_COLORS[c] + " border-current"
@@ -314,6 +324,9 @@ export default async function ItemsPage({
                     {c}
                   </Link>
                 ))}
+                <span className="text-[10px] text-zinc-400 self-center ml-1" title="N=新品 / S=未使用に近い / A=傷なし / B=使用感あり / C=傷目立つ / D=難あり / J=ジャンク">
+                  ⓘ ランク凡例
+                </span>
                 <Link
                   href={`/items?quote=1${filterSearch ? `&q=${encodeURIComponent(filterSearch)}` : ""}`}
                   className={`rounded-full px-2.5 py-1 text-[11px] font-medium border transition ${

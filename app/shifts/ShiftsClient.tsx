@@ -465,7 +465,20 @@ export function ShiftsClient({ staff }: { staff: Staff[] }) {
             <Clock className="size-4 animate-spin" />読み込み中...
           </div>
         ) : filteredIsStaff.length === 0 ? (
-          <p className="text-sm text-zinc-400">スタッフが登録されていません</p>
+          // UI/UXレビュー B4: シフト空ステートをオンボーディング化
+          <div className="rounded-xl border border-dashed border-zinc-300 bg-white p-10 text-center">
+            <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-zinc-100 text-2xl">📅</div>
+            <h3 className="mt-3 text-base font-semibold text-zinc-800">シフト管理を始めましょう</h3>
+            <p className="mt-1 text-sm text-zinc-500">スタッフを登録すると、ここに週/月のシフトカレンダーが表示されます。</p>
+            <ol className="mx-auto mt-4 max-w-md text-left text-sm text-zinc-600 space-y-1.5">
+              <li><span className="font-semibold text-zinc-800">1.</span> 設定 → スタッフ管理 でスタッフを追加</li>
+              <li><span className="font-semibold text-zinc-800">2.</span> シフト管理に戻り、各セルの「+」をクリックして登録</li>
+              <li><span className="font-semibold text-zinc-800">3.</span> CSV/画像から「一括インポート」も利用可能</li>
+            </ol>
+            <Link href="/settings?tab=staff" className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-md bg-zinc-900 px-4 text-sm font-medium text-white hover:bg-zinc-800">
+              スタッフ管理を開く →
+            </Link>
+          </div>
         ) : (
           <>
             {/* ===== 週表示 ===== */}

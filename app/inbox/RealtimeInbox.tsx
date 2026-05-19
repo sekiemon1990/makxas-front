@@ -1047,24 +1047,32 @@ export function RealtimeInbox({
                       </button>
                     ) : null}
                     <div className="ml-auto">
-                      {notifPermission !== "granted" && notifPermission !== "denied" ? (
+                      {/* UI/UXレビュー B5: 通知状態を3段階で明示（default/granted/denied） */}
+                      {notifPermission === "default" ? (
                         <button
                           className="h-7 rounded-full border border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-500 hover:bg-zinc-50 flex items-center gap-1"
                           onClick={requestNotifPermission}
-                          title="ブラウザ通知を有効化"
+                          title="クリックして通知を有効化"
                           type="button"
                         >
                           <Bell className="size-3" />
-                          通知ON
+                          🔕 通知OFF
                         </button>
                       ) : notifPermission === "granted" ? (
                         <span
-                          className="h-7 flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 text-xs text-emerald-600"
+                          className="h-7 flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 text-xs text-emerald-700"
                           title="ブラウザ通知 有効"
                         >
-                          <Bell className="size-3" />通知ON
+                          <Bell className="size-3" />🔔 通知ON
                         </span>
-                      ) : null}
+                      ) : (
+                        <span
+                          className="h-7 flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-3 text-xs text-amber-700 cursor-help"
+                          title="ブラウザでこのサイトの通知がブロックされています。ブラウザの設定 → サイトの権限 → 通知 で許可してください"
+                        >
+                          <Bell className="size-3" />⚠️ ブロック中
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
