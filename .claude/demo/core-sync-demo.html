@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>コア連携 UI イメージ — makxas-front</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif; }
+  .slide { display: none; }
+  .slide.active { display: flex; }
+  .badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:600; }
+  .dot { width:6px; height:6px; border-radius:50%; display:inline-block; }
+  .pulse { animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .spin { animation: spin 1s linear infinite; display:inline-block; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  .transition-all { transition: all 0.3s ease; }
+  .fade-in { animation: fadeIn 0.4s ease; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+</style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+<!-- ナビゲーション -->
+<div class="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shadow-sm">
+  <div class="flex items-center gap-3">
+    <span class="text-sm font-semibold text-gray-800">コア連携 UI イメージ</span>
+    <span class="text-xs text-gray-400">（小湊さん依頼後の完成形）</span>
+  </div>
+  <div class="flex items-center gap-2">
+    <button onclick="prevSlide()" class="px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 rounded-md text-gray-700 transition-colors">← 前へ</button>
+    <span id="slide-counter" class="text-xs text-gray-500 w-14 text-center">1 / 4</span>
+    <button onclick="nextSlide()" class="px-3 py-1.5 text-xs bg-gray-900 hover:bg-gray-700 rounded-md text-white transition-colors">次へ →</button>
+  </div>
+</div>
+
+<div class="pt-16 pb-8 px-6 max-w-5xl mx-auto">
+
+<!-- ========== SLIDE 1: アポ確定 → コア自動連携フロー ========== -->
+<div id="slide-1" class="slide active flex-col gap-6">
+  <div class="text-center pt-4">
+    <div class="inline-block bg-blue-50 text-blue-700 text-xs font-medium px-3 py-1 rounded-full mb-2">スライド 1 / 4</div>
+    <h2 class="text-xl font-bold text-gray-900">アポ確定ボタンを押すと…コアへ自動送信</h2>
+    <p class="text-sm text-gray-500 mt-1">現状は Google Sheets 書き出し（手動確認）→ 繋ぎ込み後はコアに即時登録</p>
+  </div>
+
+  <div class="grid grid-cols-2 gap-6">
+    <!-- 現状 -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div class="bg-gray-50 px-4 py-2 border-b border-gray-200 flex items-center gap-2">
+        <div class="w-2 h-2 rounded-full bg-gray-400"></div>
+        <span class="text-xs font-medium text-gray-500">現状（繋ぎ込み前）</span>
+      </div>
+      <div class="p-4 space-y-3">
+        <!-- アポモーダル -->
+        <div class="border border-gray-200 rounded-lg p-3">
+          <div class="text-xs font-semibold text-gray-700 mb-2">アポを設定</div>
+          <div class="space-y-2">
+            <div class="h-6 bg-gray-100 rounded text-xs flex items-center px-2 text-gray-400">2026/06/01 14:00</div>
+            <div class="h-6 bg-gray-100 rounded text-xs flex items-center px-2 text-gray-400">貴金属・ブランド品</div>
+            <div class="h-6 bg-gray-100 rounded text-xs flex items-center px-2 text-gray-400">東京都渋谷区…</div>
+          </div>
+          <button class="mt-3 w-full bg-gray-900 text-white text-xs py-1.5 rounded-md">アポ確定</button>
+        </div>
+        <!-- 矢印 -->
+        <div class="flex flex-col items-center text-gray-400 text-xs gap-1">
+          <div>↓</div>
+          <div class="bg-amber-50 border border-amber-200 rounded px-2 py-1 text-amber-700 text-xs">Google Sheets に書き出し</div>
+          <div>↓</div>
+          <div class="text-gray-400 text-xs">FSが手動で確認</div>
+          <div>↓</div>
+          <div class="text-gray-400 text-xs">コアに手動入力 ← 二重作業</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 繋ぎ込み後 -->
+    <div class="bg-white rounded-xl border border-emerald-200 shadow-sm overflow-hidden">
+      <div class="bg-emerald-50 px-4 py-2 border-b border-emerald-200 flex items-center gap-2">
+        <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+        <span class="text-xs font-medium text-emerald-700">繋ぎ込み後</span>
+      </div>
+      <div class="p-4 space-y-3">
+        <!-- アポモーダル -->
+        <div class="border border-gray-200 rounded-lg p-3">
+          <div class="text-xs font-semibold text-gray-700 mb-2">アポを設定</div>
+          <div class="space-y-2">
+            <div class="h-6 bg-gray-100 rounded text-xs flex items-center px-2 text-gray-400">2026/06/01 14:00</div>
+            <div class="h-6 bg-gray-100 rounded text-xs flex items-center px-2 text-gray-400">貴金属・ブランド品</div>
+            <div class="h-6 bg-gray-100 rounded text-xs flex items-center px-2 text-gray-400">東京都渋谷区…</div>
+          </div>
+          <!-- 確定ボタン → ローディング → 完了 の3段階 -->
+          <div id="btn-demo" class="mt-3">
+            <button onclick="demoSync()" class="w-full bg-gray-900 text-white text-xs py-1.5 rounded-md">アポ確定</button>
+          </div>
+          <div id="btn-loading" class="mt-3 hidden">
+            <button disabled class="w-full bg-blue-500 text-white text-xs py-1.5 rounded-md flex items-center justify-center gap-1.5">
+              <span class="spin">⟳</span> コアに送信中…
+            </button>
+          </div>
+          <div id="btn-done" class="mt-3 hidden fade-in">
+            <button disabled class="w-full bg-emerald-600 text-white text-xs py-1.5 rounded-md flex items-center justify-center gap-1.5">
+              ✅ コア連携完了
+            </button>
+            <div class="mt-1.5 text-center text-xs text-emerald-600">案件番号 #2806 が作成されました</div>
+          </div>
+        </div>
+        <!-- 自動フロー -->
+        <div class="flex flex-col items-center text-xs gap-1">
+          <div class="text-gray-400">↓</div>
+          <div class="bg-emerald-50 border border-emerald-200 rounded px-2 py-1 text-emerald-700">コアに即時送信（自動）</div>
+          <div class="text-gray-400">↓</div>
+          <div class="bg-emerald-50 border border-emerald-200 rounded px-2 py-1 text-emerald-700">FSがコアを開くと登録済み</div>
+          <div class="text-gray-400 mt-1">二重入力ゼロ 🎉</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== SLIDE 2: アポ一覧でのコア連携バッジ ========== -->
+<div id="slide-2" class="slide flex-col gap-6">
+  <div class="text-center pt-4">
+    <div class="inline-block bg-blue-50 text-blue-700 text-xs font-medium px-3 py-1 rounded-full mb-2">スライド 2 / 4</div>
+    <h2 class="text-xl font-bold text-gray-900">アポ一覧（/appointments）でのコア連携ステータス</h2>
+    <p class="text-sm text-gray-500 mt-1">各アポのコア連携状態が一目でわかるバッジ表示</p>
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+      <span class="text-sm font-semibold text-gray-700">アポ一覧</span>
+      <div class="flex gap-2">
+        <span class="text-xs text-gray-500">2026年6月</span>
+        <button class="text-xs bg-gray-900 text-white px-2 py-1 rounded">今日</button>
+      </div>
+    </div>
+    <div class="divide-y divide-gray-100">
+      <!-- 連携済み・成約 -->
+      <div class="px-4 py-3 flex items-center gap-3 hover:bg-gray-50">
+        <div class="w-10 text-xs text-gray-400 text-center">6/1<br><span class="text-gray-600 font-medium">14:00</span></div>
+        <div class="flex-1">
+          <div class="text-sm font-medium text-gray-900">田中 花子 様</div>
+          <div class="text-xs text-gray-500">貴金属・ブランド品 / 訪問査定 / 渋谷区</div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="badge bg-emerald-100 text-emerald-700"><span class="dot bg-emerald-500"></span>コア連携済み</span>
+          <span class="badge bg-blue-100 text-blue-700">成約 ¥48,000</span>
+        </div>
+        <div class="text-xs text-gray-400">#2804</div>
+      </div>
+      <!-- 連携済み・失注 -->
+      <div class="px-4 py-3 flex items-center gap-3 hover:bg-gray-50">
+        <div class="w-10 text-xs text-gray-400 text-center">6/2<br><span class="text-gray-600 font-medium">11:00</span></div>
+        <div class="flex-1">
+          <div class="text-sm font-medium text-gray-900">鈴木 一郎 様</div>
+          <div class="text-xs text-gray-500">スマートフォン・PC / 訪問査定 / 新宿区</div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="badge bg-emerald-100 text-emerald-700"><span class="dot bg-emerald-500"></span>コア連携済み</span>
+          <span class="badge bg-red-100 text-red-600">失注</span>
+        </div>
+        <div class="text-xs text-gray-400">#2805</div>
+      </div>
+      <!-- 連携済み・結果待ち -->
+      <div class="px-4 py-3 flex items-center gap-3 hover:bg-gray-50 bg-blue-50/40">
+        <div class="w-10 text-xs text-gray-400 text-center">6/3<br><span class="text-gray-600 font-medium">15:30</span></div>
+        <div class="flex-1">
+          <div class="text-sm font-medium text-gray-900">山田 恵子 様</div>
+          <div class="text-xs text-gray-500">骨董品・貴金属 / 訪問査定 / 世田谷区</div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="badge bg-emerald-100 text-emerald-700"><span class="dot bg-emerald-500"></span>コア連携済み</span>
+          <span class="badge bg-amber-100 text-amber-700"><span class="dot bg-amber-400 pulse"></span>結果待ち</span>
+        </div>
+        <div class="text-xs text-gray-400">#2806</div>
+      </div>
+      <!-- 未連携（エンドポイント待ち中の状態） -->
+      <div class="px-4 py-3 flex items-center gap-3 hover:bg-gray-50 opacity-60">
+        <div class="w-10 text-xs text-gray-400 text-center">6/4<br><span class="text-gray-600 font-medium">10:00</span></div>
+        <div class="flex-1">
+          <div class="text-sm font-medium text-gray-900">佐藤 良太 様</div>
+          <div class="text-xs text-gray-500">時計・ブランド品 / 訪問査定 / 目黒区</div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="badge bg-gray-100 text-gray-500"><span class="dot bg-gray-400"></span>コア未連携</span>
+        </div>
+        <div class="text-xs text-gray-400">—</div>
+      </div>
+    </div>
+    <!-- サマリー -->
+    <div class="px-4 py-3 bg-gray-50 border-t border-gray-200 flex gap-6 text-xs text-gray-600">
+      <span>今月のアポ: <strong>4件</strong></span>
+      <span>コア連携済み: <strong class="text-emerald-600">3件</strong></span>
+      <span>成約: <strong class="text-blue-600">1件</strong> / 失注: <strong class="text-red-600">1件</strong> / 結果待ち: <strong class="text-amber-600">1件</strong></span>
+    </div>
+  </div>
+</div>
+
+<!-- ========== SLIDE 3: インボックス詳細パネル ========== -->
+<div id="slide-3" class="slide flex-col gap-6">
+  <div class="text-center pt-4">
+    <div class="inline-block bg-blue-50 text-blue-700 text-xs font-medium px-3 py-1 rounded-full mb-2">スライド 3 / 4</div>
+    <h2 class="text-xl font-bold text-gray-900">反響詳細パネル — コア連携ステータス</h2>
+    <p class="text-sm text-gray-500 mt-1">インボックス右ペインでアポ・コア連携状況を一元表示</p>
+  </div>
+
+  <!-- 3カラムレイアウト（右ペインのみフル表示） -->
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex" style="height: 460px;">
+    <!-- 左: サイドバー（縮小） -->
+    <div class="w-28 bg-gray-50 border-r border-gray-200 p-2 flex-shrink-0">
+      <div class="text-xs text-gray-400 font-medium px-1 mb-2">フィルタ</div>
+      <div class="space-y-1">
+        <div class="px-2 py-1 text-xs text-gray-600 rounded hover:bg-gray-100">全て</div>
+        <div class="px-2 py-1 text-xs bg-gray-200 text-gray-900 rounded font-medium">アポ済</div>
+        <div class="px-2 py-1 text-xs text-gray-600 rounded hover:bg-gray-100">対応中</div>
+        <div class="px-2 py-1 text-xs text-gray-600 rounded hover:bg-gray-100">引継完了</div>
+      </div>
+    </div>
+    <!-- 中: 反響一覧（縮小） -->
+    <div class="w-48 border-r border-gray-200 flex-shrink-0">
+      <div class="p-2 border-b border-gray-100 bg-blue-50">
+        <div class="text-xs font-semibold text-blue-900">山田 恵子 様</div>
+        <div class="text-xs text-blue-700">骨董品・貴金属</div>
+        <div class="flex items-center gap-1 mt-1">
+          <span class="badge bg-amber-100 text-amber-700 text-xs"><span class="dot bg-amber-400 pulse"></span>アポ取得済</span>
+        </div>
+      </div>
+      <div class="p-2 border-b border-gray-100 opacity-50">
+        <div class="text-xs font-semibold text-gray-700">田中 花子 様</div>
+        <div class="text-xs text-gray-500">ブランドバッグ</div>
+      </div>
+      <div class="p-2 opacity-50">
+        <div class="text-xs font-semibold text-gray-700">鈴木 一郎 様</div>
+        <div class="text-xs text-gray-500">スマートフォン</div>
+      </div>
+    </div>
+    <!-- 右: 詳細パネル -->
+    <div class="flex-1 overflow-y-auto p-4 space-y-4">
+      <!-- ヘッダー -->
+      <div class="flex items-start justify-between">
+        <div>
+          <div class="text-base font-bold text-gray-900">山田 恵子 様</div>
+          <div class="text-xs text-gray-500">世田谷区 / LINE / 骨董品・貴金属</div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="badge bg-amber-100 text-amber-700"><span class="dot bg-amber-400 pulse"></span>アポ取得済</span>
+        </div>
+      </div>
+
+      <!-- ★ コア連携ステータスセクション（新規追加部分） -->
+      <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="text-xs font-semibold text-emerald-800 flex items-center gap-1.5">
+            <span>🔗</span> マクサスコア連携
+          </div>
+          <span class="badge bg-emerald-100 text-emerald-700"><span class="dot bg-emerald-500"></span>連携済み</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div>
+            <div class="text-emerald-600">コア案件番号</div>
+            <div class="font-semibold text-emerald-900">#2806</div>
+          </div>
+          <div>
+            <div class="text-emerald-600">連携日時</div>
+            <div class="font-semibold text-emerald-900">06/03 09:12</div>
+          </div>
+        </div>
+        <!-- 結果待ち -->
+        <div class="bg-amber-50 border border-amber-200 rounded p-2 flex items-center gap-2">
+          <span class="dot bg-amber-400 pulse flex-shrink-0"></span>
+          <div class="text-xs text-amber-800">
+            <strong>結果待ち</strong> — 査定日 6/3 15:30 以降にコアから自動更新されます
+          </div>
+        </div>
+      </div>
+
+      <!-- アポ情報 -->
+      <div class="border border-gray-200 rounded-lg p-3">
+        <div class="text-xs font-semibold text-gray-700 mb-2 flex items-center justify-between">
+          <span>📅 アポ情報</span>
+          <span class="text-gray-400 font-normal">6/3 (月) 15:30</span>
+        </div>
+        <div class="space-y-1.5 text-xs text-gray-600">
+          <div class="flex gap-2"><span class="text-gray-400 w-14">品目</span><span>骨董品・貴金属</span></div>
+          <div class="flex gap-2"><span class="text-gray-400 w-14">住所</span><span>東京都世田谷区…</span></div>
+          <div class="flex gap-2"><span class="text-gray-400 w-14">方法</span><span>訪問査定</span></div>
+        </div>
+        <!-- 追加品チェックリスト -->
+        <div class="mt-2 pt-2 border-t border-gray-100">
+          <div class="text-xs text-gray-500 mb-1.5">追加品確認（IS時点）</div>
+          <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+            <label class="flex items-center gap-1 text-gray-600"><input type="checkbox" checked class="rounded" disabled> 貴金属</label>
+            <label class="flex items-center gap-1 text-gray-600"><input type="checkbox" checked class="rounded" disabled> ブランドバッグ</label>
+            <label class="flex items-center gap-1 text-gray-600"><input type="checkbox" class="rounded" disabled> 時計</label>
+            <label class="flex items-center gap-1 text-gray-600"><input type="checkbox" class="rounded" disabled> 骨董品</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- コアリンク（想定） -->
+      <a href="#" onclick="return false" class="flex items-center gap-2 text-xs text-blue-600 hover:underline">
+        <span>↗</span> マクサスコアで案件を開く（#2806）
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- ========== SLIDE 4: 成約フィードバック受信時 ========== -->
+<div id="slide-4" class="slide flex-col gap-6">
+  <div class="text-center pt-4">
+    <div class="inline-block bg-blue-50 text-blue-700 text-xs font-medium px-3 py-1 rounded-full mb-2">スライド 4 / 4</div>
+    <h2 class="text-xl font-bold text-gray-900">成約・失注フィードバックが自動で返ってくる</h2>
+    <p class="text-sm text-gray-500 mt-1">FSがコアで成約/失注にすると makxas-front が自動更新される</p>
+  </div>
+
+  <div class="grid grid-cols-2 gap-6">
+    <!-- 成約パターン -->
+    <div class="bg-white rounded-xl border border-blue-200 shadow-sm overflow-hidden">
+      <div class="bg-blue-50 px-4 py-2.5 border-b border-blue-200">
+        <div class="text-xs font-semibold text-blue-800">🎉 成約フィードバック受信</div>
+      </div>
+      <div class="p-4 space-y-3">
+        <!-- 通知 -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 fade-in">
+          <div class="text-xs font-bold text-blue-900 mb-1">✅ 成約が確定しました</div>
+          <div class="text-xs text-blue-700">田中 花子 様 — 案件 #2804</div>
+          <div class="text-xs text-blue-700 mt-1">成約金額: <strong class="text-blue-900">¥48,000</strong></div>
+        </div>
+        <!-- 詳細パネルのステータス変化 -->
+        <div class="border border-gray-200 rounded-lg p-3 space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="text-xs font-semibold text-gray-700">🔗 マクサスコア連携</div>
+            <span class="badge bg-blue-100 text-blue-700"><span class="dot bg-blue-500"></span>成約</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div><div class="text-gray-500">成約金額</div><div class="font-bold text-gray-900">¥48,000</div></div>
+            <div><div class="text-gray-500">成約日</div><div class="font-semibold">06/01</div></div>
+          </div>
+          <div class="text-xs text-gray-500">コアより自動更新 06/01 17:22</div>
+        </div>
+        <!-- ステータスバー -->
+        <div class="flex items-center gap-1 text-xs">
+          <div class="flex-1 bg-gray-900 text-white text-center py-1 rounded-l text-xs">IS対応</div>
+          <div class="flex-1 bg-gray-900 text-white text-center py-1 text-xs">アポ取得</div>
+          <div class="flex-1 bg-blue-600 text-white text-center py-1 rounded-r text-xs font-bold">✅ 成約</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 失注パターン -->
+    <div class="bg-white rounded-xl border border-red-200 shadow-sm overflow-hidden">
+      <div class="bg-red-50 px-4 py-2.5 border-b border-red-200">
+        <div class="text-xs font-semibold text-red-800">❌ 失注フィードバック受信</div>
+      </div>
+      <div class="p-4 space-y-3">
+        <!-- 通知 -->
+        <div class="bg-red-50 border border-red-200 rounded-lg p-3 fade-in">
+          <div class="text-xs font-bold text-red-900 mb-1">❌ 失注になりました</div>
+          <div class="text-xs text-red-700">鈴木 一郎 様 — 案件 #2805</div>
+          <div class="text-xs text-red-700 mt-1">メモ: 他社に依頼済みとのこと</div>
+        </div>
+        <!-- 詳細パネルのステータス変化 -->
+        <div class="border border-gray-200 rounded-lg p-3 space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="text-xs font-semibold text-gray-700">🔗 マクサスコア連携</div>
+            <span class="badge bg-red-100 text-red-600"><span class="dot bg-red-500"></span>失注</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div><div class="text-gray-500">失注理由</div><div class="font-semibold text-gray-900">他社依頼済み</div></div>
+            <div><div class="text-gray-500">失注日</div><div class="font-semibold">06/02</div></div>
+          </div>
+          <div class="text-xs text-gray-500">コアより自動更新 06/02 16:08</div>
+        </div>
+        <!-- ステータスバー -->
+        <div class="flex items-center gap-1 text-xs">
+          <div class="flex-1 bg-gray-900 text-white text-center py-1 rounded-l text-xs">IS対応</div>
+          <div class="flex-1 bg-gray-900 text-white text-center py-1 text-xs">アポ取得</div>
+          <div class="flex-1 bg-red-500 text-white text-center py-1 rounded-r text-xs font-bold">❌ 失注</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI カード -->
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+    <div class="text-sm font-semibold text-gray-700 mb-3">📊 コア連携で取れるようになる KPI（現状は計測不可）</div>
+    <div class="grid grid-cols-4 gap-4">
+      <div class="text-center p-3 bg-blue-50 rounded-lg">
+        <div class="text-2xl font-bold text-blue-700">68%</div>
+        <div class="text-xs text-blue-600 mt-0.5">IS→成約率</div>
+      </div>
+      <div class="text-center p-3 bg-emerald-50 rounded-lg">
+        <div class="text-2xl font-bold text-emerald-700">¥42,000</div>
+        <div class="text-xs text-emerald-600 mt-0.5">平均成約単価</div>
+      </div>
+      <div class="text-center p-3 bg-amber-50 rounded-lg">
+        <div class="text-2xl font-bold text-amber-700">2.3点</div>
+        <div class="text-xs text-amber-600 mt-0.5">追加買取/件</div>
+      </div>
+      <div class="text-center p-3 bg-purple-50 rounded-lg">
+        <div class="text-2xl font-bold text-purple-700">LINE</div>
+        <div class="text-xs text-purple-600 mt-0.5">成約率1位チャネル</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /px-6 -->
+
+<script>
+let current = 1;
+const total = 4;
+
+function showSlide(n) {
+  document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+  document.getElementById('slide-' + n).classList.add('active');
+  document.getElementById('slide-counter').textContent = n + ' / ' + total;
+}
+
+function nextSlide() {
+  if (current < total) { current++; showSlide(current); }
+}
+function prevSlide() {
+  if (current > 1) { current--; showSlide(current); }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') nextSlide();
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') prevSlide();
+});
+
+// スライド1: アポ確定デモ
+function demoSync() {
+  document.getElementById('btn-demo').classList.add('hidden');
+  document.getElementById('btn-loading').classList.remove('hidden');
+  setTimeout(() => {
+    document.getElementById('btn-loading').classList.add('hidden');
+    document.getElementById('btn-done').classList.remove('hidden');
+  }, 1800);
+}
+</script>
+</body>
+</html>

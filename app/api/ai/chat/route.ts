@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { logAiUsage } from "@/lib/ai/usage";
 import { createServiceClient } from "@/lib/supabase/service";
+import { buildHelpDocsContext } from "@/lib/help/manual";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -174,7 +175,7 @@ export async function POST(request: NextRequest) {
     "",
     "4. 返信文に追加買取のヒントを自然な形で含める（押し売りは禁止）",
     "   - 顧客が後悔しない取引を最優先にしながら、声掛けの機会を作る",
-  ].join("\n");
+  ].join("\n") + buildHelpDocsContext();
 
   // 動的部分 (リクエスト毎に変動 → キャッシュ対象外)
   const dynamicSystemParts: string[] = [];

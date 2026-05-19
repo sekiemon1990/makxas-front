@@ -326,9 +326,16 @@ export default function LeadsPage() {
                   const isStale = daysSince !== null && daysSince >= 7;
 
                   return (
+                    // UI/UXレビュー C3: 行全体をクリック可能に
                     <tr
                       key={lead.id}
-                      className="hover:bg-zinc-50 transition-colors"
+                      className="hover:bg-zinc-50 transition-colors cursor-pointer"
+                      onClick={(e) => {
+                        // Linkや他のクリック可能要素を踏んだ場合は親で再ナビゲートしない
+                        const target = e.target as HTMLElement;
+                        if (target.closest("a, button")) return;
+                        window.location.href = `/leads/${lead.id}`;
+                      }}
                     >
                       <td className="px-4 py-3">
                         <Link
@@ -367,8 +374,20 @@ export default function LeadsPage() {
                       </td>
                       <td className="px-4 py-3">
                         {lastContact ? (
-                          <span className={cn("text-xs", isStale ? "font-medium text-orange-500" : "text-zinc-500")}>
-                            {isStale ? `${daysSince}日前` : formatDate(lastContact)}
+                          // UI/UXレビュー C10: 相対時刻 + 絶対日付を併記して表記統一
+                          <span
+                            className={cn("text-xs", isStale ? "font-medium text-orange-500" : "text-zinc-500")}
+                            title={formatDate(lastContact)}
+                          >
+                            {daysSince === null
+                              ? formatDate(lastContact)
+                              : daysSince === 0
+                                ? "今日"
+                                : daysSince === 1
+                                  ? "昨日"
+                                  : daysSince < 30
+                                    ? `${daysSince}日前`
+                                    : formatDate(lastContact)}
                           </span>
                         ) : (
                           <span className="text-xs text-zinc-300">—</span>

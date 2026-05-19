@@ -114,7 +114,7 @@ export default function AiPage() {
                 </div>
               </div>
 
-              {/* サイドバー: 例文 */}
+              {/* サイドバー: 例文 — UI/UXレビュー C9: 上位3問のみ表示し残りはdetailsで折りたたみ */}
               <aside className="shrink-0 md:w-52">
                 <div className="rounded-xl border border-zinc-200 bg-white p-3">
                   <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-zinc-500">
@@ -122,7 +122,7 @@ export default function AiPage() {
                     よく使う質問
                   </div>
                   <div className="flex flex-col gap-1">
-                    {EXAMPLE_QUESTIONS.map((q) => (
+                    {EXAMPLE_QUESTIONS.slice(0, 3).map((q) => (
                       <button
                         key={q}
                         type="button"
@@ -139,6 +139,32 @@ export default function AiPage() {
                         {q}
                       </button>
                     ))}
+                    {EXAMPLE_QUESTIONS.length > 3 && (
+                      <details className="group">
+                        <summary className="cursor-pointer rounded-lg px-3 py-1.5 text-left text-xs text-zinc-400 hover:bg-zinc-50 list-none [&::-webkit-details-marker]:hidden">
+                          + もっと見る ({EXAMPLE_QUESTIONS.length - 3}件)
+                        </summary>
+                        <div className="flex flex-col gap-1 pt-1">
+                          {EXAMPLE_QUESTIONS.slice(3).map((q) => (
+                            <button
+                              key={q}
+                              type="button"
+                              className="rounded-lg px-3 py-2 text-left text-xs text-zinc-700 transition hover:bg-zinc-100"
+                              onClick={() => {
+                                const el = document.querySelector("textarea");
+                                if (el) {
+                                  el.value = q;
+                                  el.dispatchEvent(new Event("input", { bubbles: true }));
+                                  el.focus();
+                                }
+                              }}
+                            >
+                              {q}
+                            </button>
+                          ))}
+                        </div>
+                      </details>
+                    )}
                   </div>
                 </div>
               </aside>

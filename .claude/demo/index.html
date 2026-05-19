@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>makxas-front — 追加買取強化 機能デモ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .annotation-pulse { animation: pulse 2s cubic-bezier(0.4,0,0.6,1) infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+    .slide { display: none; }
+    .slide.active { display: block; }
+    .badge-new {
+      display: inline-flex; align-items: center; gap: 3px;
+      background: #2563eb; color: white;
+      font-size: 9px; font-weight: 700; letter-spacing: 0.05em;
+      padding: 2px 6px; border-radius: 9999px;
+    }
+    .step-number {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: #2563eb; color: white;
+      font-size: 11px; font-weight: 700; flex-shrink: 0;
+    }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; }
+  </style>
+</head>
+<body class="bg-zinc-100 min-h-screen">
+
+<!-- ナビゲーションバー -->
+<div class="bg-zinc-900 text-white sticky top-0 z-50 shadow-lg">
+  <div class="max-w-[1300px] mx-auto px-4 py-2.5 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <span class="font-bold text-sm">makxas-front</span>
+      <span class="bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">機能デモ</span>
+      <span class="text-zinc-400 text-xs hidden sm:block">PR #70 — 追加買取強化（属性×ニーズ×高単価 2軸フレームワーク）</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <span id="slideLabel" class="text-zinc-400 text-xs"></span>
+      <button onclick="prevSlide()" class="text-xs bg-zinc-700 hover:bg-zinc-600 px-3 py-1.5 rounded transition">← 前へ</button>
+      <button onclick="nextSlide()" class="text-xs bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded transition">次へ →</button>
+    </div>
+  </div>
+  <!-- スライドインジケーター -->
+  <div class="flex gap-1 px-4 pb-2">
+    <div id="ind0" onclick="goSlide(0)" class="h-1 rounded-full cursor-pointer transition-all duration-300" style="background:#3b82f6;width:48px"></div>
+    <div id="ind1" onclick="goSlide(1)" class="h-1 w-8 rounded-full bg-zinc-600 cursor-pointer transition-all duration-300"></div>
+    <div id="ind2" onclick="goSlide(2)" class="h-1 w-8 rounded-full bg-zinc-600 cursor-pointer transition-all duration-300"></div>
+    <div id="ind3" onclick="goSlide(3)" class="h-1 w-8 rounded-full bg-zinc-600 cursor-pointer transition-all duration-300"></div>
+    <div id="ind4" onclick="goSlide(4)" class="h-1 w-8 rounded-full bg-zinc-600 cursor-pointer transition-all duration-300"></div>
+    <div id="ind5" onclick="goSlide(5)" class="h-1 w-8 rounded-full bg-zinc-600 cursor-pointer transition-all duration-300"></div>
+  </div>
+</div>
+
+<!-- ========== SLIDE 0: 全体俯瞰（実際のUI再現） ========== -->
+<div class="slide active" id="slide0">
+  <div class="max-w-[1300px] mx-auto px-4 py-4">
+    <div class="bg-white rounded-xl border border-zinc-200 shadow-sm p-4 mb-4">
+      <h1 class="text-base font-bold text-zinc-800 mb-1">追加買取強化 — 実装した5つの機能（実際のUIはこのような画面です）</h1>
+      <p class="text-xs text-zinc-500">青い <span class="badge-new">NEW</span> バッジが付いている部分が今回追加した機能です。各機能カードをクリックすると詳細スライドへ移動します。</p>
+    </div>
+
+    <!-- 機能ナビ -->
+    <div class="grid grid-cols-5 gap-2 mb-4">
+      <div onclick="goSlide(1)" class="bg-white rounded-lg border-2 border-violet-300 p-2.5 cursor-pointer hover:shadow-md transition hover:border-violet-500 text-center">
+        <div class="text-[11px] font-bold text-violet-600 mb-1">① AI抽出</div>
+        <div class="text-[10px] text-zinc-500">顧客プロファイル生成</div>
+        <div class="mt-1.5 text-[10px] text-violet-500 font-medium">→ 詳細を見る</div>
+      </div>
+      <div onclick="goSlide(2)" class="bg-white rounded-lg border-2 border-amber-300 p-2.5 cursor-pointer hover:shadow-md transition hover:border-amber-500 text-center">
+        <div class="text-[11px] font-bold text-amber-600 mb-1">② サジェスト</div>
+        <div class="text-[10px] text-zinc-500">追加買取バナー表示</div>
+        <div class="mt-1.5 text-[10px] text-amber-500 font-medium">→ 詳細を見る</div>
+      </div>
+      <div onclick="goSlide(3)" class="bg-white rounded-lg border-2 border-yellow-300 p-2.5 cursor-pointer hover:shadow-md transition hover:border-yellow-500 text-center">
+        <div class="text-[11px] font-bold text-yellow-600 mb-1">③ 高単価バッジ</div>
+        <div class="text-[10px] text-zinc-500">⭐自動ソート付き</div>
+        <div class="mt-1.5 text-[10px] text-yellow-600 font-medium">→ 詳細を見る</div>
+      </div>
+      <div onclick="goSlide(4)" class="bg-white rounded-lg border-2 border-green-300 p-2.5 cursor-pointer hover:shadow-md transition hover:border-green-500 text-center">
+        <div class="text-[11px] font-bold text-green-600 mb-1">④ AI声掛け</div>
+        <div class="text-[10px] text-zinc-500">返信アシスト追加</div>
+        <div class="mt-1.5 text-[10px] text-green-500 font-medium">→ 詳細を見る</div>
+      </div>
+      <div onclick="goSlide(5)" class="bg-white rounded-lg border-2 border-indigo-300 p-2.5 cursor-pointer hover:shadow-md transition hover:border-indigo-500 text-center">
+        <div class="text-[11px] font-bold text-indigo-600 mb-1">⑤ チェックリスト</div>
+        <div class="text-[10px] text-zinc-500">アポ設定モーダル</div>
+        <div class="mt-1.5 text-[10px] text-indigo-500 font-medium">→ 詳細を見る</div>
+      </div>
+    </div>
+
+    <!-- 実際のインボックスUI再現 -->
+    <div class="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+      <!-- アプリヘッダー（実際と同じ） -->
+      <div class="flex items-center gap-1 border-b border-zinc-800 bg-zinc-900 px-3 py-2">
+        <span class="text-white font-bold text-sm mr-4">makxas-front</span>
+        <div class="flex gap-0">
+          <div class="px-3 py-1.5 text-xs text-zinc-400 cursor-pointer hover:text-white">ダッシュボード</div>
+          <div class="px-3 py-1.5 text-xs bg-zinc-700 text-white rounded-sm cursor-pointer">インボックス</div>
+          <div class="px-3 py-1.5 text-xs text-zinc-400 cursor-pointer hover:text-white">リード一覧</div>
+          <div class="px-3 py-1.5 text-xs text-zinc-400 cursor-pointer hover:text-white">アポ一覧</div>
+          <div class="px-3 py-1.5 text-xs text-zinc-400 cursor-pointer hover:text-white">設定</div>
+        </div>
+      </div>
+
+      <!-- 3カラムレイアウト -->
+      <div class="flex" style="height:500px">
+
+        <!-- 左: サイドバー（実際と同じ） -->
+        <div class="w-40 border-r border-zinc-200 bg-zinc-50 overflow-y-auto flex-shrink-0 p-2">
+          <div class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider px-1 mb-2">ステータス</div>
+          <div class="rounded-md bg-white border border-zinc-200 px-2 py-1.5 text-[11px] text-zinc-700 font-medium mb-0.5 flex justify-between"><span>すべて</span><span class="text-zinc-400">8</span></div>
+          <div class="rounded-md px-2 py-1.5 text-[11px] text-zinc-500 hover:bg-white cursor-pointer flex justify-between"><span>新着</span><span class="text-red-500 font-semibold">3</span></div>
+          <div class="rounded-md px-2 py-1.5 text-[11px] text-zinc-500 hover:bg-white cursor-pointer">対応中</div>
+          <div class="rounded-md px-2 py-1.5 text-[11px] text-zinc-500 hover:bg-white cursor-pointer">アポ済</div>
+          <div class="rounded-md px-2 py-1.5 text-[11px] text-zinc-500 hover:bg-white cursor-pointer">引継完了</div>
+          <div class="mt-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider px-1 mb-2">チャネル</div>
+          <div class="rounded-md px-2 py-1.5 text-[11px] text-zinc-500 hover:bg-white cursor-pointer">LINE</div>
+          <div class="rounded-md px-2 py-1.5 text-[11px] text-zinc-500 hover:bg-white cursor-pointer">フォーム</div>
+          <div class="rounded-md px-2 py-1.5 text-[11px] text-zinc-500 hover:bg-white cursor-pointer">おいくら</div>
+        </div>
+
+        <!-- 中: 反響一覧 -->
+        <div class="w-60 border-r border-zinc-200 overflow-y-auto flex-shrink-0">
+          <!-- 田中様（選択中・遺品整理） -->
+          <div class="border-b border-zinc-200 bg-blue-50 border-l-[3px] border-l-blue-500 px-3 py-2.5 cursor-pointer">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold text-zinc-800">田中 美智子</span>
+              <span class="text-[10px] text-zinc-400">5分前</span>
+            </div>
+            <div class="flex gap-1 flex-wrap mb-1">
+              <span class="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">LINE</span>
+              <span class="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-medium">遺品整理</span>
+              <span class="text-[10px] bg-zinc-200 text-zinc-600 px-1.5 py-0.5 rounded-full">新着</span>
+            </div>
+            <div class="text-[11px] text-zinc-500 truncate">ルイヴィトンのバッグ・金のネックレス</div>
+          </div>
+          <!-- 鈴木様 -->
+          <div class="border-b border-zinc-200 px-3 py-2.5 cursor-pointer hover:bg-zinc-50">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold text-zinc-800">鈴木 健太</span>
+              <span class="text-[10px] text-zinc-400">1時間前</span>
+            </div>
+            <div class="flex gap-1 flex-wrap mb-1">
+              <span class="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">フォーム</span>
+              <span class="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">対応中</span>
+            </div>
+            <div class="text-[11px] text-zinc-500">スマホ買い換え</div>
+          </div>
+          <!-- 山田様 -->
+          <div class="border-b border-zinc-200 px-3 py-2.5 cursor-pointer hover:bg-zinc-50">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold text-zinc-800">山田 邦夫</span>
+              <span class="text-[10px] text-zinc-400">2時間前</span>
+            </div>
+            <div class="flex gap-1 flex-wrap mb-1">
+              <span class="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">おいくら</span>
+              <span class="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full">引越し</span>
+            </div>
+            <div class="text-[11px] text-zinc-500">カメラ</div>
+          </div>
+          <div class="border-b border-zinc-200 px-3 py-2.5 cursor-pointer hover:bg-zinc-50">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold text-zinc-800">佐藤 花子</span>
+              <span class="text-[10px] text-zinc-400">昨日</span>
+            </div>
+            <div class="flex gap-1 flex-wrap mb-1">
+              <span class="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">LINE</span>
+              <span class="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full">アポ済</span>
+            </div>
+            <div class="text-[11px] text-zinc-500">ブランドバッグ</div>
+          </div>
+        </div>
+
+        <!-- 中央: メッセージ -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+          <!-- メッセージスレッド -->
+          <div class="flex-1 overflow-y-auto p-4 space-y-3 bg-white">
+            <div class="flex justify-end">
+              <div class="bg-zinc-800 text-white text-xs rounded-2xl rounded-tr-sm px-3 py-2 max-w-xs leading-5">
+                こんにちは！買取のご相談ありがとうございます。詳しくお聞かせください。
+              </div>
+            </div>
+            <div class="flex gap-2 items-start">
+              <div class="w-7 h-7 rounded-full bg-zinc-300 flex-shrink-0 flex items-center justify-center text-[11px] text-zinc-600 font-medium">田</div>
+              <div class="bg-zinc-100 text-zinc-800 text-xs rounded-2xl rounded-tl-sm px-3 py-2 max-w-sm leading-5">
+                先日母が他界しまして、遺品の整理をしているところです。ルイヴィトンのバッグと、金のネックレスがあるのですが、査定をお願いできますか？他にも色々と出てきそうです。
+              </div>
+            </div>
+          </div>
+          <!-- 返信欄 -->
+          <div class="border-t border-zinc-200 p-3 bg-white">
+            <div class="border border-zinc-200 rounded-lg p-2.5 text-xs text-zinc-400 h-14 flex items-start">返信を入力...</div>
+            <div class="flex justify-between items-center mt-2">
+              <div class="flex gap-1.5">
+                <button class="text-[10px] bg-zinc-100 text-zinc-600 px-2 py-1 rounded border border-zinc-200">LINE送信</button>
+              </div>
+              <button class="text-[10px] bg-indigo-600 text-white px-3 py-1.5 rounded font-medium">送信</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右: 詳細パネル（実際のUIを忠実再現） -->
+        <div class="w-64 border-l border-zinc-200 overflow-y-auto flex-shrink-0 bg-white">
+
+          <!-- ステータス・担当 -->
+          <div class="p-3 border-b border-zinc-200 space-y-2">
+            <div>
+              <div class="text-[10px] font-semibold text-zinc-500 mb-1">ステータス</div>
+              <div class="border border-zinc-200 rounded-md px-2.5 py-1.5 text-xs text-zinc-700 bg-white flex items-center justify-between">
+                新着 <svg class="w-3 h-3 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+              </div>
+            </div>
+            <button class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs py-2 rounded-md font-medium transition">🗓 アポを設定</button>
+          </div>
+
+          <!-- 商品情報パネル（実際のコードから再現） -->
+          <div class="border-b border-zinc-200">
+            <!-- ヘッダー -->
+            <div class="flex items-center justify-between bg-zinc-50 px-3 py-2 border-b border-zinc-200">
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                <span class="text-xs font-semibold text-zinc-700">商品情報</span>
+                <span class="bg-zinc-200 text-zinc-700 text-[10px] px-1.5 py-0 rounded-full">2</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <button class="flex items-center gap-1 rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-[10px] font-medium text-violet-700">
+                  🤖 AI抽出
+                </button>
+                <button class="flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 py-1 text-[10px] text-zinc-600">+ 追加</button>
+              </div>
+            </div>
+
+            <!-- ② 追加買取サジェストバナー（NEW） -->
+            <div class="border-b border-amber-100 bg-amber-50 px-3 py-2 space-y-1 relative">
+              <div class="absolute top-1 right-1 badge-new annotation-pulse">NEW ②</div>
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <svg class="w-3 h-3 text-amber-600 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.997.153-2.234.672-3.014C13.526 9.67 14 8.897 14 8a4 4 0 10-8 0c0 .897.474 1.67 1.328 2.986.52.78.657 2.017.672 3.014H12z"/></svg>
+                <span class="text-[10px] font-semibold text-amber-800">追加買取サジェスト</span>
+                <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700">動機: 遺品整理（強）</span>
+              </div>
+              <div class="flex flex-wrap gap-1">
+                <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">貴金属・金製品</span>
+                <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">時計（高級品）</span>
+                <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">骨董品・美術品</span>
+              </div>
+              <p class="text-[10px] text-amber-700 leading-4">丁寧に寄り添いながら、お家にある貴金属・ブランド品を自然にお聞きする流れが有効です</p>
+            </div>
+
+            <!-- ③ 商品リスト（高単価バッジ + ソート） -->
+            <div class="divide-y divide-zinc-100">
+              <!-- 高単価が先頭 -->
+              <div class="flex items-start gap-2 px-3 py-2 relative hover:bg-zinc-50/80">
+                <div class="flex-1 space-y-0.5">
+                  <div class="flex items-center gap-1 flex-wrap">
+                    <span class="text-xs font-semibold text-zinc-800">ルイヴィトン モノグラム</span>
+                    <span class="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-medium text-sky-800">A</span>
+                    <span class="flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">⭐ 高単価</span>
+                    <span class="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-600">AI</span>
+                    <div class="absolute top-1 right-1 badge-new annotation-pulse">NEW ③</div>
+                  </div>
+                  <div class="text-[11px] font-medium text-emerald-700">事前査定: ¥45,000 前後</div>
+                  <div class="text-[11px] text-zinc-500">🏷 Louis Vuitton</div>
+                </div>
+              </div>
+              <div class="flex items-start gap-2 px-3 py-2 hover:bg-zinc-50/80">
+                <div class="flex-1 space-y-0.5">
+                  <div class="flex items-center gap-1 flex-wrap">
+                    <span class="text-xs font-semibold text-zinc-800">金のネックレス 18K</span>
+                    <span class="flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">⭐ 高単価</span>
+                    <span class="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-600">AI</span>
+                  </div>
+                  <div class="text-[11px] text-zinc-500">見込: ¥38,000</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ① 顧客プロファイルカード（NEW） -->
+          <div class="border-b border-zinc-200 p-3 relative">
+            <div class="absolute top-2 right-2 badge-new annotation-pulse">NEW ①</div>
+            <div class="text-[10px] font-semibold text-zinc-500 mb-2">顧客プロファイル</div>
+            <div class="grid grid-cols-2 gap-1">
+              <div class="bg-zinc-50 rounded p-1.5 text-[10px]">
+                <div class="text-zinc-400">年齢層</div>
+                <div class="font-semibold text-zinc-700">中高年</div>
+              </div>
+              <div class="bg-zinc-50 rounded p-1.5 text-[10px]">
+                <div class="text-zinc-400">収入感</div>
+                <div class="font-semibold text-zinc-700">高所得</div>
+              </div>
+              <div class="bg-red-50 rounded p-1.5 text-[10px] col-span-2">
+                <div class="text-zinc-400">売却動機</div>
+                <div class="font-semibold text-red-700">遺品整理（強 ●●●）</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ④ AI返信アシスト（追加買取ボタン付き） -->
+          <div class="p-3">
+            <div class="text-[10px] font-semibold text-zinc-500 mb-2">AI返信アシスト</div>
+            <div class="space-y-1">
+              <button class="w-full text-left text-[10px] bg-zinc-50 border border-zinc-200 px-2 py-1.5 rounded text-zinc-700 hover:bg-zinc-100 transition">返信文を作って</button>
+              <button class="w-full text-left text-[10px] bg-zinc-50 border border-zinc-200 px-2 py-1.5 rounded text-zinc-700 hover:bg-zinc-100 transition">アポ取得の返信を作って</button>
+              <button class="w-full text-left text-[10px] bg-green-50 border border-green-300 px-2 py-1.5 rounded text-green-700 hover:bg-green-100 transition font-semibold relative">
+                <span class="absolute -top-1.5 -right-1 badge-new annotation-pulse">NEW ④</span>
+                💬 追加買取の声掛け文を作って
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mt-3 text-center text-xs text-zinc-400">↑ キーボードの ← → キーまたは上の「前へ / 次へ」でスライドを切り替えられます</div>
+  </div>
+</div>
+
+<!-- ========== SLIDE 1: AI抽出→顧客プロファイル ========== -->
+<div class="slide" id="slide1">
+  <div class="max-w-[980px] mx-auto px-4 py-4">
+    <div class="bg-white rounded-xl border border-zinc-200 shadow-sm p-4 mb-4">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="step-number">①</span>
+        <h2 class="text-base font-bold text-zinc-800">AI抽出 → 顧客プロファイル生成</h2>
+        <span class="badge-new">NEW</span>
+      </div>
+      <p class="text-xs text-zinc-500 mb-1">「AI抽出」ボタンを押すと商品情報の抽出に加えて、顧客の年齢層・収入感・売却動機を自動推定。追加買取の方針が即座にわかります。</p>
+      <p class="text-[11px] text-zinc-400">変更: <code class="bg-zinc-100 px-1 rounded">app/api/ai/extract-items/route.ts</code>（システムプロンプト全面改修・max_tokens 1024→2048）</p>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4 mb-4">
+      <!-- Before -->
+      <div class="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+        <div class="bg-zinc-100 px-4 py-2.5 border-b border-zinc-200">
+          <span class="text-xs font-bold text-zinc-600">❌ 変更前のAI抽出の返り値</span>
+        </div>
+        <div class="p-4 font-mono text-[11px] text-zinc-700 bg-zinc-50 space-y-1">
+          <div class="text-zinc-400">// /api/ai/extract-items のレスポンス</div>
+          <div>{"</div>
+          <div class="pl-4">"items": [</div>
+          <div class="pl-8">{"item_name": "ルイヴィトン バッグ",</div>
+          <div class="pl-8"> "estimated_price_min": 45000}</div>
+          <div class="pl-4">],</div>
+          <div class="pl-4">"saved": [...]</div>
+          <div>}</div>
+          <div class="mt-3 text-zinc-400">// 顧客に関する情報はゼロ</div>
+          <div class="text-zinc-400">// 追加買取の示唆もなし</div>
+        </div>
+      </div>
+
+      <!-- After -->
+      <div class="bg-white rounded-xl border-2 border-violet-400 shadow-sm overflow-hidden">
+        <div class="bg-violet-600 px-4 py-2.5">
+          <span class="text-xs font-bold text-white">✅ 変更後（追加されたフィールド）</span>
+        </div>
+        <div class="p-4 font-mono text-[11px] bg-zinc-900 space-y-0.5">
+          <div class="text-zinc-400">// 新しいレスポンス</div>
+          <div class="text-zinc-200">{"</div>
+          <div class="text-zinc-200 pl-4">"items": [...既存...],</div>
+          <div class="text-zinc-200 pl-4">"saved": [...],</div>
+          <div class="text-yellow-300 pl-4">// ↓ 以下が全て新規追加</div>
+          <div class="text-green-300 pl-4">"customer_profile": {"</div>
+          <div class="text-green-300 pl-8">"age_group": "middle_senior",</div>
+          <div class="text-green-300 pl-8">"income_level": "affluent",</div>
+          <div class="text-green-300 pl-8">"sell_motivation": "estate",</div>
+          <div class="text-green-300 pl-8">"motivation_strength": "strong"</div>
+          <div class="text-green-300 pl-4">},</div>
+          <div class="text-amber-300 pl-4">"suggested_items": [</div>
+          <div class="text-amber-300 pl-8">"貴金属・金製品", "時計（高級品）"</div>
+          <div class="text-amber-300 pl-4">],</div>
+          <div class="text-blue-300 pl-4">"approach_hint": "丁寧に寄り添いながら..."</div>
+          <div class="text-zinc-200">}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3本柱 -->
+    <div class="bg-white rounded-xl border border-zinc-200 shadow-sm p-4">
+      <div class="text-xs font-semibold text-zinc-700 mb-3">AIプロンプト改修の3本柱</div>
+      <div class="grid grid-cols-3 gap-3">
+        <div class="bg-violet-50 border border-violet-200 rounded-lg p-3 text-[11px] space-y-1.5">
+          <div class="font-bold text-violet-700">① 顧客プロファイリング</div>
+          <div class="text-zinc-600">会話テキストから<br>・年齢層（中高年/若年層）<br>・収入感（高所得/一般）<br>・売却動機（遺品/引越し等）<br>・動機強さ（強/中/弱）<br>を推定してJSONで返却</div>
+        </div>
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-[11px] space-y-1.5">
+          <div class="font-bold text-amber-700">② 属性別 suggested_items</div>
+          <div class="text-zinc-600">プロファイル結果に合わせて提案商材を選択<br><br>中高年・高所得<br>→ 貴金属/ブランド/時計<br><br>若年層・一般所得<br>→ スマホ/PC/ゲーム機<br><br>中古¥5,000未満は対象外</div>
+        </div>
+        <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-[11px] space-y-1.5">
+          <div class="font-bold text-green-700">③ approach_hint 生成</div>
+          <div class="text-zinc-600">動機に合わせた声掛け方針を一言コメントで生成<br><br>遺品整理→「丁寧に寄り添いながら...」<br><br>引越し→「まとめてお売りいただける流れで...」<br><br>買い換え→「他の端末も...」</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== SLIDE 2: 追加買取サジェストバナー ========== -->
+<div class="slide" id="slide2">
+  <div class="max-w-[980px] mx-auto px-4 py-4">
+    <div class="bg-white rounded-xl border border-zinc-200 shadow-sm p-4 mb-4">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="step-number">②</span>
+        <h2 class="text-base font-bold text-zinc-800">追加買取サジェストバナー</h2>
+        <span class="badge-new">NEW</span>
+      </div>
+      <p class="text-xs text-zinc-500 mb-1">AI抽出後、商品パネル上部にアンバー色のバナーが表示。顧客の動機・属性に合わせた提案商材とアプローチヒントをスタッフが即座に把握できます。</p>
+      <p class="text-[11px] text-zinc-400">変更: <code class="bg-zinc-100 px-1 rounded">components/inbox/InquiryItemsPanel.tsx</code>（355〜381行目付近）</p>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <!-- 遺品整理 -->
+      <div class="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+        <div class="bg-amber-500 px-3 py-2 text-xs font-bold text-white">遺品整理 × 中高年 × 高所得の場合</div>
+        <div class="border border-zinc-200 m-3 rounded-lg overflow-hidden">
+          <div class="flex items-center justify-between bg-zinc-50 px-3 py-2 border-b border-zinc-200">
+            <span class="text-xs font-semibold text-zinc-700 flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+              商品情報 <span class="bg-zinc-200 text-zinc-700 text-[10px] px-1.5 rounded-full">2</span>
+            </span>
+            <button class="bg-violet-50 border border-violet-200 text-violet-700 text-[10px] px-2 py-1 rounded">🤖 AI抽出</button>
+          </div>
+          <!-- バナー -->
+          <div class="border-b border-amber-100 bg-amber-50 px-3 py-2 space-y-1">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <svg class="w-3 h-3 text-amber-600 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.997.153-2.234.672-3.014C13.526 9.67 14 8.897 14 8a4 4 0 10-8 0c0 .897.474 1.67 1.328 2.986.52.78.657 2.017.672 3.014H12z"/></svg>
+              <span class="text-[10px] font-semibold text-amber-800">追加買取サジェスト</span>
+              <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700">動機: 遺品整理（強）</span>
+            </div>
+            <div class="flex flex-wrap gap-1">
+              <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">貴金属・金製品</span>
+              <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">時計（高級品）</span>
+              <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">ブランドバッグ</span>
+              <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">骨董品・美術品</span>
+              <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">宝石・ダイヤ</span>
+            </div>
+            <p class="text-[10px] text-amber-700 leading-4">丁寧に寄り添いながら、お家にある貴金属・ブランド品を自然にお聞きする流れが有効です</p>
+          </div>
+          <div class="divide-y divide-zinc-100 px-3">
+            <div class="py-2 text-[11px]"><span class="font-semibold text-zinc-800">ルイヴィトン モノグラム</span> <span class="flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 inline-flex">⭐ 高単価</span></div>
+            <div class="py-2 text-[11px]"><span class="font-semibold text-zinc-800">金のネックレス 18K</span> <span class="text-emerald-700 ml-1">¥38,000</span></div>
+          </div>
+        </div>
+        <div class="px-3 pb-3 text-[10px] text-amber-700 bg-amber-50/50 pt-2 border-t border-amber-100 mx-3 mb-3 rounded-b-lg text-center">高価古物優先・寄り添い型声掛けを促進</div>
+      </div>
+
+      <!-- 引越し・若年層 -->
+      <div class="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+        <div class="bg-blue-500 px-3 py-2 text-xs font-bold text-white">買い換え × 若年層 × 一般所得の場合</div>
+        <div class="border border-zinc-200 m-3 rounded-lg overflow-hidden">
+          <div class="flex items-center justify-between bg-zinc-50 px-3 py-2 border-b border-zinc-200">
+            <span class="text-xs font-semibold text-zinc-700 flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+              商品情報 <span class="bg-zinc-200 text-zinc-700 text-[10px] px-1.5 rounded-full">1</span>
+            </span>
+            <button class="bg-violet-50 border border-violet-200 text-violet-700 text-[10px] px-2 py-1 rounded">🤖 AI抽出</button>
+          </div>
+          <!-- バナー -->
+          <div class="border-b border-amber-100 bg-amber-50 px-3 py-2 space-y-1">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <svg class="w-3 h-3 text-amber-600 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.997.153-2.234.672-3.014C13.526 9.67 14 8.897 14 8a4 4 0 10-8 0c0 .897.474 1.67 1.328 2.986.52.78.657 2.017.672 3.014H12z"/></svg>
+              <span class="text-[10px] font-semibold text-amber-800">追加買取サジェスト</span>
+              <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700">動機: 買い換え（弱）</span>
+            </div>
+            <div class="flex flex-wrap gap-1">
+              <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">スマートフォン</span>
+              <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">PC・タブレット</span>
+              <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">ゲーム機</span>
+              <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">イヤホン・ヘッドホン</span>
+            </div>
+            <p class="text-[10px] text-amber-700 leading-4">古い端末・ゲーム機がほかにあれば、まとめてお売りいただけますかとお聞きするのが自然です</p>
+          </div>
+          <div class="divide-y divide-zinc-100 px-3">
+            <div class="py-2 text-[11px]"><span class="font-semibold text-zinc-800">iPhone 15 Pro Max</span> <span class="bg-green-100 text-green-800 text-[10px] px-1 rounded ml-1">S</span></div>
+          </div>
+        </div>
+        <div class="px-3 pb-3 text-[10px] text-blue-700 bg-blue-50/50 pt-2 border-t border-blue-100 mx-3 mb-3 rounded-b-lg text-center">若年層向け商材を自動選択・デジタル機器に誘導</div>
+      </div>
+    </div>
+
+    <!-- AI未実行時 -->
+    <div class="mt-4 bg-white rounded-xl border border-zinc-200 shadow-sm p-4">
+      <div class="text-xs font-semibold text-zinc-700 mb-2">AI抽出前（バナー非表示）</div>
+      <div class="border border-zinc-200 rounded-lg overflow-hidden">
+        <div class="flex items-center justify-between bg-zinc-50 px-3 py-2 border-b border-zinc-200">
+          <span class="text-xs font-semibold text-zinc-700">商品情報</span>
+          <button class="bg-violet-50 border border-violet-200 text-violet-700 text-[10px] px-2 py-1 rounded">🤖 AI抽出</button>
+        </div>
+        <div class="px-3 py-4 text-center space-y-1">
+          <p class="text-[11px] text-zinc-400">商品情報がありません。「AI抽出」または「追加」から登録してください。</p>
+          <p class="text-[10px] text-violet-500">💡 AI抽出で顧客プロファイルと追加買取候補も確認できます</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== SLIDE 3: 高単価バッジ + ソート ========== -->
+<div class="slide" id="slide3">
+  <div class="max-w-[980px] mx-auto px-4 py-4">
+    <div class="bg-white rounded-xl border border-zinc-200 shadow-sm p-4 mb-4">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="step-number">③</span>
+        <h2 class="text-base font-bold text-zinc-800">⭐ 高単価バッジ + 自動ソート</h2>
+        <span class="badge-new">NEW</span>
+      </div>
+      <p class="text-xs text-zinc-500 mb-1">高単価カテゴリ（貴金属・時計・ブランド品・骨董品）または事前査定¥30,000以上の商品に自動でバッジを付与し、リストの先頭に並べます。FSへの引き継ぎで見落としゼロに。</p>
+      <p class="text-[11px] text-zinc-400">変更: <code class="bg-zinc-100 px-1 rounded">components/inbox/InquiryItemsPanel.tsx</code> + <code class="bg-zinc-100 px-1 rounded">lib/inquiry-options.ts</code>（定数追加）</p>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4 mb-4">
+      <!-- 変更前 -->
+      <div class="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+        <div class="bg-zinc-100 px-4 py-2.5 border-b border-zinc-200 text-xs font-bold text-zinc-600">❌ 変更前: 登録順のまま / バッジなし</div>
+        <div class="divide-y divide-zinc-100 px-3">
+          <div class="py-2.5">
+            <div class="text-[11px] font-semibold text-zinc-800">iPhone 15 Pro Max</div>
+            <div class="text-[11px] text-emerald-700">事前査定: ¥60,000</div>
+          </div>
+          <div class="py-2.5">
+            <div class="text-[11px] font-semibold text-zinc-800">Nintendo Switch</div>
+            <div class="text-[11px] text-zinc-500">見込: ¥18,000</div>
+          </div>
+          <div class="py-2.5">
+            <div class="text-[11px] font-semibold text-zinc-800">ルイヴィトン バッグ</div>
+            <div class="text-[11px] text-emerald-700">事前査定: ¥45,000</div>
+          </div>
+          <div class="py-2.5">
+            <div class="text-[11px] font-semibold text-zinc-800">金のネックレス 18K</div>
+            <div class="text-[11px] text-zinc-500">見込: ¥38,000</div>
+          </div>
+          <div class="py-2.5">
+            <div class="text-[11px] font-semibold text-zinc-800">CASIO デジカメ</div>
+            <div class="text-[11px] text-zinc-500">見込: ¥8,000</div>
+          </div>
+        </div>
+        <div class="p-2 bg-zinc-50 border-t border-zinc-200 text-[10px] text-zinc-400 text-center">どれが高単価か視覚的にわからない</div>
+      </div>
+
+      <!-- 変更後 -->
+      <div class="bg-white rounded-xl border-2 border-amber-400 shadow-sm overflow-hidden">
+        <div class="bg-amber-500 px-4 py-2.5 text-xs font-bold text-white">✅ 変更後: 高単価を先頭 + ⭐バッジ</div>
+        <div class="divide-y divide-zinc-100 px-3">
+          <!-- 高単価カテゴリ + 高単価価格 -->
+          <div class="py-2.5 bg-amber-50/30">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="text-[11px] font-semibold text-zinc-800">ルイヴィトン バッグ</span>
+              <span class="flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">⭐ 高単価</span>
+              <span class="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-600">AI</span>
+            </div>
+            <div class="text-[11px] text-emerald-700 font-medium">事前査定: ¥45,000 — ブランド品カテゴリ</div>
+          </div>
+          <!-- 高単価価格のみ -->
+          <div class="py-2.5 bg-amber-50/30">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="text-[11px] font-semibold text-zinc-800">金のネックレス 18K</span>
+              <span class="flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">⭐ 高単価</span>
+            </div>
+            <div class="text-[11px] text-zinc-500">見込: ¥38,000（¥30,000超のため）</div>
+          </div>
+          <!-- 通常 -->
+          <div class="py-2.5">
+            <div class="text-[11px] font-semibold text-zinc-800">iPhone 15 Pro Max</div>
+            <div class="text-[11px] text-emerald-700">事前査定: ¥60,000</div>
+          </div>
+          <div class="py-2.5">
+            <div class="text-[11px] font-semibold text-zinc-800">Nintendo Switch</div>
+            <div class="text-[11px] text-zinc-500">見込: ¥18,000</div>
+          </div>
+          <div class="py-2.5">
+            <div class="text-[11px] font-semibold text-zinc-800">CASIO デジカメ</div>
+            <div class="text-[11px] text-zinc-500">見込: ¥8,000</div>
+          </div>
+        </div>
+        <div class="p-2 bg-amber-50 border-t border-amber-100 text-[10px] text-amber-700 text-center font-medium">貴金属・ブランド品・骨董品が常に最優先表示</div>
+      </div>
+    </div>
+
+    <!-- 定数説明 -->
+    <div class="bg-white rounded-xl border border-zinc-200 shadow-sm p-4">
+      <div class="text-xs font-semibold text-zinc-700 mb-3"><code class="bg-zinc-100 px-1 rounded">lib/inquiry-options.ts</code> に追加した定数</div>
+      <div class="grid grid-cols-3 gap-3">
+        <div class="bg-zinc-900 rounded-lg p-3 font-mono text-[10px] leading-5">
+          <div class="text-amber-300">HIGH_VALUE_CATEGORIES</div>
+          <div class="text-green-300">= ["貴金属", "時計",</div>
+          <div class="text-green-300">&nbsp; "ブランド品", "骨董品"]</div>
+          <div class="text-zinc-500 mt-2">商品名・ブランド名に</div>
+          <div class="text-zinc-500">キーワードが含まれると</div>
+          <div class="text-zinc-500">バッジ表示</div>
+        </div>
+        <div class="bg-zinc-900 rounded-lg p-3 font-mono text-[10px] leading-5">
+          <div class="text-amber-300">HIGH_VALUE_PRICE_THRESHOLD</div>
+          <div class="text-green-300">= 30000</div>
+          <div class="text-zinc-500 mt-2">¥30,000以上の</div>
+          <div class="text-zinc-500">事前査定 or 見込金額でも</div>
+          <div class="text-zinc-500">バッジ表示</div>
+        </div>
+        <div class="bg-zinc-900 rounded-lg p-3 font-mono text-[10px] leading-5">
+          <div class="text-amber-300">BUYOUT_MIN_THRESHOLD</div>
+          <div class="text-green-300">= 5000</div>
+          <div class="text-zinc-500 mt-2">¥5,000未満は</div>
+          <div class="text-zinc-500">追加買取提案の</div>
+          <div class="text-zinc-500">対象外（思想準拠）</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== SLIDE 4: AI返信「追加買取の声掛け文」 ========== -->
+<div class="slide" id="slide4">
+  <div class="max-w-[980px] mx-auto px-4 py-4">
+    <div class="bg-white rounded-xl border border-zinc-200 shadow-sm p-4 mb-4">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="step-number">④</span>
+        <h2 class="text-base font-bold text-zinc-800">AI返信アシスト — 「追加買取の声掛け文を作って」ボタン</h2>
+        <span class="badge-new">NEW</span>
+      </div>
+      <p class="text-xs text-zinc-500 mb-1">返信アシストパネルのクイックテーマに新ボタンを追加。顧客の動機×属性を読み取り、自然な声掛け文をワンクリックで生成します。</p>
+      <p class="text-[11px] text-zinc-400">変更: <code class="bg-zinc-100 px-1 rounded">components/inbox/AiSuggestPanel.tsx</code>（quickPrompts追加）+ <code class="bg-zinc-100 px-1 rounded">app/api/ai/chat/route.ts</code>（システムプロンプト改修）</p>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <!-- UIパネル -->
+      <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+        <!-- 変更前 -->
+        <div class="border border-zinc-200 rounded-lg mb-4 overflow-hidden">
+          <div class="bg-zinc-100 px-3 py-2 text-xs font-bold text-zinc-600 border-b border-zinc-200">❌ 変更前のクイックテーマ</div>
+          <div class="p-3 space-y-1.5">
+            <button class="w-full text-left text-[11px] bg-zinc-50 border border-zinc-200 px-3 py-2 rounded-md text-zinc-700">返信文を作って</button>
+            <button class="w-full text-left text-[11px] bg-zinc-50 border border-zinc-200 px-3 py-2 rounded-md text-zinc-700">アポ取得の返信を作って</button>
+            <button class="w-full text-left text-[11px] bg-zinc-50 border border-zinc-200 px-3 py-2 rounded-md text-zinc-700">相場を調べて返信文を作って</button>
+            <div class="text-[10px] text-zinc-400 text-center pt-1">追加買取の声掛け機能なし</div>
+          </div>
+        </div>
+
+        <!-- 変更後 -->
+        <div class="border-2 border-green-400 rounded-lg overflow-hidden">
+          <div class="bg-green-500 px-3 py-2 text-xs font-bold text-white">✅ 変更後（新ボタン追加）</div>
+          <div class="p-3 space-y-1.5">
+            <button class="w-full text-left text-[11px] bg-zinc-50 border border-zinc-200 px-3 py-2 rounded-md text-zinc-700">返信文を作って</button>
+            <button class="w-full text-left text-[11px] bg-zinc-50 border border-zinc-200 px-3 py-2 rounded-md text-zinc-700">アポ取得の返信を作って</button>
+            <button class="w-full text-left text-[11px] bg-zinc-50 border border-zinc-200 px-3 py-2 rounded-md text-zinc-700">相場を調べて返信文を作って</button>
+            <!-- 新規 -->
+            <div class="relative">
+              <button class="w-full text-left text-[11px] bg-green-50 border-2 border-green-400 px-3 py-2 rounded-md text-green-700 font-semibold flex items-center gap-2 hover:bg-green-100 transition">
+                <span>💬</span>
+                追加買取の声掛け文を作って
+              </button>
+              <div class="absolute -top-2 -right-2 badge-new annotation-pulse">NEW</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 生成例 -->
+      <div class="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+        <div class="bg-zinc-700 px-3 py-2 text-xs font-bold text-white">クリックすると生成される文章例</div>
+        <div class="p-3 space-y-4">
+          <div>
+            <div class="flex items-center gap-1.5 mb-2">
+              <span class="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-medium">遺品整理・中高年・高所得</span>
+              <span class="text-[10px] text-zinc-400">→ 寄り添い型</span>
+            </div>
+            <div class="bg-zinc-50 border border-zinc-200 rounded-lg p-3 text-xs text-zinc-700 leading-5">
+              この度はご連絡いただきありがとうございます。大切なお品物の買取をご検討いただき、誠にありがとうございます。<br><br>
+              ご自宅の整理をされているとのこと、他にもお手元にある<span class="bg-amber-100 text-amber-700 px-0.5 rounded font-semibold">貴金属・アクセサリー類</span>や、<span class="bg-amber-100 text-amber-700 px-0.5 rounded font-semibold">高級腕時計</span>などがございましたら、ぜひあわせてご相談いただければ幸いです。
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center gap-1.5 mb-2">
+              <span class="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">買い換え・若年層</span>
+              <span class="text-[10px] text-zinc-400">→ 効率重視型</span>
+            </div>
+            <div class="bg-zinc-50 border border-zinc-200 rounded-lg p-3 text-xs text-zinc-700 leading-5">
+              スマートフォンの買い替えとのこと、ありがとうございます。もし古い<span class="bg-blue-100 text-blue-700 px-0.5 rounded font-semibold">ゲーム機</span>や<span class="bg-blue-100 text-blue-700 px-0.5 rounded font-semibold">イヤホン・ヘッドホン</span>なども眠っていましたら、まとめてお買取りできますよ。
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== SLIDE 5: アポ設定モーダル チェックリスト ========== -->
+<div class="slide" id="slide5">
+  <div class="max-w-[980px] mx-auto px-4 py-4">
+    <div class="bg-white rounded-xl border border-zinc-200 shadow-sm p-4 mb-4">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="step-number">⑤</span>
+        <h2 class="text-base font-bold text-zinc-800">アポ設定モーダル — 顧客属性別・追加品確認チェックリスト</h2>
+        <span class="badge-new">NEW</span>
+      </div>
+      <p class="text-xs text-zinc-500 mb-1">アポ設定時に「ISからFSへの追加確認リスト」が表示されます。顧客プロファイル（属性）に応じた品目が自動選択され、チェック結果はDBに保存されてFS引き継ぎに活用されます。</p>
+      <p class="text-[11px] text-zinc-400">変更: <code class="bg-zinc-100 px-1 rounded">components/inbox/AppointmentModal.tsx</code> + <code class="bg-zinc-100 px-1 rounded">supabase/migrations/018_appointment_additional_items.sql</code>（本番DBに適用済み）</p>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <!-- 変更前モーダル -->
+      <div class="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+        <div class="bg-zinc-100 px-3 py-2.5 border-b border-zinc-200 text-xs font-bold text-zinc-600">❌ 変更前のアポ設定モーダル</div>
+        <div class="p-4 space-y-3">
+          <div>
+            <label class="text-[10px] text-zinc-500 font-semibold block mb-1">査定日時 *</label>
+            <div class="border border-zinc-200 rounded-md px-2.5 py-1.5 text-xs text-zinc-500 flex gap-2">
+              <input type="date" class="text-xs border-0 outline-none bg-transparent text-zinc-700" value="2026-05-16" readonly>
+              <input type="time" class="text-xs border-0 outline-none bg-transparent text-zinc-700" value="13:00" readonly>
+            </div>
+          </div>
+          <div>
+            <label class="text-[10px] text-zinc-500 font-semibold block mb-1">品目カテゴリ</label>
+            <div class="border border-zinc-200 rounded-md px-2.5 py-1.5 text-xs text-zinc-700 flex items-center justify-between">ブランド品 <svg class="w-3 h-3 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg></div>
+          </div>
+          <div>
+            <label class="text-[10px] text-zinc-500 font-semibold block mb-1">品物の説明</label>
+            <div class="border border-zinc-200 rounded-md px-2.5 py-2 text-xs text-zinc-500 h-12">ルイヴィトン バッグ 他</div>
+          </div>
+          <div>
+            <label class="text-[10px] text-zinc-500 font-semibold block mb-1">住所 *</label>
+            <div class="border border-zinc-200 rounded-md px-2.5 py-1.5 text-xs text-zinc-700">東京都世田谷区太子堂3-1-1</div>
+          </div>
+          <div>
+            <label class="text-[10px] text-zinc-500 font-semibold block mb-1">訪問方法</label>
+            <div class="flex gap-2">
+              <div class="flex-1 border-2 border-indigo-500 bg-indigo-50 rounded-md py-1.5 text-xs text-indigo-700 text-center font-medium">出張買取</div>
+              <div class="flex-1 border border-zinc-200 rounded-md py-1.5 text-xs text-zinc-400 text-center">宅配買取</div>
+            </div>
+          </div>
+          <div class="pt-1 text-[10px] text-zinc-400 text-center border-t border-zinc-100">FSへの追加確認情報なし</div>
+          <button class="w-full bg-indigo-600 text-white text-xs py-2 rounded-md font-medium">アポを確定する</button>
+        </div>
+      </div>
+
+      <!-- 変更後モーダル -->
+      <div class="bg-white rounded-xl border-2 border-indigo-400 shadow-sm overflow-hidden">
+        <div class="bg-indigo-600 px-3 py-2.5 text-xs font-bold text-white">✅ 変更後（チェックリスト追加）</div>
+        <div class="p-4 space-y-3">
+          <div>
+            <label class="text-[10px] text-zinc-500 font-semibold block mb-1">査定日時 *</label>
+            <div class="border border-zinc-200 rounded-md px-2.5 py-1.5 text-xs flex gap-2">
+              <input type="date" class="text-xs border-0 outline-none bg-transparent text-zinc-700" value="2026-05-16" readonly>
+              <input type="time" class="text-xs border-0 outline-none bg-transparent text-zinc-700" value="13:00" readonly>
+            </div>
+          </div>
+          <div>
+            <label class="text-[10px] text-zinc-500 font-semibold block mb-1">品目カテゴリ</label>
+            <div class="border border-zinc-200 rounded-md px-2.5 py-1.5 text-xs text-zinc-700 flex items-center justify-between">ブランド品 <svg class="w-3 h-3 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg></div>
+          </div>
+          <div>
+            <label class="text-[10px] text-zinc-500 font-semibold block mb-1">住所 *</label>
+            <div class="border border-zinc-200 rounded-md px-2.5 py-1.5 text-xs text-zinc-700">東京都世田谷区太子堂3-1-1</div>
+          </div>
+
+          <!-- 🌟 新機能チェックリスト -->
+          <div class="border-2 border-indigo-300 rounded-lg overflow-hidden relative">
+            <div class="absolute -top-2 -right-2 badge-new annotation-pulse">NEW</div>
+            <button class="w-full flex items-center justify-between bg-indigo-50 px-3 py-2 text-[11px]">
+              <span class="font-semibold text-indigo-700 flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                ISからFSへの追加確認リスト
+              </span>
+              <span class="text-indigo-400 text-[10px]">中高年・高所得</span>
+            </button>
+            <div class="px-3 py-2 space-y-1.5 bg-white">
+              <div class="flex items-center gap-2 text-xs">
+                <input type="checkbox" checked class="w-3.5 h-3.5 accent-indigo-600" readonly>
+                <span class="text-zinc-700">貴金属・金製品</span>
+                <span class="ml-auto text-[10px] text-green-600 font-medium">✓ 確認済み</span>
+              </div>
+              <div class="flex items-center gap-2 text-xs">
+                <input type="checkbox" checked class="w-3.5 h-3.5 accent-indigo-600" readonly>
+                <span class="text-zinc-700">時計（高級品）</span>
+                <span class="ml-auto text-[10px] text-green-600 font-medium">✓ 確認済み</span>
+              </div>
+              <div class="flex items-center gap-2 text-xs">
+                <input type="checkbox" class="w-3.5 h-3.5" readonly>
+                <span class="text-zinc-700">ブランドバッグ・財布</span>
+              </div>
+              <div class="flex items-center gap-2 text-xs">
+                <input type="checkbox" class="w-3.5 h-3.5" readonly>
+                <span class="text-zinc-700">骨董品・美術品</span>
+              </div>
+              <div class="flex items-center gap-2 text-xs">
+                <input type="checkbox" class="w-3.5 h-3.5" readonly>
+                <span class="text-zinc-700">宝石・ダイヤ</span>
+              </div>
+            </div>
+          </div>
+
+          <button class="w-full bg-indigo-600 text-white text-xs py-2 rounded-md font-medium">アポを確定 → コアへ連携</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 属性別チェックリスト一覧 -->
+    <div class="mt-4 bg-white rounded-xl border border-zinc-200 shadow-sm p-4">
+      <div class="text-xs font-semibold text-zinc-700 mb-3">顧客プロファイル別のチェックリスト（自動切り替え）</div>
+      <div class="grid grid-cols-3 gap-3">
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-[11px] space-y-1">
+          <div class="font-bold text-amber-700">中高年 × 高所得</div>
+          <div class="text-zinc-600 space-y-0.5">
+            <div>□ 貴金属・金製品</div>
+            <div>□ 時計（高級品）</div>
+            <div>□ ブランドバッグ・財布</div>
+            <div>□ 骨董品・美術品</div>
+            <div>□ 宝石・ダイヤ</div>
+          </div>
+        </div>
+        <div class="bg-orange-50 border border-orange-200 rounded-lg p-3 text-[11px] space-y-1">
+          <div class="font-bold text-orange-700">中高年 × 一般所得</div>
+          <div class="text-zinc-600 space-y-0.5">
+            <div>□ 貴金属・金製品</div>
+            <div>□ ブランドバッグ・財布</div>
+            <div>□ カメラ</div>
+            <div>□ 楽器</div>
+            <div>□ 着物・帯</div>
+          </div>
+        </div>
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-[11px] space-y-1">
+          <div class="font-bold text-blue-700">若年層（全所得）</div>
+          <div class="text-zinc-600 space-y-0.5">
+            <div>□ スマートフォン</div>
+            <div>□ PC・タブレット</div>
+            <div>□ ゲーム機</div>
+            <div>□ イヤホン・ヘッドホン</div>
+            <div>□ カメラ</div>
+          </div>
+        </div>
+      </div>
+      <div class="mt-3 bg-zinc-50 rounded-lg p-3 text-[11px]">
+        <div class="font-semibold text-zinc-700 mb-1">DBに保存される形式（<code>appointments.additional_items_confirmed</code> jsonb）</div>
+        <code class="text-zinc-500">{"貴金属・金製品": true, "時計（高級品）": true, "ブランドバッグ・財布": false, "骨董品・美術品": false}</code>
+        <div class="text-zinc-400 mt-1">→ マクサスコアへの連携ペイロードにも含まれ、FSスタッフが訪問前に確認できます</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let current = 0;
+const total = 6;
+const titles = [
+  "全体俯瞰 — 実際のUIで5機能を確認 (1/6)",
+  "① AI抽出 → 顧客プロファイル生成 (2/6)",
+  "② 追加買取サジェストバナー (3/6)",
+  "③ ⭐高単価バッジ + 自動ソート (4/6)",
+  "④ AI返信「追加買取の声掛け文」ボタン (5/6)",
+  "⑤ アポ設定 追加品チェックリスト (6/6)"
+];
+
+function goSlide(n) {
+  document.getElementById('slide' + current).classList.remove('active');
+  document.getElementById('ind' + current).style.width = '32px';
+  document.getElementById('ind' + current).style.background = '#52525b';
+  current = Math.max(0, Math.min(total - 1, n));
+  document.getElementById('slide' + current).classList.add('active');
+  document.getElementById('ind' + current).style.width = '48px';
+  document.getElementById('ind' + current).style.background = '#3b82f6';
+  document.getElementById('slideLabel').textContent = titles[current];
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function nextSlide() { goSlide(current + 1); }
+function prevSlide() { goSlide(current - 1); }
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextSlide(); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); prevSlide(); }
+});
+document.getElementById('slideLabel').textContent = titles[0];
+</script>
+</body>
+</html>

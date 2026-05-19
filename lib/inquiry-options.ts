@@ -4,33 +4,35 @@ export const statusMeta: Record<
   InquiryStatus,
   { label: string; className: string }
 > = {
+  // UI/UXレビュー B2: コントラスト強化（背景塗りつぶし + font-semibold）
+  // 失注・完了はグレースケール寄りに沈ませて視線分離を強める
   new: {
     label: "新着",
-    className: "border-blue-200 bg-blue-50 text-blue-700",
+    className: "border-blue-300 bg-blue-100 text-blue-800 font-semibold",
   },
   in_progress: {
     label: "対応中",
-    className: "border-amber-200 bg-amber-50 text-amber-700",
+    className: "border-amber-300 bg-amber-100 text-amber-800 font-semibold",
   },
   pending: {
     label: "保留",
-    className: "border-zinc-200 bg-zinc-100 text-zinc-700",
+    className: "border-zinc-300 bg-zinc-100 text-zinc-700 font-semibold",
   },
   appointment_set: {
     label: "アポ取得済",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    className: "border-emerald-300 bg-emerald-100 text-emerald-800 font-semibold",
   },
   transferred: {
     label: "引継完了",
-    className: "border-indigo-200 bg-indigo-50 text-indigo-700",
+    className: "border-indigo-300 bg-indigo-100 text-indigo-800 font-semibold",
   },
   lost: {
     label: "失注",
-    className: "border-rose-200 bg-rose-50 text-rose-700",
+    className: "border-zinc-200 bg-zinc-50 text-zinc-500 line-through",
   },
   closed: {
     label: "完了",
-    className: "border-teal-200 bg-teal-50 text-teal-700",
+    className: "border-zinc-200 bg-zinc-50 text-zinc-500",
   },
 };
 

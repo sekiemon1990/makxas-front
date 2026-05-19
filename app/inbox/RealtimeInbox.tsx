@@ -47,6 +47,7 @@ import {
   statusFilters,
 } from "@/lib/inquiry-options";
 import { createClient } from "@/lib/supabase/client";
+import { formatUnansweredBadge } from "@/lib/design-tokens";
 import { cn } from "@/lib/utils";
 import type {
   Inquiry,
@@ -920,7 +921,8 @@ export function RealtimeInbox({
         </span>
       </div>
 
-      <div className="flex min-h-0 flex-1 overflow-hidden md:grid md:grid-cols-[minmax(260px,340px)_1fr]">
+      {/* UI/UXレビュー A4: 画面サイズ柔軟化 — md:340px、lg:380px、xl:420px、2xl:460px と段階的に拡張 */}
+      <div className="flex min-h-0 flex-1 overflow-hidden md:grid md:grid-cols-[minmax(260px,340px)_1fr] lg:grid-cols-[minmax(300px,380px)_1fr] xl:grid-cols-[minmax(320px,420px)_1fr] 2xl:grid-cols-[minmax(360px,460px)_1fr]">
         {/* 一覧カラム */}
         <section className={cn("overflow-y-auto border-r border-zinc-200 bg-zinc-50", mobilePanel !== "list" && "hidden md:block")}>
           <div className="sticky top-0 z-10 border-b border-zinc-200 bg-zinc-50/95 px-3 py-2.5 backdrop-blur space-y-2">
@@ -952,71 +954,130 @@ export function RealtimeInbox({
               type="search"
               value={searchQuery}
             />
-            {/* フィルターチップ */}
-            <div className="flex flex-wrap gap-1.5">
-              <Select value={initialStatus} onValueChange={(v) => updateQuery({ status: v, id: null })}>
-                <SelectTrigger className="h-7 w-auto rounded-full border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-600 gap-1 [&>svg]:size-3">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {statusFilters.map((f) => (
-                    <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={initialChannel} onValueChange={(v) => updateQuery({ channel: v, id: null })}>
-                <SelectTrigger className="h-7 w-auto rounded-full border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-600 gap-1 [&>svg]:size-3">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全チャンネル</SelectItem>
-                  {channelFilters.map((ch) => (
-                    <SelectItem key={ch} value={ch}>{channelMeta[ch].label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {stores.length > 1 || canUseAllStores ? (
-                <Select value={initialStore} onValueChange={(v) => updateQuery({ store: v, id: null })}>
-                  <SelectTrigger className="h-7 w-auto rounded-full border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-600 gap-1 [&>svg]:size-3">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {canUseAllStores ? <SelectItem value="all">全店舗</SelectItem> : null}
-                    {stores.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : null}
-              {currentStaffId ? (
-                <button
-                  className={cn(
-                    "h-7 rounded-full border px-3 text-xs font-medium transition",
-                    initialAssignee === "mine"
-                      ? "border-violet-400 bg-violet-50 text-violet-700"
-                      : "border-zinc-200 bg-white text-zinc-600 hover:border-violet-300 hover:text-violet-600",
-                  )}
-                  onClick={() => updateQuery({ assignee: initialAssignee === "mine" ? "all" : "mine", id: null })}
-                  type="button"
-                >
-                  {initialAssignee === "mine" ? "自分のみ ✓" : "自分のみ"}
-                </button>
-              ) : null}
-              {notifPermission !== "granted" && notifPermission !== "denied" ? (
-                <button
-                  className="h-7 rounded-full border border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-500 hover:bg-zinc-50 flex items-center gap-1"
-                  onClick={requestNotifPermission}
-                  type="button"
-                >
-                  <Bell className="size-3" />
-                  通知ON
-                </button>
-              ) : notifPermission === "granted" ? (
-                <span className="h-7 flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 text-xs text-emerald-600">
-                  <Bell className="size-3" />通知ON
-                </span>
-              ) : null}
-            </div>
+            {/* UI/UXレビュー C8: フィルター整理 — フィルター本体・自分のみ・通知の3グループに分離、アクティブ時はクリアボタン表示 */}
+            {(() => {
+              const activeFilters = [
+                initialStatus !== "all",
+                initialChannel !== "all",
+                initialStore !== "all" && (stores.length > 1 || canUseAllStores),
+                initialAssignee === "mine",
+              ].filter(Boolean).length;
+              const isActiveFilter = (v: string, def: string = "all") => v !== def;
+              return (
+                <div className="space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Select value={initialStatus} onValueChange={(v) => updateQuery({ status: v, id: null })}>
+                      <SelectTrigger
+                        className={cn(
+                          "h-7 w-auto rounded-full border px-3 text-xs font-medium gap-1 [&>svg]:size-3",
+                          isActiveFilter(initialStatus)
+                            ? "border-violet-300 bg-violet-50 text-violet-700"
+                            : "border-zinc-200 bg-white text-zinc-600",
+                        )}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {statusFilters.map((f) => (
+                          <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={initialChannel} onValueChange={(v) => updateQuery({ channel: v, id: null })}>
+                      <SelectTrigger
+                        className={cn(
+                          "h-7 w-auto rounded-full border px-3 text-xs font-medium gap-1 [&>svg]:size-3",
+                          isActiveFilter(initialChannel)
+                            ? "border-violet-300 bg-violet-50 text-violet-700"
+                            : "border-zinc-200 bg-white text-zinc-600",
+                        )}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">全チャンネル</SelectItem>
+                        {channelFilters.map((ch) => (
+                          <SelectItem key={ch} value={ch}>{channelMeta[ch].label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {stores.length > 1 || canUseAllStores ? (
+                      <Select value={initialStore} onValueChange={(v) => updateQuery({ store: v, id: null })}>
+                        <SelectTrigger
+                          className={cn(
+                            "h-7 w-auto rounded-full border px-3 text-xs font-medium gap-1 [&>svg]:size-3",
+                            isActiveFilter(initialStore)
+                              ? "border-violet-300 bg-violet-50 text-violet-700"
+                              : "border-zinc-200 bg-white text-zinc-600",
+                          )}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {canUseAllStores ? <SelectItem value="all">全店舗</SelectItem> : null}
+                          {stores.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : null}
+                    {currentStaffId ? (
+                      <button
+                        className={cn(
+                          "h-7 rounded-full border px-3 text-xs font-medium transition",
+                          initialAssignee === "mine"
+                            ? "border-violet-400 bg-violet-50 text-violet-700"
+                            : "border-zinc-200 bg-white text-zinc-600 hover:border-violet-300 hover:text-violet-600",
+                        )}
+                        onClick={() => updateQuery({ assignee: initialAssignee === "mine" ? "all" : "mine", id: null })}
+                        type="button"
+                      >
+                        {initialAssignee === "mine" ? "自分のみ ✓" : "自分のみ"}
+                      </button>
+                    ) : null}
+                    {activeFilters > 0 ? (
+                      <button
+                        aria-label="フィルターをすべてクリア"
+                        className="h-7 rounded-full border border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-500 hover:border-zinc-300 hover:bg-zinc-50"
+                        onClick={() => updateQuery({ status: "all", channel: "all", store: "all", assignee: "all", id: null })}
+                        title="フィルターをすべてクリア"
+                        type="button"
+                      >
+                        ✕ クリア ({activeFilters})
+                      </button>
+                    ) : null}
+                    <div className="ml-auto">
+                      {/* UI/UXレビュー B5: 通知状態を3段階で明示（default/granted/denied） */}
+                      {notifPermission === "default" ? (
+                        <button
+                          className="h-7 rounded-full border border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-500 hover:bg-zinc-50 flex items-center gap-1"
+                          onClick={requestNotifPermission}
+                          title="クリックして通知を有効化"
+                          type="button"
+                        >
+                          <Bell className="size-3" />
+                          🔕 通知OFF
+                        </button>
+                      ) : notifPermission === "granted" ? (
+                        <span
+                          className="h-7 flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 text-xs text-emerald-700"
+                          title="ブラウザ通知 有効"
+                        >
+                          <Bell className="size-3" />🔔 通知ON
+                        </span>
+                      ) : (
+                        <span
+                          className="h-7 flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-3 text-xs text-amber-700 cursor-help"
+                          title="ブラウザでこのサイトの通知がブロックされています。ブラウザの設定 → サイトの権限 → 通知 で許可してください"
+                        >
+                          <Bell className="size-3" />⚠️ ブロック中
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
             <p className="text-[11px] text-zinc-400 md:hidden">
               ← スワイプで保留 ／ スワイプで対応中 →
             </p>
@@ -1100,16 +1161,22 @@ export function RealtimeInbox({
                   <div className="mt-2 flex items-center justify-between text-xs text-zinc-400">
                     <div className="flex items-center gap-1.5">
                       <span>{formatElapsed(item.created_at)}</span>
-                      {getStaleLevel(item) !== "none" ? (
-                        <span className={cn(
-                          "rounded-full px-1.5 py-0.5 font-semibold",
-                          getStaleLevel(item) === "urgent"
-                            ? "bg-red-100 text-red-700"
-                            : "bg-orange-100 text-orange-700",
-                        )}>
-                          ⚠ {getStaleHours(item)}h
-                        </span>
-                      ) : null}
+                      {getStaleLevel(item) !== "none" ? (() => {
+                        // UI/UXレビュー B3: 「170h」を「7日未返信」と日本語化
+                        const badge = formatUnansweredBadge(getStaleHours(item));
+                        return (
+                          <span
+                            className={cn(
+                              "rounded-full px-1.5 py-0.5 font-semibold",
+                              badge.bg,
+                              badge.text,
+                            )}
+                            title={`最後の更新から ${getStaleHours(item)} 時間経過`}
+                          >
+                            ⚠ {badge.label}
+                          </span>
+                        );
+                      })() : null}
                     </div>
                     <span className="flex items-center gap-1 truncate">
                       {(item.brands?.name ?? item.stores?.name) ? (
@@ -1698,10 +1765,14 @@ export function RealtimeInbox({
 
                 {/* ボタン行 */}
                 <div className="flex items-center gap-2 flex-wrap">
+                  {/* UI/UXレビュー A3: AI関連3ボタンを統一スタイル（violet）で並べ、状態は✓で表現 */}
                   <Button
+                    aria-label="AI下書き：会話履歴から返信案を自動生成"
                     className={cn(
                       "h-8 gap-1 px-2.5 text-xs",
-                      aiSuggest ? "border-violet-400 bg-violet-50 text-violet-700" : "border-violet-300 text-violet-600 hover:bg-violet-50",
+                      aiSuggest
+                        ? "border-violet-400 bg-violet-50 text-violet-700"
+                        : "border-violet-300 text-violet-700 hover:bg-violet-50",
                     )}
                     disabled={aiLoading}
                     onClick={async () => {
@@ -1722,24 +1793,29 @@ export function RealtimeInbox({
                       }
                     }}
                     size="sm"
+                    title={aiSuggest ? "AI下書きを閉じる" : "会話履歴からAIが返信案を提案します"}
                     type="button"
                     variant="outline"
                   >
                     <Sparkles className="size-3.5" />
-                    {aiLoading ? "分析中..." : aiSuggest ? "AI生成済み ✕" : "AI下書き"}
+                    {aiLoading ? "分析中..." : aiSuggest ? "AI下書き ✓" : "AI下書き"}
                   </Button>
                   <Button
+                    aria-label="AIチャット：AIと相談しながら返信を考える"
                     className={cn(
                       "h-8 gap-1 px-2.5 text-xs",
-                      aiPanelOpen ? "border-violet-400 text-violet-700 bg-violet-50" : "border-zinc-200 text-zinc-600 hover:bg-zinc-50",
+                      aiPanelOpen
+                        ? "border-violet-400 bg-violet-50 text-violet-700"
+                        : "border-violet-300 text-violet-700 hover:bg-violet-50",
                     )}
                     onClick={() => setAiPanelOpen((v) => !v)}
                     size="sm"
+                    title={aiPanelOpen ? "AIチャットを閉じる" : "AIと対話しながら返信案を作成"}
                     type="button"
                     variant="outline"
                   >
                     <MessageCircle className="size-3.5" />
-                    {aiPanelOpen ? "相談中…" : "AIに質問"}
+                    {aiPanelOpen ? "AIチャット ✓" : "AIチャット"}
                   </Button>
                   {templates.length > 0 ? (
                     <Button className="h-8 gap-1 px-2.5 text-xs" onClick={() => setShowTemplates((v) => !v)} size="sm" type="button" variant="outline">
@@ -1775,6 +1851,7 @@ export function RealtimeInbox({
                   ) : null}
                   {selectedInquiry.ai_suggested_reply ? (
                     <Button
+                      aria-label="AI原案：自動生成済みの返信原案を表示"
                       className="h-8 gap-1 border-violet-300 bg-violet-50 px-2.5 text-xs text-violet-700 hover:bg-violet-100"
                       onClick={() => {
                         setAiPanelDraft(selectedInquiry.ai_suggested_reply!);
@@ -1783,10 +1860,12 @@ export function RealtimeInbox({
                         setAiPanelOpen(true);
                       }}
                       size="sm"
+                      title="自動生成済みの返信原案を表示"
                       type="button"
                       variant="outline"
                     >
-                      ✦ AI原案を確認
+                      <Sparkles className="size-3.5" />
+                      AI原案
                     </Button>
                   ) : null}
                   <div className="flex-1" />

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Bot,
+  BookOpen,
   BrainCircuit,
   CalendarDays,
   Clock,
@@ -20,6 +21,8 @@ import {
 } from "lucide-react";
 import { FloatingWidget } from "./ai/FloatingWidget";
 import { WidgetPageContextProvider } from "@/contexts/WidgetPageContext";
+import { ContextHelpButton } from "./help/ContextHelpButton";
+import { OnboardingTutorial } from "./help/OnboardingTutorial";
 import { cn } from "@/lib/utils";
 
 const AI_HISTORY_STORAGE_KEY = "makxas-show-ai-history";
@@ -32,6 +35,7 @@ const navItems = [
   { href: "/appointments", label: "アポ一覧", mobileLabel: "アポ", icon: CalendarDays },
   { href: "/shifts", label: "シフト管理", mobileLabel: "シフト", icon: Clock },
   { href: "/ai", label: "AIアシスタント", mobileLabel: "AI", icon: Bot },
+  { href: "/help", label: "ヘルプ", mobileLabel: "ヘルプ", icon: BookOpen },
   { href: "/settings", label: "設定", mobileLabel: "設定", icon: Settings },
   { href: "/admin", label: "管理", mobileLabel: "管理", icon: ShieldCheck, divider: true as const, exactMatch: true as const },
   { href: "/admin/ai", label: "AI学習・自動化", mobileLabel: "学習", icon: BrainCircuit, indent: true as const },
@@ -88,14 +92,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen flex-col overflow-hidden bg-zinc-50 text-zinc-950 md:flex-row">
         {/* デスクトップサイドバー */}
         <aside className="hidden w-[220px] shrink-0 flex-col border-r border-zinc-200 bg-white md:flex">
-          <Link
-            href="/dashboard"
-            className="flex h-16 items-center border-b border-zinc-200 px-5"
-          >
-            <span className="text-base font-semibold tracking-tight">
-              makxas-front
-            </span>
-          </Link>
+          <div className="flex h-16 items-center justify-between border-b border-zinc-200 px-5">
+            <Link href="/dashboard">
+              <span className="text-base font-semibold tracking-tight">
+                makxas-front
+              </span>
+            </Link>
+            <ContextHelpButton />
+          </div>
           <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
             {visibleNavItems.map((item) => {
               const Icon = item.icon;
@@ -162,13 +166,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </aside>
 
         {/* モバイルヘッダー */}
-        <header className="flex h-12 items-center border-b border-zinc-200 bg-white px-4 md:hidden">
+        <header className="flex h-12 items-center justify-between border-b border-zinc-200 bg-white px-4 md:hidden">
           <Link
             href="/dashboard"
             className="text-base font-semibold tracking-tight"
           >
             makxas-front
           </Link>
+          <ContextHelpButton />
         </header>
 
         <main className="flex min-w-0 flex-1 flex-col overflow-y-auto pb-16 md:pb-0">
@@ -180,6 +185,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {children}
         </main>
         {pathname !== "/ai" && <FloatingWidget />}
+        <OnboardingTutorial />
 
         {/* モバイルボトムナビ */}
         <nav className="fixed bottom-0 left-0 right-0 z-50 flex border-t border-zinc-200 bg-white md:hidden">

@@ -127,4 +127,13 @@
   html {
     @apply font-sans;
   }
+  /* UI/UXレビュー D6: キーボード操作時のフォーカス可視性を強化 */
+  *:focus-visible {
+    @apply outline-2 outline-offset-2;
+    outline-color: rgb(139 92 246); /* violet-500 — AI/プライマリーカラーに揃える */
+  }
+  /* マウスクリック時は枠を出さない（focus-visible のみに反応） */
+  *:focus:not(:focus-visible) {
+    outline: none;
+  }
 }
