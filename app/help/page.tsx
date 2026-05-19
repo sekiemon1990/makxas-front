@@ -15,13 +15,22 @@ import {
   type HelpChapter,
 } from "@/lib/help/manual";
 import { BookOpen, Search as SearchIcon, X as XIcon, Play } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { resetTutorial } from "@/components/help/OnboardingTutorial";
 
 export default function HelpPage() {
+  // useSearchParams は Suspense でラップする必要がある (Next.js prerender 要件)
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-zinc-500">読み込み中...</div>}>
+      <HelpPageInner />
+    </Suspense>
+  );
+}
+
+function HelpPageInner() {
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string>(HELP_CHAPTERS[0]!.id);
   const searchParams = useSearchParams();
