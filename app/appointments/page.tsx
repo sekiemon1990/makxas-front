@@ -390,26 +390,63 @@ export default function AppointmentsPage() {
             </div>
           ) : (
             <div className="rounded-lg border border-zinc-200 bg-white">
-              {/* カレンダーヘッダー */}
-              <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3">
-                <button
-                  className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-zinc-100"
-                  onClick={() => setCalMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
-                  type="button"
-                >
-                  <ChevronLeft className="size-4" />
-                </button>
-                <span className="text-sm font-semibold">
-                  {calMonth.getFullYear()}年{calMonth.getMonth() + 1}月
-                </span>
-                <button
-                  className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-zinc-100"
-                  onClick={() => setCalMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
-                  type="button"
-                >
-                  <ChevronRight className="size-4" />
-                </button>
-              </div>
+              {/* カレンダーヘッダー — UI/UXレビュー C4: 前月/翌月のアポ件数を表示して見落とし防止 + D5: title属性 */}
+              {(() => {
+                const prevMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1);
+                const nextMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1);
+                const thisMonthEnd = new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1);
+                const nextMonthEnd = new Date(calMonth.getFullYear(), calMonth.getMonth() + 2, 1);
+                const prevCount = filteredAppointments.filter((a) => {
+                  const d = new Date(a.scheduled_at);
+                  return d >= prevMonth && d < calMonth;
+                }).length;
+                const nextCount = filteredAppointments.filter((a) => {
+                  const d = new Date(a.scheduled_at);
+                  return d >= thisMonthEnd && d < nextMonthEnd;
+                }).length;
+                const isCurrentMonth = calMonth.getFullYear() === new Date().getFullYear() && calMonth.getMonth() === new Date().getMonth();
+                return (
+                  <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3">
+                    <button
+                      className="flex h-8 items-center gap-1.5 rounded-md px-2 hover:bg-zinc-100"
+                      onClick={() => setCalMonth(prevMonth)}
+                      type="button"
+                      title={`${prevMonth.getMonth() + 1}月に戻る`}
+                    >
+                      <ChevronLeft className="size-4" />
+                      {prevCount > 0 && (
+                        <span className="text-[10px] font-medium text-zinc-500">前月 {prevCount}件</span>
+                      )}
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold">
+                        {calMonth.getFullYear()}年{calMonth.getMonth() + 1}月
+                      </span>
+                      {!isCurrentMonth && (
+                        <button
+                          type="button"
+                          onClick={() => setCalMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}
+                          className="text-[10px] text-violet-600 underline hover:text-violet-800"
+                          title="今月に戻る"
+                        >
+                          今月へ
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      className="flex h-8 items-center gap-1.5 rounded-md px-2 hover:bg-zinc-100"
+                      onClick={() => setCalMonth(nextMonth)}
+                      type="button"
+                      title={`${nextMonth.getMonth() + 1}月へ進む`}
+                    >
+                      {nextCount > 0 && (
+                        <span className="text-[10px] font-medium text-zinc-500">翌月 {nextCount}件</span>
+                      )}
+                      <ChevronRight className="size-4" />
+                    </button>
+                  </div>
+                );
+              })()}
               {/* 曜日ヘッダー */}
               <div className="grid grid-cols-7 border-b border-zinc-200">
                 {["日", "月", "火", "水", "木", "金", "土"].map((d) => (
