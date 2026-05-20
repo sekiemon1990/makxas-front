@@ -1039,6 +1039,48 @@ export type Database = {
         };
         Relationships: [];
       };
+      audit_logs: {
+        Row: {
+          id: string;
+          entity_type: string;
+          entity_id: string;
+          action: string;
+          field: string | null;
+          before_value: Json | null;
+          after_value: Json | null;
+          changed_by: string | null;
+          changed_by_email: string | null;
+          note: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          entity_type: string;
+          entity_id: string;
+          action: string;
+          field?: string | null;
+          before_value?: Json | null;
+          after_value?: Json | null;
+          changed_by?: string | null;
+          changed_by_email?: string | null;
+          note?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          entity_type?: string;
+          entity_id?: string;
+          action?: string;
+          field?: string | null;
+          before_value?: Json | null;
+          after_value?: Json | null;
+          changed_by?: string | null;
+          changed_by_email?: string | null;
+          note?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {

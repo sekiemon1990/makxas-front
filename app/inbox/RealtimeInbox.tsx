@@ -27,6 +27,7 @@ import { InquiryPriorityRow } from "@/components/inquiry/InquiryPriorityRow";
 import { AiSuggestPanel } from "@/components/inbox/AiSuggestPanel";
 import { AppointmentModal } from "@/components/inbox/AppointmentModal";
 import { InquiryItemsPanel, type CustomerProfile } from "@/components/inbox/InquiryItemsPanel";
+import { AuditLogPanel } from "@/components/inbox/AuditLogPanel";
 import { LeadAssignModal } from "@/components/inbox/LeadAssignModal";
 import { LeadMergeModal } from "@/components/inbox/LeadMergeModal";
 import { Badge } from "@/components/ui/badge";
@@ -1555,6 +1556,9 @@ export function RealtimeInbox({
                   </div>
                 </div>
               ) : null}
+
+              {/* PR28: 変更履歴パネル */}
+              {selectedInquiry ? <AuditLogPanel inquiryId={selectedInquiry.id} /> : null}
 
               {duplicateLeads.length > 0 ? (
                 <div className="border-b border-red-200 bg-red-50">
