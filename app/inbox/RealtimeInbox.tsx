@@ -64,7 +64,7 @@ import type {
 type StatusFilter = InquiryStatus | "all";
 type ChannelFilter = InquiryChannel | "all";
 type StoreFilter = string | "all";
-type AssigneeFilter = "mine" | "all";
+type AssigneeFilter = "mine" | "all" | "mentioned";
 
 type RelatedInquiry = {
   id: string;
@@ -1054,6 +1054,22 @@ export function RealtimeInbox({
                         {initialAssignee === "mine" ? "自分のみ ✓" : "自分のみ"}
                       </button>
                     ) : null}
+                    {/* PR20: @me メンション受信ボックス */}
+                    {currentStaffId ? (
+                      <button
+                        className={cn(
+                          "h-7 rounded-full border px-3 text-xs font-medium transition",
+                          initialAssignee === "mentioned"
+                            ? "border-amber-400 bg-amber-50 text-amber-700"
+                            : "border-zinc-200 bg-white text-zinc-600 hover:border-amber-300 hover:text-amber-600",
+                        )}
+                        onClick={() => updateQuery({ assignee: initialAssignee === "mentioned" ? "all" : "mentioned", id: null })}
+                        title="内部メモで @自分宛にメンションされた反響を表示"
+                        type="button"
+                      >
+                        {initialAssignee === "mentioned" ? "@me ✓" : "@me"}
+                      </button>
+                    ) : null}
                     {activeFilters > 0 ? (
                       <button
                         aria-label="フィルターをすべてクリア"
@@ -1410,8 +1426,15 @@ export function RealtimeInbox({
                 <div className="space-y-3">
                   {messages.map((message) => {
                     const isOut = message.direction === "outbound";
+                    // PR19: 全返信に対応者記録 — is_auto/sent_byで送信者を明確化
+                    const staffEntry = isOut ? staff.find((s) => s.id === message.sent_by) : null;
+                    const isAutoSend = (message as { is_auto?: boolean | null }).is_auto === true;
                     const senderName = isOut
-                      ? (staff.find((s) => s.id === message.sent_by)?.name ?? "スタッフ")
+                      ? (staffEntry?.name
+                          ? staffEntry.name
+                          : isAutoSend
+                          ? "システム自動送信"
+                          : "(対応者不明)")
                       : getCustomerName(selectedInquiry);
                     const initial = senderName.charAt(0);
                     return (
@@ -1426,9 +1449,13 @@ export function RealtimeInbox({
                           </div>
                         ) : null}
                         <div className={cn("flex max-w-[76%] flex-col", isOut ? "items-end" : "items-start")}>
-                          {/* 送信者名（送信のみ） */}
+                          {/* 送信者名（送信のみ・PR19 で AI送信/対応者不明を区別） */}
                           {isOut ? (
-                            <p className="mb-1 pr-1 text-[10px] text-zinc-400">{senderName}</p>
+                            <p className="mb-1 pr-1 text-[10px] text-zinc-400 flex items-center gap-1">
+                              {isAutoSend && <span className="rounded bg-violet-100 px-1 text-violet-700">AUTO</span>}
+                              {!staffEntry && !isAutoSend && <span className="rounded bg-amber-100 px-1 text-amber-700">⚠️</span>}
+                              {senderName}
+                            </p>
                           ) : null}
                           {/* バブル本体 */}
                           <div
