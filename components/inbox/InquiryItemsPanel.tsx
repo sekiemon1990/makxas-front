@@ -437,6 +437,16 @@ export function InquiryItemsPanel({
   );
 }
 
+type CompetitorPriceResult = {
+  price_range_min?: number;
+  price_range_max?: number;
+  median_price?: number;
+  confidence?: "high" | "medium" | "low";
+  reasoning?: string;
+  comparables?: { competitor: string; estimated_price: number; note?: string }[];
+  negotiation_hint?: string;
+};
+
 function ItemRow({
   item,
   onEdit,
@@ -452,6 +462,38 @@ function ItemRow({
   const effectivePrice = item.quote_price_min ?? item.estimated_price_min ?? 0;
   const isHighValuePrice = effectivePrice >= HIGH_VALUE_PRICE_THRESHOLD;
   const isHighValue = isHighValueCat || isHighValuePrice;
+
+  // PR31: 競合相場参照
+  const [compLoading, setCompLoading] = useState(false);
+  const [compResult, setCompResult] = useState<CompetitorPriceResult | null>(null);
+  const [compError, setCompError] = useState<string | null>(null);
+
+  async function fetchCompetitorPrice() {
+    setCompLoading(true);
+    setCompError(null);
+    try {
+      const r = await fetch("/api/ai/competitor-price", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          item_name: item.item_name,
+          brand: item.brand ?? undefined,
+          model_number: item.model_number ?? undefined,
+          condition: item.condition ?? undefined,
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) {
+        setCompError(d.error ?? "相場参照失敗");
+      } else {
+        setCompResult(d);
+      }
+    } catch (e) {
+      setCompError(e instanceof Error ? e.message : "失敗");
+    } finally {
+      setCompLoading(false);
+    }
+  }
 
   return (
     <div className="group flex items-start gap-2 px-3 py-2.5 hover:bg-zinc-50/80">
@@ -495,24 +537,78 @@ function ItemRow({
         )}
         {item.notes && <p className="text-[11px] text-zinc-400 line-clamp-2">{item.notes}</p>}
       </div>
-      <div className="flex shrink-0 items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex shrink-0 items-center gap-1">
         <button
-          className="rounded p-1 hover:bg-zinc-200 text-zinc-400 hover:text-zinc-600"
-          onClick={onEdit}
+          className="rounded px-1.5 py-0.5 text-[10px] font-medium border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 transition-colors"
+          onClick={fetchCompetitorPrice}
           type="button"
-          aria-label="編集"
+          disabled={compLoading}
+          title="競合他社（コメ兵・なんぼや・ブランディア等）の相場をAIに参照"
         >
-          <Pencil className="size-3" />
+          {compLoading ? "..." : "💹相場"}
         </button>
-        <button
-          className="rounded p-1 hover:bg-red-50 text-zinc-400 hover:text-red-500"
-          onClick={onDelete}
-          type="button"
-          aria-label="削除"
-        >
-          <Trash2 className="size-3" />
-        </button>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            className="rounded p-1 hover:bg-zinc-200 text-zinc-400 hover:text-zinc-600"
+            onClick={onEdit}
+            type="button"
+            aria-label="編集"
+          >
+            <Pencil className="size-3" />
+          </button>
+          <button
+            className="rounded p-1 hover:bg-red-50 text-zinc-400 hover:text-red-500"
+            onClick={onDelete}
+            type="button"
+            aria-label="削除"
+          >
+            <Trash2 className="size-3" />
+          </button>
+        </div>
       </div>
+      {compResult ? (
+        <div className="basis-full mt-2 rounded-md border border-emerald-200 bg-emerald-50/50 p-2">
+          <div className="flex items-baseline justify-between">
+            <p className="text-[11px] font-semibold text-emerald-900">💹 競合相場（AI推定）</p>
+            <button type="button" onClick={() => setCompResult(null)} className="text-[10px] text-emerald-700 hover:text-emerald-900">閉じる</button>
+          </div>
+          {compResult.price_range_min != null && compResult.price_range_max != null ? (
+            <p className="mt-1 text-sm font-bold text-emerald-800">
+              ¥{compResult.price_range_min.toLocaleString("ja-JP")} 〜 ¥{compResult.price_range_max.toLocaleString("ja-JP")}
+              {compResult.median_price != null ? (
+                <span className="ml-2 text-[10px] font-normal text-emerald-700">
+                  （中央値 ¥{compResult.median_price.toLocaleString("ja-JP")}）
+                </span>
+              ) : null}
+              <span className="ml-2 text-[10px] font-normal text-zinc-500">
+                信頼度: {compResult.confidence ?? "—"}
+              </span>
+            </p>
+          ) : null}
+          {compResult.reasoning ? (
+            <p className="mt-1 text-[10px] text-zinc-700">根拠: {compResult.reasoning}</p>
+          ) : null}
+          {compResult.comparables && compResult.comparables.length > 0 ? (
+            <ul className="mt-1 space-y-0.5">
+              {compResult.comparables.map((c, i) => (
+                <li key={i} className="text-[10px] text-zinc-600">
+                  ・{c.competitor}: ¥{c.estimated_price.toLocaleString("ja-JP")}
+                  {c.note ? <span className="text-zinc-400"> — {c.note}</span> : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {compResult.negotiation_hint ? (
+            <p className="mt-1.5 rounded bg-amber-50 px-2 py-1 text-[10px] text-amber-900">
+              💡 マクサス推奨: {compResult.negotiation_hint}
+            </p>
+          ) : null}
+          <p className="mt-1 text-[9px] text-zinc-400">※ AI推定値・実勢相場と異なる可能性あり</p>
+        </div>
+      ) : null}
+      {compError ? (
+        <p className="basis-full mt-1 text-[10px] text-red-600">相場参照失敗: {compError}</p>
+      ) : null}
     </div>
   );
 }
