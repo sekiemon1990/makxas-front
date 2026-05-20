@@ -26,6 +26,8 @@ type InboxPageProps = {
     page?: string | string[];
     assignee?: string | string[];
     q?: string | string[]; // PR17: サーバーサイド検索クエリ
+    sort?: string | string[]; // PR23: ソート（updated_at | priority）
+    priority?: string | string[]; // PR23: 優先度フィルタ (high|medium|low|all)
   }>;
 };
 
@@ -46,6 +48,13 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
       : "all";
   // PR17: サーバーサイド検索（subject + lead display_name / phone / email を OR）
   const searchQuery = (firstValue(params.q) ?? "").trim();
+  // PR23: ソート + 優先度フィルター
+  const sortMode: "updated_at" | "priority" =
+    firstValue(params.sort) === "priority" ? "priority" : "updated_at";
+  const priorityFilter: "all" | "high" | "medium" | "low" = (() => {
+    const v = firstValue(params.priority);
+    return v === "high" || v === "medium" || v === "low" ? v : "all";
+  })();
   const authClient = await createClient();
   const {
     data: { user },
@@ -106,8 +115,21 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
       "*, leads(*), staff:assigned_to(id,name,email), brands(id,name,brand_code), stores(id,name,store_code,store_type), line_accounts(id,name,destination), email_accounts(id,email,display_name), comparison_site_accounts(id,site,notification_email), inquiry_tags(tag)",
       { count: "exact" },
     )
-    .order("updated_at", { ascending: false })
     .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+
+  // PR23: ソート（優先度は ai_priority_score DESC、updated_at DESC を tie-breaker）
+  if (sortMode === "priority") {
+    inquiryQuery = inquiryQuery
+      .order("ai_priority_score", { ascending: false, nullsFirst: false })
+      .order("updated_at", { ascending: false });
+  } else {
+    inquiryQuery = inquiryQuery.order("updated_at", { ascending: false });
+  }
+
+  // PR23: 優先度フィルタ
+  if (priorityFilter !== "all") {
+    inquiryQuery = inquiryQuery.eq("ai_priority", priorityFilter);
+  }
 
   if (status !== "all") {
     inquiryQuery = inquiryQuery.eq("status", status);
@@ -209,7 +231,7 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
   return (
     <AppShell>
       <RealtimeInbox
-        key={`${status}:${channel}:${store}:${assigneeFilter}:${page}:${searchQuery}:${selectedId ?? ""}`}
+        key={`${status}:${channel}:${store}:${assigneeFilter}:${sortMode}:${priorityFilter}:${page}:${searchQuery}:${selectedId ?? ""}`}
         canUseAllStores={canUseAllStores}
         currentStaffId={currentStaff?.id ?? null}
         hasMore={hasMore}
@@ -220,6 +242,8 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
         initialReadIds={[...readInquiryIds]}
         initialSelectedId={selectedId ?? null}
         initialSearch={searchQuery}
+        initialSort={sortMode}
+        initialPriority={priorityFilter}
         initialStatus={status}
         initialStore={store}
         page={page}

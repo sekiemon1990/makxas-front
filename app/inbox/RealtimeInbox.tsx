@@ -117,6 +117,8 @@ export function RealtimeInbox({
   initialReadIds,
   initialSelectedId,
   initialSearch,
+  initialSort,
+  initialPriority,
   initialStatus,
   initialStore,
   page,
@@ -134,6 +136,8 @@ export function RealtimeInbox({
   initialReadIds: string[];
   initialSelectedId: string | null;
   initialSearch?: string;
+  initialSort?: "updated_at" | "priority";
+  initialPriority?: "all" | "high" | "medium" | "low";
   initialStatus: StatusFilter;
   initialStore: StoreFilter;
   page: number;
@@ -1054,6 +1058,34 @@ export function RealtimeInbox({
                         {initialAssignee === "mine" ? "自分のみ ✓" : "自分のみ"}
                       </button>
                     ) : null}
+                    {/* PR23: 優先度ソート切替 */}
+                    <button
+                      className={cn(
+                        "h-7 rounded-full border px-3 text-xs font-medium transition",
+                        initialSort === "priority"
+                          ? "border-rose-400 bg-rose-50 text-rose-700"
+                          : "border-zinc-200 bg-white text-zinc-600 hover:border-rose-300 hover:text-rose-600",
+                      )}
+                      onClick={() => updateQuery({ sort: initialSort === "priority" ? "updated_at" : "priority", id: null })}
+                      title="AI判定の優先度順に並び替え"
+                      type="button"
+                    >
+                      {initialSort === "priority" ? "🔥 優先度順 ✓" : "🔥 優先度順"}
+                    </button>
+                    {/* PR23: 優先度フィルター（高のみ） */}
+                    <button
+                      className={cn(
+                        "h-7 rounded-full border px-3 text-xs font-medium transition",
+                        initialPriority === "high"
+                          ? "border-red-400 bg-red-50 text-red-700"
+                          : "border-zinc-200 bg-white text-zinc-600 hover:border-red-300 hover:text-red-600",
+                      )}
+                      onClick={() => updateQuery({ priority: initialPriority === "high" ? "all" : "high", id: null })}
+                      title="優先度=高 の反響のみ表示"
+                      type="button"
+                    >
+                      {initialPriority === "high" ? "高のみ ✓" : "高のみ"}
+                    </button>
                     {/* PR20: @me メンション受信ボックス */}
                     {currentStaffId ? (
                       <button
