@@ -29,6 +29,7 @@ import { AppointmentModal } from "@/components/inbox/AppointmentModal";
 import { InquiryItemsPanel, type CustomerProfile } from "@/components/inbox/InquiryItemsPanel";
 import { AuditLogPanel } from "@/components/inbox/AuditLogPanel";
 import { NextQuestionsPanel } from "@/components/inbox/NextQuestionsPanel";
+import { HandoverSummaryButton } from "@/components/inbox/HandoverSummaryButton";
 import { LeadAssignModal } from "@/components/inbox/LeadAssignModal";
 import { LeadMergeModal } from "@/components/inbox/LeadMergeModal";
 import { Badge } from "@/components/ui/badge";
@@ -1565,6 +1566,8 @@ export function RealtimeInbox({
               {selectedInquiry ? (
                 <div className="border-b border-zinc-200 bg-white px-5 py-2">
                   <NextQuestionsPanel inquiryId={selectedInquiry.id} />
+                  <span className="ml-2" />
+                  <HandoverSummaryButton inquiryId={selectedInquiry.id} />
                 </div>
               ) : null}
 
