@@ -303,10 +303,10 @@ function TagsTab({ tags, setTags }: { tags: TagMaster[]; setTags: (t: TagMaster[
                             onKeyDown={(e) => e.key === "Enter" && void saveEdit(tag.id)}
                             autoFocus
                           />
-                          <button onClick={() => void saveEdit(tag.id)} className="text-green-600 hover:text-green-700">
+                          <button onClick={() => void saveEdit(tag.id)} className="text-green-600 hover:text-green-700" title="保存" aria-label="保存">
                             <Check className="size-4" />
                           </button>
-                          <button onClick={() => setEditId(null)} className="text-zinc-400 hover:text-zinc-600">
+                          <button onClick={() => setEditId(null)} className="text-zinc-400 hover:text-zinc-600" title="キャンセル" aria-label="キャンセル">
                             <X className="size-4" />
                           </button>
                         </div>

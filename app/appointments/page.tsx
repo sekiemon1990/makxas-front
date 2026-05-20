@@ -7,6 +7,7 @@ import { AppShell } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { formatCount } from "@/lib/design-tokens";
 
 type Appointment = {
   id: string;
@@ -153,8 +154,9 @@ export default function AppointmentsPage() {
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">アポ一覧</h1>
               <p className="mt-1 text-sm text-zinc-500">
-                全 {appointments.length} 件
-                {filteredAppointments.length !== appointments.length ? ` / 表示中 ${filteredAppointments.length} 件` : ""}
+                {/* UI/UXレビュー C1: formatCount で表記統一 */}
+                全 {formatCount(appointments.length)}
+                {filteredAppointments.length !== appointments.length ? ` / 表示中 ${formatCount(filteredAppointments.length)}` : ""}
               </p>
             </div>
             <div className="flex items-center gap-2">

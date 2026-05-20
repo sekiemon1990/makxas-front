@@ -7,6 +7,7 @@ import { CalendarCheck, Search, SlidersHorizontal, X } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ChannelBadge } from "@/components/badges";
 import { cn } from "@/lib/utils";
+import { formatCount } from "@/lib/design-tokens";
 import { channelMeta } from "@/lib/inquiry-options";
 import type { InquiryChannel } from "@/types/database";
 
@@ -167,7 +168,8 @@ export default function LeadsPage() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">リード一覧</h1>
             <p className="mt-1 text-sm text-zinc-500">
-              全 {leads.length} 件{filteredLeads.length !== leads.length ? ` / 表示中 ${filteredLeads.length} 件` : ""}
+              {/* UI/UXレビュー C1: formatCount で表記統一（数字+半角スペース+件、千区切り対応） */}
+              全 {formatCount(leads.length)}{filteredLeads.length !== leads.length ? ` / 表示中 ${formatCount(filteredLeads.length)}` : ""}
             </p>
           </div>
           <div className="flex items-center gap-2">
