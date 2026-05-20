@@ -204,7 +204,8 @@ export default async function ItemsPage({
       {/* UI/UXレビュー C2: 余白・幅統一 */}
       <div className="mx-auto max-w-6xl p-4 md:p-8">
         {/* ── ヘッダー ─────────────────────────────────────── */}
-        <div className="mb-6 flex items-start justify-between gap-4">
+        {/* UI/UXレビュー C7: 検索バーをヘッダー右上に統一配置 */}
+        <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
               <Package className="size-6 text-violet-500" />
@@ -214,6 +215,23 @@ export default async function ItemsPage({
               全リードからの問い合わせ商品 · AI抽出・手動入力を含む
             </p>
           </div>
+          {activeTab !== "review" && (
+            <form method="GET" className="flex gap-2 w-full sm:w-auto sm:min-w-[280px]">
+              <input
+                type="search"
+                name="q"
+                defaultValue={filterSearch}
+                placeholder="商品名・ブランド・顧客名で検索"
+                className="h-9 flex-1 rounded-lg border border-zinc-200 bg-white px-3 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-violet-400"
+                aria-label="商品検索"
+              />
+              {filterCondition && <input type="hidden" name="condition" value={filterCondition} />}
+              {filterQuote && <input type="hidden" name="quote" value="1" />}
+              <button type="submit" className="h-9 rounded-lg bg-zinc-900 px-3 text-sm font-medium text-white hover:bg-zinc-700">
+                検索
+              </button>
+            </form>
+          )}
         </div>
 
         {/* ── 統計カード ───────────────────────────────────── */}
@@ -274,24 +292,8 @@ export default async function ItemsPage({
           />
         ) : (
           <>
-            {/* ── フィルターバー ───────────────────────────────── */}
+            {/* ── フィルターバー — 検索バーはヘッダー右上に移動済み (C7) ─── */}
             <div className="mb-4 flex flex-wrap items-center gap-2">
-              {/* 検索 */}
-              <form method="GET" className="flex gap-2 flex-1 min-w-[200px] max-w-xs">
-                <input
-                  type="text"
-                  name="q"
-                  defaultValue={filterSearch}
-                  placeholder="商品名・ブランド・顧客名で検索"
-                  className="h-8 flex-1 rounded-lg border border-zinc-200 bg-white px-3 text-xs placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-violet-400"
-                />
-                {filterCondition && <input type="hidden" name="condition" value={filterCondition} />}
-                {filterQuote && <input type="hidden" name="quote" value="1" />}
-                <button type="submit" className="h-8 rounded-lg bg-zinc-900 px-3 text-xs font-medium text-white hover:bg-zinc-700">
-                  検索
-                </button>
-              </form>
-
               {/* 状態フィルター */}
               <div className="flex flex-wrap gap-1.5">
                 {filterCondition || filterQuote || filterSearch ? (
