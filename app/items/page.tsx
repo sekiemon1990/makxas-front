@@ -201,7 +201,8 @@ export default async function ItemsPage({
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-5xl px-6 py-8">
+      {/* UI/UXレビュー C2: 余白・幅統一 */}
+      <div className="mx-auto max-w-6xl p-4 md:p-8">
         {/* ── ヘッダー ─────────────────────────────────────── */}
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>

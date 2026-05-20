@@ -315,7 +315,8 @@ export default function AppointmentsPage() {
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8">
+        {/* UI/UXレビュー C2: 余白統一 (p-4/md:p-8) */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-8">
           {loading ? (
             // UI/UXレビュー D1: スケルトンUI
             <div className="space-y-2" aria-label="読み込み中">

@@ -423,7 +423,8 @@ export default async function DashboardPage() {
 
   return (
     <AppShell>
-      <div className="min-h-screen bg-zinc-50 p-8">
+      {/* UI/UXレビュー C2: 余白統一 — モバイル16px / デスクトップ32px、内側コンテナ統一 */}
+      <div className="min-h-screen bg-zinc-50 p-4 md:p-8">
         <div className="mx-auto max-w-6xl">
           {/* ヘッダー */}
           <div className="flex items-end justify-between">

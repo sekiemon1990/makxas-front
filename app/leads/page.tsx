@@ -172,7 +172,8 @@ export default function LeadsPage() {
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-5xl px-6 py-8">
+      {/* UI/UXレビュー C2: 余白・幅統一 (p-4/md:p-8, max-w-6xl) */}
+      <div className="mx-auto max-w-6xl p-4 md:p-8">
         {/* ヘッダー */}
         <div className="flex items-end justify-between gap-4">
           <div>
