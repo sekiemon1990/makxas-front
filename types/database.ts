@@ -25,6 +25,7 @@ export type Database = {
           core_appointment_id: string | null;
           reminder_sent_at: string | null;
           additional_items_confirmed: Json | null;
+          view_token: string;
           created_at: string;
         };
         Insert: {
@@ -42,6 +43,7 @@ export type Database = {
           core_appointment_id?: string | null;
           reminder_sent_at?: string | null;
           additional_items_confirmed?: Json | null;
+          view_token?: string;
           created_at?: string;
         };
         Update: {
@@ -59,6 +61,7 @@ export type Database = {
           core_appointment_id?: string | null;
           reminder_sent_at?: string | null;
           additional_items_confirmed?: Json | null;
+          view_token?: string;
           created_at?: string;
         };
         Relationships: [
