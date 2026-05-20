@@ -13,6 +13,7 @@ import { LeadContactsPanel } from "@/components/leads/LeadContactsPanel";
 import { AppShell } from "@/components/app-shell";
 import { ChannelBadge, StatusBadge } from "@/components/badges";
 import { createServiceClient } from "@/lib/supabase/service";
+import { TAG_STYLE } from "@/lib/design-tokens";
 import type { InquiryItem, InquiryItemCondition, InquiryWithLead, Message } from "@/types/database";
 import type { InquiryChannel } from "@/types/database";
 
@@ -401,11 +402,9 @@ function InquiryOpenItem({ item }: { item: TLInquiryOpen }) {
         </div>
         {item.tags.length > 0 ? (
           <div className="mt-2 flex flex-wrap gap-1">
+            {/* UI/UXレビュー C5: TAG_STYLE で全画面統一 */}
             {item.tags.map((tag) => (
-              <span
-                key={tag}
-                className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600"
-              >
+              <span key={tag} className={TAG_STYLE}>
                 {tag}
               </span>
             ))}
