@@ -62,6 +62,31 @@ export function AppointmentModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // PR18: アポ確認メッセージ送信チャネル選択（複数可）
+  const lead = inquiry?.leads as { line_user_id?: string | null; email?: string | null; phone?: string | null } | null;
+  const [confirmChannels, setConfirmChannels] = useState<Set<"line" | "email" | "sms">>(() => {
+    const initial = new Set<"line" | "email" | "sms">();
+    if (lead?.line_user_id) initial.add("line");
+    return initial;
+  });
+  // 反響が変わったらチャネルデフォルトを再評価
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const next = new Set<"line" | "email" | "sms">();
+    if (lead?.line_user_id) next.add("line");
+    setConfirmChannels(next);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inquiry?.id]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+  const toggleChannel = (ch: "line" | "email" | "sms") => {
+    setConfirmChannels((prev) => {
+      const next = new Set(prev);
+      if (next.has(ch)) next.delete(ch);
+      else next.add(ch);
+      return next;
+    });
+  };
+
   // 追加品チェックリスト
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
@@ -124,6 +149,8 @@ export function AppointmentModal({
         preferred_method: method,
         staff_id: inquiry.assigned_to,
         additional_items_confirmed: confirmedItems.length > 0 ? confirmedItems : null,
+        // PR18: 選択したチャネルにアポ確認メッセージ送信
+        confirmation_channels: [...confirmChannels],
       }),
     });
 
@@ -288,6 +315,51 @@ export function AppointmentModal({
                 ))}
               </div>
             )}
+          </div>
+
+          {/* PR18: アポ確認メッセージ送信チャネル選択 */}
+          <div className="rounded-lg border border-violet-200 bg-violet-50/40 p-3">
+            <p className="mb-2 text-xs font-semibold text-violet-900">
+              📩 確認メッセージを送信（任意・複数選択可）
+            </p>
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <label className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 ${confirmChannels.has("line") ? "border-emerald-400 bg-white" : "border-zinc-200 bg-white"} ${lead?.line_user_id ? "" : "opacity-50"}`}>
+                <input
+                  type="checkbox"
+                  className="size-3.5"
+                  checked={confirmChannels.has("line")}
+                  disabled={!lead?.line_user_id}
+                  onChange={() => toggleChannel("line")}
+                />
+                <span>💬 LINE</span>
+                {!lead?.line_user_id && <span className="text-zinc-400">(未登録)</span>}
+              </label>
+              <label className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 ${confirmChannels.has("email") ? "border-blue-400 bg-white" : "border-zinc-200 bg-white"} ${lead?.email ? "" : "opacity-50"}`}>
+                <input
+                  type="checkbox"
+                  className="size-3.5"
+                  checked={confirmChannels.has("email")}
+                  disabled={!lead?.email}
+                  onChange={() => toggleChannel("email")}
+                />
+                <span>✉️ メール</span>
+                {!lead?.email && <span className="text-zinc-400">(未登録)</span>}
+              </label>
+              <label className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 ${confirmChannels.has("sms") ? "border-amber-400 bg-white" : "border-zinc-200 bg-white"} ${lead?.phone ? "" : "opacity-50"}`}>
+                <input
+                  type="checkbox"
+                  className="size-3.5"
+                  checked={confirmChannels.has("sms")}
+                  disabled={!lead?.phone}
+                  onChange={() => toggleChannel("sms")}
+                />
+                <span>📱 SMS</span>
+                {!lead?.phone && <span className="text-zinc-400">(電話未登録)</span>}
+              </label>
+            </div>
+            <p className="mt-2 text-[10px] text-zinc-500">
+              選択したチャネルすべてに同じ確認文を送信します（日時・品目・住所を自動挿入）
+            </p>
           </div>
 
           {error ? <p className="text-sm text-rose-600">{error}</p> : null}
