@@ -23,6 +23,7 @@ import { FloatingWidget } from "./ai/FloatingWidget";
 import { WidgetPageContextProvider } from "@/contexts/WidgetPageContext";
 import { ContextHelpButton } from "./help/ContextHelpButton";
 import { OnboardingTutorial } from "./help/OnboardingTutorial";
+import { ThemeToggle } from "./ThemeToggle";
 import { cn } from "@/lib/utils";
 
 const AI_HISTORY_STORAGE_KEY = "makxas-show-ai-history";
@@ -89,10 +90,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <WidgetPageContextProvider>
-      <div className="flex h-screen flex-col overflow-hidden bg-zinc-50 text-zinc-950 md:flex-row">
+      {/* UI/UXレビュー D4: ダークモード対応 — dark: variant でカラーパレット切替 */}
+      <div className="flex h-screen flex-col overflow-hidden bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-100 md:flex-row">
         {/* デスクトップサイドバー */}
-        <aside className="hidden w-[220px] shrink-0 flex-col border-r border-zinc-200 bg-white md:flex">
-          <div className="flex h-16 items-center justify-between border-b border-zinc-200 px-5">
+        <aside className="hidden w-[220px] shrink-0 flex-col border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 md:flex">
+          <div className="flex h-16 items-center justify-between border-b border-zinc-200 dark:border-zinc-800 px-5">
             <Link href="/dashboard">
               <span className="text-base font-semibold tracking-tight">
                 makxas-front
@@ -114,15 +116,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               return (
                 <div key={item.href}>
                   {item.divider && (
-                    <div className="my-2 border-t border-zinc-100" />
+                    <div className="my-2 border-t border-zinc-100 dark:border-zinc-800" />
                   )}
                   <Link
                     href={item.href}
                     className={cn(
-                      "flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950",
+                      "flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-50",
                       item.indent && "pl-6 text-[13px]",
                       active &&
-                        "bg-zinc-950 text-white hover:bg-zinc-900 hover:text-white",
+                        "bg-zinc-950 text-white hover:bg-zinc-900 hover:text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 dark:hover:text-zinc-900",
                     )}
                     title={item.label}
                   >
@@ -145,12 +147,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               );
             })}
 
-            {/* AI履歴管理 表示切り替えトグル */}
-            <div className="mt-auto pt-2 border-t border-zinc-100">
+            {/* AI履歴管理 表示切り替えトグル + テーマ切替 (D4) */}
+            <div className="mt-auto pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-1">
               <button
                 type="button"
                 onClick={toggleAiHistory}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[11px] text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50 transition-colors"
+                className="flex flex-1 items-center gap-2 rounded-lg px-3 py-1.5 text-[11px] text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300 transition-colors"
               >
                 {showAiHistory ? (
                   <EyeOff className="size-3 shrink-0" />
@@ -161,12 +163,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   AI履歴管理を{showAiHistory ? "隠す" : "表示"}
                 </span>
               </button>
+              <ThemeToggle />
             </div>
           </nav>
         </aside>
 
         {/* モバイルヘッダー */}
-        <header className="flex h-12 items-center justify-between border-b border-zinc-200 bg-white px-4 md:hidden">
+        <header className="flex h-12 items-center justify-between border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 px-4 md:hidden">
           <Link
             href="/dashboard"
             className="text-base font-semibold tracking-tight"
@@ -188,7 +191,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <OnboardingTutorial />
 
         {/* モバイルボトムナビ */}
-        <nav className="fixed bottom-0 left-0 right-0 z-50 flex border-t border-zinc-200 bg-white md:hidden">
+        <nav className="fixed bottom-0 left-0 right-0 z-50 flex border-t border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 md:hidden">
           {visibleNavItems
             .filter((item) => !item.aiHistoryOnly)
             .map((item) => {

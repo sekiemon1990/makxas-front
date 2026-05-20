@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { KeyboardShortcutsHelp } from "@/components/KeyboardShortcutsHelp";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
   title: "makxas-front",
@@ -24,11 +25,14 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // UI/UXレビュー D4: ダークモード対応 — next-themes + suppressHydrationWarning
   return (
-    <html lang="ja" className="h-full antialiased">
+    <html lang="ja" className="h-full antialiased" suppressHydrationWarning>
       <body className="min-h-full flex flex-col">
-        {children}
-        <KeyboardShortcutsHelp />
+        <ThemeProvider>
+          {children}
+          <KeyboardShortcutsHelp />
+        </ThemeProvider>
       </body>
     </html>
   );
