@@ -174,6 +174,37 @@ export default async function LeadDetailPage({
     lead.display_name ?? lead.email ?? lead.phone ?? "名前未登録";
   const lastContact = inquiries[inquiries.length - 1]?.created_at ?? null;
 
+  // PR21: LTVサマリー計算
+  const HIGH_VALUE_CATEGORIES = new Set(["貴金属", "時計", "ブランド品", "骨董品"]);
+  // 1. 事前査定見込み合計（estimated_price_min × 件数）
+  const totalEstimatedMin = inquiryItems.reduce(
+    (sum, item) =>
+      sum + (typeof item.estimated_price_min === "number" ? item.estimated_price_min : 0),
+    0,
+  );
+  // 2. 高単価カテゴリの商品数
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const highValueItemCount = (appointments as any[]).filter((a) =>
+    typeof a.item_category === "string" && HIGH_VALUE_CATEGORIES.has(a.item_category),
+  ).length;
+  // 3. 追加品確認チェック数
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const additionalConfirmedCount = (appointments as any[]).reduce((sum, a) => {
+    const conf = a.additional_items_confirmed;
+    if (!conf || typeof conf !== "object") return sum;
+    return sum + Object.values(conf).filter((v) => v === true).length;
+  }, 0);
+  // 4. アポ完了/失注/予定中の内訳
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const completedAppts = (appointments as any[]).filter((a) => a.status === "completed").length;
+  // 5. LTV見込みスコア: 高単価カテゴリ数 × 3 + 追加品確認 × 2 + 完了アポ × 5（最大 100）
+  const ltvScore = Math.min(
+    100,
+    highValueItemCount * 15 + additionalConfirmedCount * 5 + completedAppts * 25,
+  );
+  const ltvLevel: "high" | "mid" | "low" =
+    ltvScore >= 60 ? "high" : ltvScore >= 30 ? "mid" : "low";
+
   return (
     <AppShell>
       <div className="mx-auto max-w-3xl px-6 py-8">
@@ -271,6 +302,57 @@ export default async function LeadDetailPage({
               <p className="text-sm font-medium text-zinc-900">
                 {lastContact ? formatDate(lastContact) : "—"}
               </p>
+            </div>
+          </div>
+
+          {/* PR21: 顧客LTVサマリー — MAKXAS思想に基づくレバー2スコアリング */}
+          <div className="mt-5 rounded-xl border border-violet-200 bg-violet-50/30 p-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h3 className="text-sm font-semibold text-violet-900">📊 顧客LTVサマリー</h3>
+                <p className="text-[11px] text-violet-700/80">レバー2（追加買取）視点でのこの顧客の価値見込み</p>
+              </div>
+              <div className={`rounded-full px-3 py-1 text-xs font-bold ${
+                ltvLevel === "high"
+                  ? "bg-rose-100 text-rose-700"
+                  : ltvLevel === "mid"
+                  ? "bg-amber-100 text-amber-700"
+                  : "bg-zinc-100 text-zinc-700"
+              }`}>
+                {ltvLevel === "high" ? "🔥 高LTV" : ltvLevel === "mid" ? "⭐ 中LTV" : "📌 低LTV"} ({ltvScore}/100)
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="rounded-md bg-white border border-zinc-100 px-3 py-2">
+                <p className="text-[10px] text-zinc-500">事前査定合計（最低）</p>
+                <p className="text-lg font-semibold text-zinc-900">
+                  ¥{totalEstimatedMin.toLocaleString("ja-JP")}
+                </p>
+              </div>
+              <div className="rounded-md bg-white border border-zinc-100 px-3 py-2">
+                <p className="text-[10px] text-zinc-500">高単価カテゴリ数</p>
+                <p className="text-lg font-semibold text-rose-700">{highValueItemCount} 件</p>
+              </div>
+              <div className="rounded-md bg-white border border-zinc-100 px-3 py-2">
+                <p className="text-[10px] text-zinc-500">追加品確認数</p>
+                <p className="text-lg font-semibold text-amber-700">{additionalConfirmedCount} 件</p>
+              </div>
+              <div className="rounded-md bg-white border border-zinc-100 px-3 py-2">
+                <p className="text-[10px] text-zinc-500">完了アポ数</p>
+                <p className="text-lg font-semibold text-emerald-700">{completedAppts} 件</p>
+              </div>
+            </div>
+            <div className="mt-3 h-2 w-full rounded-full bg-zinc-200">
+              <div
+                className={`h-2 rounded-full transition-all ${
+                  ltvLevel === "high"
+                    ? "bg-rose-500"
+                    : ltvLevel === "mid"
+                    ? "bg-amber-500"
+                    : "bg-zinc-400"
+                }`}
+                style={{ width: `${ltvScore}%` }}
+              />
             </div>
           </div>
         </div>
