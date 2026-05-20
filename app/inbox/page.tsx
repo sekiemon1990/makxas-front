@@ -25,6 +25,7 @@ type InboxPageProps = {
     id?: string | string[];
     page?: string | string[];
     assignee?: string | string[];
+    q?: string | string[]; // PR17: サーバーサイド検索クエリ
   }>;
 };
 
@@ -36,6 +37,8 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
   const requestedId = firstValue(params.id);
   const page = Math.max(1, parseInt(firstValue(params.page) ?? "1", 10) || 1);
   const assigneeFilter = firstValue(params.assignee) === "mine" ? "mine" : "all";
+  // PR17: サーバーサイド検索（subject + lead display_name / phone / email を OR）
+  const searchQuery = (firstValue(params.q) ?? "").trim();
   const authClient = await createClient();
   const {
     data: { user },
@@ -111,6 +114,36 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
     inquiryQuery = inquiryQuery.eq("assigned_to", currentStaff.id);
   }
 
+  // PR17: 検索クエリ — subject の前方一致 + lead 系（電話/メール/氏名）の一致リードIDを ORで結合
+  if (searchQuery) {
+    // 数字のみ抽出した電話バリエーション（ハイフン省略・全角→半角）
+    const phoneDigits = searchQuery.replace(/[０-９]/g, (c) =>
+      String.fromCharCode(c.charCodeAt(0) - 0xfee0),
+    ).replace(/[^0-9]/g, "");
+    const orParts: string[] = [];
+    if (searchQuery) orParts.push(`display_name.ilike.%${searchQuery}%`);
+    if (searchQuery.includes("@") || searchQuery.length >= 3) {
+      orParts.push(`email.ilike.%${searchQuery}%`);
+    }
+    if (phoneDigits.length >= 4) {
+      orParts.push(`phone.ilike.%${phoneDigits}%`);
+    }
+    const { data: matchedLeads } = await supabase
+      .from("leads")
+      .select("id")
+      .or(orParts.join(","))
+      .limit(500);
+    const leadIds = (matchedLeads ?? []).map((l) => l.id);
+    // subject 一致 OR lead 一致
+    if (leadIds.length > 0) {
+      inquiryQuery = inquiryQuery.or(
+        `subject.ilike.%${searchQuery}%,lead_id.in.(${leadIds.join(",")})`,
+      );
+    } else {
+      inquiryQuery = inquiryQuery.ilike("subject", `%${searchQuery}%`);
+    }
+  }
+
   if (store !== "all") {
     inquiryQuery = inquiryQuery.eq("store_id", store);
   } else if (!canUseAllStores) {
@@ -157,7 +190,7 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
   return (
     <AppShell>
       <RealtimeInbox
-        key={`${status}:${channel}:${store}:${assigneeFilter}:${page}:${selectedId ?? ""}`}
+        key={`${status}:${channel}:${store}:${assigneeFilter}:${page}:${searchQuery}:${selectedId ?? ""}`}
         canUseAllStores={canUseAllStores}
         currentStaffId={currentStaff?.id ?? null}
         hasMore={hasMore}
@@ -167,6 +200,7 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
         initialMessages={(messageRows ?? []) as Message[]}
         initialReadIds={[...readInquiryIds]}
         initialSelectedId={selectedId ?? null}
+        initialSearch={searchQuery}
         initialStatus={status}
         initialStore={store}
         page={page}

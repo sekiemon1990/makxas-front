@@ -116,6 +116,7 @@ export function RealtimeInbox({
   initialMessages,
   initialReadIds,
   initialSelectedId,
+  initialSearch,
   initialStatus,
   initialStore,
   page,
@@ -132,6 +133,7 @@ export function RealtimeInbox({
   initialMessages: Message[];
   initialReadIds: string[];
   initialSelectedId: string | null;
+  initialSearch?: string;
   initialStatus: StatusFilter;
   initialStore: StoreFilter;
   page: number;
@@ -157,7 +159,24 @@ export function RealtimeInbox({
   const [noteSaving, setNoteSaving] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<"sidebar" | "list" | "detail">("list");
   const [readIds, setReadIds] = useState<Set<string>>(new Set(initialReadIds));
-  const [searchQuery, setSearchQuery] = useState("");
+  // PR17: 初期値をサーバーから受け取ってサーバーサイド検索と同期
+  const [searchQuery, setSearchQuery] = useState(initialSearch ?? "");
+  // 500ms 入力停止後にサーバー検索（URLパラメータ q を更新）
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      const trimmed = searchQuery.trim();
+      const currentQ = (searchParams?.get("q") ?? "").trim();
+      if (trimmed === currentQ) return;
+      const params = new URLSearchParams(searchParams?.toString() ?? "");
+      if (trimmed) params.set("q", trimmed);
+      else params.delete("q");
+      params.delete("page"); // 検索時はページリセット
+      params.delete("id");
+      router.replace(`${pathname}?${params.toString()}`);
+    }, 500);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkApplying, setBulkApplying] = useState(false);
   const [templates, setTemplates] = useState<ReplyTemplate[]>([]);
