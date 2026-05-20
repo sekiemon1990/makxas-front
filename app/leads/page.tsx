@@ -9,6 +9,7 @@ import { ChannelBadge } from "@/components/badges";
 import { cn } from "@/lib/utils";
 import { formatCount } from "@/lib/design-tokens";
 import { channelMeta } from "@/lib/inquiry-options";
+import { ErrorState } from "@/components/ErrorState";
 import type { InquiryChannel } from "@/types/database";
 
 type LeadRow = {
@@ -59,22 +60,31 @@ export default function LeadsPage() {
   const [apptFilter, setApptFilter] = useState<"all" | "yes" | "no">("all");
   const [sortBy, setSortBy] = useState<SortKey>("created_at");
   const [showFilters, setShowFilters] = useState(false);
+  // UI/UXレビュー D2: エラー状態を可視化
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   // Date.now() はマウント時に一度だけ評価（最終接触の経過日数計算用）
   // eslint-disable-next-line react-hooks/purity
   const nowMs = useMemo(() => Date.now(), []);
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/leads/list").then((r) => r.json()),
-    ])
-      .then(([d]: [{ leads?: LeadRow[]; inquiries?: InquirySummary[]; appointments?: AppointmentSummary[] }]) => {
+    setError(null);
+    setLoading(true);
+    fetch("/api/leads/list")
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((d: { leads?: LeadRow[]; inquiries?: InquirySummary[]; appointments?: AppointmentSummary[] }) => {
         setLeads(d.leads ?? []);
         setInquiries(d.inquiries ?? []);
         setAppointments(d.appointments ?? []);
       })
-      .catch(() => {})
+      .catch((e: Error) => {
+        setError(e.message ?? "通信エラー");
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [reloadKey]);
 
   const countMap = useMemo(() => {
     const map = new Map<string, { total: number; channels: string[]; lastContact: string | null }>();
@@ -298,6 +308,18 @@ export default function LeadsPage() {
             </div>
           </div>
         )}
+
+        {/* UI/UXレビュー D2: エラー時は専用UIを表示 */}
+        {error && !loading ? (
+          <div className="mt-6">
+            <ErrorState
+              message="リード一覧の読み込みに失敗しました"
+              detail={error}
+              onRetry={() => setReloadKey((k) => k + 1)}
+              retrying={loading}
+            />
+          </div>
+        ) : null}
 
         {/* テーブル */}
         <div className="mt-6 overflow-hidden rounded-xl border border-zinc-200 bg-white">
