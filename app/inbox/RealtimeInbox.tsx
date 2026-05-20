@@ -1366,6 +1366,31 @@ export function RealtimeInbox({
                         ))}
                       </SelectContent>
                     </Select>
+                    {/* PR24: AI即時架電（Phase 4） */}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0 h-8 border-violet-300 text-violet-700 hover:bg-violet-50"
+                      title="AIが即時電話で対応・追加買取候補も自然に聞き出します（Phase 4）"
+                      onClick={async () => {
+                        if (!selectedInquiry) return;
+                        if (!confirm("AI即時架電をキューに登録しますか？\n(makxas-phone が後段で発信処理を行います)")) return;
+                        const res = await fetch("/api/ai-call/queue", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ inquiry_id: selectedInquiry.id }),
+                        });
+                        const d = (await res.json()) as { queueItem?: { id: string; status: string }; duplicated?: boolean; error?: string };
+                        if (d.error) {
+                          alert(`AI架電キュー登録失敗: ${d.error}`);
+                          return;
+                        }
+                        alert(d.duplicated ? "既に同じ反響のキューが登録済みです" : "AI即時架電キューに登録しました");
+                      }}
+                    >
+                      <Sparkles className="size-3.5" aria-hidden="true" />
+                      AI架電
+                    </Button>
                     <Button size="sm" className="shrink-0 h-8" onClick={() => setAppointmentOpen(true)}>
                       <CalendarPlus className="size-3.5" aria-hidden="true" />
                       アポ設定
