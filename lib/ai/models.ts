@@ -13,7 +13,8 @@ export type AiCategory =
   | "analyze-edit" // 修正理由ラベル生成 (Haiku)
   | "learning" // AI 学習パイプライン (Sonnet)
   | "auto-tag" // PR22: 反響自動タグ付与 (Haiku)
-  | "inquiry-priority"; // 反響優先度判定 (Haiku)
+  | "inquiry-priority" // 反響優先度判定 (Haiku)
+  | "next-questions"; // PR29: 顧客の次の質問予測 (Haiku)
 
 /** Anthropic モデル ID */
 export type ModelId =
@@ -30,6 +31,7 @@ const MODEL_BY_CATEGORY: Record<AiCategory, ModelId> = {
   learning: "claude-sonnet-4-6",
   "auto-tag": "claude-haiku-4-5-20251001",
   "inquiry-priority": "claude-haiku-4-5-20251001",
+  "next-questions": "claude-haiku-4-5-20251001",
 };
 
 /** カテゴリに応じた推奨モデルを返す */
@@ -59,6 +61,7 @@ export const CATEGORY_LABELS: Record<AiCategory, string> = {
   learning: "プロンプト学習",
   "auto-tag": "反響自動タグ付与",
   "inquiry-priority": "反響優先度判定",
+  "next-questions": "次の質問予測",
 };
 
 /** UI で列挙する場合に使うカテゴリ一覧 */
@@ -70,4 +73,5 @@ export const AI_CATEGORIES: AiCategory[] = [
   "learning",
   "auto-tag",
   "inquiry-priority",
+  "next-questions",
 ];
