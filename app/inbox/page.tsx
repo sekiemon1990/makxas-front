@@ -36,7 +36,14 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
   const requestedStore = firstValue(params.store);
   const requestedId = firstValue(params.id);
   const page = Math.max(1, parseInt(firstValue(params.page) ?? "1", 10) || 1);
-  const assigneeFilter = firstValue(params.assignee) === "mine" ? "mine" : "all";
+  // PR20: assignee に "mentioned" を追加（自分が @メンション された反響）
+  const rawAssignee = firstValue(params.assignee);
+  const assigneeFilter: "all" | "mine" | "mentioned" =
+    rawAssignee === "mine"
+      ? "mine"
+      : rawAssignee === "mentioned"
+      ? "mentioned"
+      : "all";
   // PR17: サーバーサイド検索（subject + lead display_name / phone / email を OR）
   const searchQuery = (firstValue(params.q) ?? "").trim();
   const authClient = await createClient();
@@ -112,6 +119,18 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
 
   if (assigneeFilter === "mine" && currentStaff) {
     inquiryQuery = inquiryQuery.eq("assigned_to", currentStaff.id);
+  } else if (assigneeFilter === "mentioned" && currentStaff) {
+    // PR20: internal_note に @自分の名前 を含む反響を抽出
+    // 名前に半角スペースを含む場合の両形式 + LIKE のエスケープ
+    const escName = currentStaff.name.replace(/[%_]/g, (c) => `\\${c}`);
+    const escNoSpace = escName.replace(/\s+/g, "");
+    if (escNoSpace !== escName) {
+      inquiryQuery = inquiryQuery.or(
+        `internal_note.ilike.%@${escName}%,internal_note.ilike.%@${escNoSpace}%`,
+      );
+    } else {
+      inquiryQuery = inquiryQuery.ilike("internal_note", `%@${escName}%`);
+    }
   }
 
   // PR17: 検索クエリ — subject の前方一致 + lead 系（電話/メール/氏名）の一致リードIDを ORで結合
