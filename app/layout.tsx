@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { KeyboardShortcutsHelp } from "@/components/KeyboardShortcutsHelp";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 
 export const metadata: Metadata = {
   title: "makxas-front",
@@ -32,6 +33,7 @@ export default function RootLayout({
         <ThemeProvider>
           {children}
           <KeyboardShortcutsHelp />
+          <PwaInstallPrompt />
         </ThemeProvider>
       </body>
     </html>
