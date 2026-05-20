@@ -221,6 +221,47 @@ export default async function DashboardPage() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
 
+  // --- スタッフ別レバー2スコア（PR26: 追加買取貢献度ランキング） ---
+  // MAKXAS思想: レバー2（追加買取）こそ最重要指標。スタッフごとの貢献度を可視化する。
+  type StaffLever2Stats = {
+    name: string;
+    apptCount: number;
+    additionalChecked: number;
+    highValueCount: number;
+    totalChecks: number;
+  };
+  const staffLever2Map: Record<string, StaffLever2Stats> = {};
+  for (const a of appts) {
+    const name = a.staff?.name ?? "未割当";
+    if (!staffLever2Map[name]) {
+      staffLever2Map[name] = { name, apptCount: 0, additionalChecked: 0, highValueCount: 0, totalChecks: 0 };
+    }
+    const s = staffLever2Map[name];
+    s.apptCount++;
+    if (a.item_category && HIGH_VALUE_CATEGORIES.has(a.item_category)) s.highValueCount++;
+    const conf = a.additional_items_confirmed;
+    if (conf && typeof conf === "object") {
+      const checkedCount = Object.values(conf).filter((v) => v === true).length;
+      if (checkedCount > 0) {
+        s.additionalChecked++;
+        s.totalChecks += checkedCount;
+      }
+    }
+  }
+  const staffLever2Ranking = Object.values(staffLever2Map)
+    .filter((s) => s.apptCount > 0)
+    .map((s) => ({
+      ...s,
+      additionalRate: Math.round((s.additionalChecked / s.apptCount) * 100),
+      highValueRate: Math.round((s.highValueCount / s.apptCount) * 100),
+      avgChecks: s.additionalChecked > 0 ? (s.totalChecks / s.additionalChecked).toFixed(1) : "0",
+      // レバー2総合スコア: 追加品確認率×50% + 高単価カテゴリ率×50%
+      lever2Score: Math.round(
+        (s.additionalChecked / s.apptCount) * 50 + (s.highValueCount / s.apptCount) * 50,
+      ),
+    }))
+    .sort((a, b) => b.lever2Score - a.lever2Score);
+
   // 品目カテゴリ別ランキング
   const categoryMap: Record<string, number> = {};
   for (const a of appts) {
@@ -895,6 +936,82 @@ export default async function DashboardPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* === スタッフ別レバー2貢献度ランキング (PR26) === */}
+          {staffLever2Ranking.length > 0 ? (
+            <div className="mt-6">
+              <Card className="rounded-lg border-amber-200 bg-white shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-1.5">
+                    <span className="text-base">🏆</span>
+                    スタッフ別レバー2貢献度
+                  </CardTitle>
+                  <CardDescription>
+                    {monthLabel}：追加品確認率 × 50% + 高単価カテゴリ率 × 50% で算出（MAKXAS思想：レバー2教育観点）
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-zinc-200 text-left text-xs text-zinc-500">
+                          <th className="py-2 pr-3 font-medium">順位</th>
+                          <th className="py-2 pr-3 font-medium">スタッフ</th>
+                          <th className="py-2 pr-3 text-right font-medium">アポ数</th>
+                          <th className="py-2 pr-3 text-right font-medium">追加品確認率</th>
+                          <th className="py-2 pr-3 text-right font-medium">高単価カテゴリ率</th>
+                          <th className="py-2 pr-3 text-right font-medium">平均確認数</th>
+                          <th className="py-2 pr-3 text-right font-medium">レバー2スコア</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {staffLever2Ranking.map((s, i) => {
+                          const rankEmoji = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}`;
+                          const scoreColor =
+                            s.lever2Score >= 60 ? "bg-emerald-500 text-white"
+                            : s.lever2Score >= 40 ? "bg-amber-500 text-white"
+                            : s.lever2Score >= 20 ? "bg-orange-400 text-white"
+                            : "bg-zinc-300 text-zinc-700";
+                          return (
+                            <tr key={s.name} className="border-b border-zinc-100 last:border-0">
+                              <td className="py-2.5 pr-3 text-base">{rankEmoji}</td>
+                              <td className="py-2.5 pr-3 font-medium text-zinc-800">{s.name}</td>
+                              <td className="py-2.5 pr-3 text-right tabular-nums text-zinc-600">{s.apptCount}</td>
+                              <td className="py-2.5 pr-3 text-right tabular-nums">
+                                <div className="flex items-center justify-end gap-2">
+                                  <div className="h-1.5 w-16 rounded-full bg-zinc-100">
+                                    <div className="h-1.5 rounded-full bg-amber-500" style={{ width: `${s.additionalRate}%` }} />
+                                  </div>
+                                  <span className="w-10 text-zinc-700">{s.additionalRate}%</span>
+                                </div>
+                              </td>
+                              <td className="py-2.5 pr-3 text-right tabular-nums">
+                                <div className="flex items-center justify-end gap-2">
+                                  <div className="h-1.5 w-16 rounded-full bg-zinc-100">
+                                    <div className="h-1.5 rounded-full bg-rose-500" style={{ width: `${s.highValueRate}%` }} />
+                                  </div>
+                                  <span className="w-10 text-zinc-700">{s.highValueRate}%</span>
+                                </div>
+                              </td>
+                              <td className="py-2.5 pr-3 text-right tabular-nums text-zinc-600">{s.avgChecks}</td>
+                              <td className="py-2.5 pr-3 text-right">
+                                <span className={cn("inline-block min-w-[44px] rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums", scoreColor)}>
+                                  {s.lever2Score}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="mt-3 text-[10px] text-zinc-400">
+                    ※ スコアは追加品確認率と高単価カテゴリ率の加重平均。教育観点でレバー2の切り出しを行えているかを定量化。
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
 
           {/* チャネル別アポ率（今月） */}
           {Object.keys(channelApptRate).length > 0 ? (
