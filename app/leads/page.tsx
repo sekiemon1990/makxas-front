@@ -63,6 +63,15 @@ export default function LeadsPage() {
   // UI/UXレビュー D2: エラー状態を可視化
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  // リード重複検出（PR16）
+  type DupGroup = {
+    key: string;
+    matchType: "phone" | "email" | "line";
+    matchValue: string;
+    leads: { id: string; display_name: string | null; phone: string | null; email: string | null; first_channel: string | null; created_at: string }[];
+  };
+  const [duplicateGroups, setDuplicateGroups] = useState<DupGroup[]>([]);
+  const [showDuplicates, setShowDuplicates] = useState(false);
   // Date.now() はマウント時に一度だけ評価（最終接触の経過日数計算用）
   // eslint-disable-next-line react-hooks/purity
   const nowMs = useMemo(() => Date.now(), []);
@@ -82,6 +91,12 @@ export default function LeadsPage() {
       })
       .catch((e: Error) => {
         setError(e.message ?? "通信エラー");
+      });
+    // 重複検出 — 並行で取得
+    fetch("/api/leads/duplicates")
+      .then((r) => (r.ok ? r.json() : { groups: [] }))
+      .then((d: { groups?: DupGroup[] }) => setDuplicateGroups(d.groups ?? []))
+      .catch(() => {
       })
       .finally(() => setLoading(false));
   }, [reloadKey]);
@@ -309,6 +324,52 @@ export default function LeadsPage() {
             </div>
           </div>
         )}
+
+        {/* PR16: リード重複検出 — 検出時のみバナー表示 */}
+        {duplicateGroups.length > 0 ? (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm text-amber-900">
+                ⚠️ <strong>{duplicateGroups.length} 件</strong>の重複リードが検出されました（同一電話 / メール / LINE）
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowDuplicates((v) => !v)}
+                className="rounded-md border border-amber-300 bg-white px-3 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100"
+              >
+                {showDuplicates ? "閉じる" : "詳細を表示"}
+              </button>
+            </div>
+            {showDuplicates && (
+              <div className="mt-3 space-y-2">
+                {duplicateGroups.map((g) => (
+                  <div key={g.key} className="rounded-md border border-amber-200 bg-white p-2.5 text-xs">
+                    <p className="mb-1.5 text-amber-700">
+                      <strong>
+                        {g.matchType === "phone" ? "📞 電話" : g.matchType === "email" ? "✉️ メール" : "💬 LINE"}
+                      </strong>{" "}
+                      一致: <code className="rounded bg-amber-100 px-1.5 py-0.5">{g.matchValue}</code>
+                    </p>
+                    <div className="flex flex-col gap-1">
+                      {g.leads.map((l) => (
+                        <Link
+                          key={l.id}
+                          href={`/leads/${l.id}`}
+                          className="flex items-center justify-between gap-2 rounded px-2 py-1 hover:bg-amber-50"
+                        >
+                          <span className="font-medium text-zinc-800">{l.display_name ?? "(名前なし)"}</span>
+                          <span className="text-zinc-500">
+                            {l.first_channel ?? "—"} ／ {new Date(l.created_at).toLocaleDateString("ja-JP")}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
 
         {/* UI/UXレビュー D2: エラー時は専用UIを表示 */}
         {error && !loading ? (
