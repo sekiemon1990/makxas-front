@@ -2131,6 +2131,39 @@ export function RealtimeInbox({
                       AI原案
                     </Button>
                   ) : null}
+                  {/* PR30: スタッフ別パーソナライズAI返信 */}
+                  {currentStaffId && selectedInquiry ? (
+                    <Button
+                      aria-label="自分の文体でAI返信案を生成"
+                      className="h-8 gap-1 border-rose-300 bg-rose-50 px-2.5 text-xs text-rose-700 hover:bg-rose-100"
+                      size="sm"
+                      title="過去の自分の返信履歴を文体サンプルとして本人らしい返信案を生成"
+                      type="button"
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          const r = await fetch("/api/ai/personalized-suggest", {
+                            method: "POST",
+                            headers: { "content-type": "application/json" },
+                            body: JSON.stringify({ inquiry_id: selectedInquiry.id, staff_id: currentStaffId }),
+                          });
+                          const d = await r.json();
+                          if (!r.ok || !d.body) {
+                            setToast({ title: "パーソナライズ失敗", description: d.error ?? "返信生成に失敗しました" });
+                            return;
+                          }
+                          setReplyBody(d.body);
+                          setAiOriginalBody(d.body);
+                          setToast({ title: "私の文体で生成しました", description: `過去サンプル ${d.samples_used} 件参照` });
+                        } catch (e) {
+                          setToast({ title: "パーソナライズ失敗", description: e instanceof Error ? e.message : "" });
+                        }
+                      }}
+                    >
+                      <Sparkles className="size-3.5" />
+                      私の文体
+                    </Button>
+                  ) : null}
                   <div className="flex-1" />
                   {imageFiles.length > 0 ? (
                     <Button className="h-8 gap-1 text-xs" disabled={sendingImages} onClick={handleSendImages} size="sm" type="button" variant="outline">
