@@ -9,6 +9,7 @@ import {
   Hash,
 } from "lucide-react";
 import { LeadContactsPanel } from "@/components/leads/LeadContactsPanel";
+import { LtvPredictionPanel } from "@/components/leads/LtvPredictionPanel";
 
 import { AppShell } from "@/components/app-shell";
 import { ChannelBadge, StatusBadge } from "@/components/badges";
@@ -355,6 +356,9 @@ export default async function LeadDetailPage({
               />
             </div>
           </div>
+
+          {/* PR32: LTV予測（AI） */}
+          <LtvPredictionPanel leadId={lead.id} />
         </div>
 
         {/* ── 査定商品履歴 ──────────────────────────────────────────────────── */}
