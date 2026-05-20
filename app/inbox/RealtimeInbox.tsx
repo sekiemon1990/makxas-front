@@ -47,7 +47,7 @@ import {
   statusFilters,
 } from "@/lib/inquiry-options";
 import { createClient } from "@/lib/supabase/client";
-import { formatUnansweredBadge } from "@/lib/design-tokens";
+import { formatUnansweredBadge, TAG_STYLE } from "@/lib/design-tokens";
 import { cn } from "@/lib/utils";
 import type {
   Inquiry,
@@ -1482,13 +1482,14 @@ export function RealtimeInbox({
                 <div className="flex items-center gap-2 flex-wrap border-b border-zinc-100 pb-2">
                   <Tag className="size-3 text-zinc-400 shrink-0" aria-hidden="true" />
                   <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
+                    {/* UI/UXレビュー C5: TAG_STYLE で全画面統一（インボックスはX削除ボタン付き） */}
                     {(selectedInquiry.inquiry_tags ?? []).map((tag) => (
-                      <Badge key={tag.tag} variant="outline" className="rounded-md bg-white pr-1 text-xs">
+                      <span key={tag.tag} className={cn(TAG_STYLE, "pr-1")}>
                         {tag.tag}
-                        <button className="ml-1 rounded hover:text-red-500" onClick={() => handleRemoveTag(tag.tag)} type="button">
+                        <button className="ml-1 rounded hover:text-red-500" onClick={() => handleRemoveTag(tag.tag)} type="button" aria-label={`タグ「${tag.tag}」を削除`} title="タグを削除">
                           <X className="size-2.5" />
                         </button>
-                      </Badge>
+                      </span>
                     ))}
                     <div className="relative">
                       <input
