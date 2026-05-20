@@ -77,11 +77,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // appointments.status を更新
+  // appointments.status と core 結果データを更新
   const newApptStatus = body.result === "won" ? "completed" : "cancelled";
-  await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase as any)
     .from("appointments")
-    .update({ status: newApptStatus })
+    .update({
+      status: newApptStatus,
+      core_result_amount: body.amount ?? null,
+      core_result_memo: body.memo ?? null,
+      core_result_received_at: new Date().toISOString(),
+    })
     .eq("id", appt.id);
 
   // inquiries.status を更新
