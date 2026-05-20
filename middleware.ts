@@ -6,6 +6,8 @@ import type { Database } from "@/types/database";
 const PUBLIC_PREFIXES = [
   "/login",
   "/inquiry",
+  "/appointment", // PR37: 顧客向けアポ照会（トークン認証で別途保護）
+  "/api/public", // PR37: 顧客向け公開API
   "/auth/callback",
   "/api/auth/google",
   "/api/webhooks",
