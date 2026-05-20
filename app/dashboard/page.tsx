@@ -136,6 +136,35 @@ export default async function DashboardPage() {
       .neq("status", "cancelled"),
   ]);
 
+  // PR27: ファネル分析用データ取得
+  const [
+    { count: thisMonthLeadCount },
+    { count: thisMonthCompletedApptCount },
+    { count: thisMonthLostCount },
+    { count: thisMonthTransferredCount },
+  ] = await Promise.all([
+    supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", monthStart.toISOString()),
+    supabase
+      .from("appointments")
+      .select("id", { count: "exact", head: true })
+      .gte("scheduled_at", monthStart.toISOString())
+      .lt("scheduled_at", monthEnd.toISOString())
+      .eq("status", "completed"),
+    supabase
+      .from("inquiries")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", monthStart.toISOString())
+      .eq("status", "lost"),
+    supabase
+      .from("inquiries")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", monthStart.toISOString())
+      .eq("status", "transferred"),
+  ]);
+
   // 今月のシフトデータ（生産性計算用）
   type ShiftRow = Shift & { staff?: { id: string; name: string } | null };
   let monthlyShifts: ShiftRow[] = [];
@@ -1012,6 +1041,107 @@ export default async function DashboardPage() {
               </Card>
             </div>
           ) : null}
+
+          {/* === PR27: リード→アポ→契約ファネル分析 === */}
+          {(() => {
+            const leadsN = thisMonthLeadCount ?? 0;
+            const inqN = monthlyInquiries.length;
+            const apptN = thisMonthApptCount;
+            const transferN = thisMonthTransferredCount ?? 0;
+            const completedN = thisMonthCompletedApptCount ?? 0;
+            const lostN = thisMonthLostCount ?? 0;
+            const maxN = Math.max(leadsN, inqN, apptN, transferN, completedN, 1);
+            const stages = [
+              { label: "リード作成", value: leadsN, color: "bg-zinc-400", desc: "新規発生したリード" },
+              { label: "反響", value: inqN, color: "bg-sky-500", desc: "問い合わせ" },
+              { label: "アポ確定", value: apptN, color: "bg-amber-500", desc: "予約が入った" },
+              { label: "コア引継", value: transferN, color: "bg-violet-500", desc: "FS へ引き継ぎ済" },
+              { label: "成約", value: completedN, color: "bg-emerald-500", desc: "査定完了" },
+            ];
+            return (
+              <div className="mt-6">
+                <Card className="rounded-lg border-zinc-200 bg-white shadow-sm">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-1.5">
+                      <span className="text-base">📊</span>
+                      ファネル分析（リード→成約）
+                    </CardTitle>
+                    <CardDescription>
+                      {monthLabel}：各ステージの件数とコンバージョン率（失注 {lostN} 件）
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {stages.map((stage, i) => {
+                        const widthPct = Math.round((stage.value / maxN) * 100);
+                        const prev = i > 0 ? stages[i - 1] : null;
+                        const cvr = prev && prev.value > 0
+                          ? Math.round((stage.value / prev.value) * 100)
+                          : null;
+                        return (
+                          <div key={stage.label} className="space-y-1.5">
+                            <div className="flex items-baseline justify-between text-sm">
+                              <span className="font-medium text-zinc-700">
+                                {stage.label}
+                                <span className="ml-2 text-xs font-normal text-zinc-400">{stage.desc}</span>
+                              </span>
+                              <span className="tabular-nums text-zinc-700">
+                                {stage.value} 件
+                                {cvr !== null ? (
+                                  <span className={cn(
+                                    "ml-2 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                                    cvr >= 50 ? "bg-emerald-100 text-emerald-700"
+                                    : cvr >= 25 ? "bg-amber-100 text-amber-700"
+                                    : "bg-rose-100 text-rose-700",
+                                  )}>
+                                    前段比 {cvr}%
+                                  </span>
+                                ) : null}
+                              </span>
+                            </div>
+                            <div className="h-3 w-full rounded-full bg-zinc-100">
+                              <div
+                                className={cn("h-3 rounded-full transition-all", stage.color)}
+                                style={{ width: `${Math.max(widthPct, 2)}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {leadsN > 0 ? (
+                      <div className="mt-4 grid grid-cols-2 gap-3 border-t border-zinc-100 pt-4 md:grid-cols-4">
+                        <div>
+                          <p className="text-xs text-zinc-500">反響→アポ率</p>
+                          <p className="text-lg font-semibold text-zinc-800 tabular-nums">
+                            {inqN > 0 ? Math.round((apptN / inqN) * 100) : 0}%
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-zinc-500">アポ→成約率</p>
+                          <p className="text-lg font-semibold text-zinc-800 tabular-nums">
+                            {apptN > 0 ? Math.round((completedN / apptN) * 100) : 0}%
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-zinc-500">リード→成約率</p>
+                          <p className="text-lg font-semibold text-emerald-700 tabular-nums">
+                            {leadsN > 0 ? Math.round((completedN / leadsN) * 100) : 0}%
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-zinc-500">失注率</p>
+                          <p className="text-lg font-semibold text-rose-600 tabular-nums">
+                            {inqN > 0 ? Math.round((lostN / inqN) * 100) : 0}%
+                          </p>
+                        </div>
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              </div>
+            );
+          })()}
 
           {/* チャネル別アポ率（今月） */}
           {Object.keys(channelApptRate).length > 0 ? (
