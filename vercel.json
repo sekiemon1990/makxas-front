@@ -23,6 +23,10 @@
     {
       "path": "/api/cron/email-poll",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/db-backup",
+      "schedule": "0 18 * * *"
     }
   ]
 }
