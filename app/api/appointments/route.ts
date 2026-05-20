@@ -1,8 +1,12 @@
-import * as line from "@line/bot-sdk";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { syncAppointmentToCore } from "@/lib/core/sync";
 import { createClient } from "@/lib/supabase/server";
+import {
+  buildAppointmentConfirmation,
+  sendMultiChannel,
+  type NotificationChannel,
+} from "@/lib/notifications/multi-channel";
 import type { Appointment, InquiryWithLead } from "@/types/database";
 
 export const runtime = "nodejs";
@@ -16,6 +20,8 @@ export async function POST(request: NextRequest) {
     address?: string;
     preferred_method?: "visit" | "delivery";
     staff_id?: string | null;
+    /** PR18: アポ確認メッセージ送信チャネル。省略時は元の "line" のみ（後方互換） */
+    confirmation_channels?: NotificationChannel[];
   } | null;
 
   if (!body?.inquiry_id || !body.scheduled_at) {
@@ -47,7 +53,7 @@ export async function POST(request: NextRequest) {
   const { data: inquiry, error: inquiryError } = await supabase
     .from("inquiries")
     .select(
-      "*, leads(*), staff:assigned_to(id,name,email), inquiry_tags(tag), line_accounts(channel_access_token)",
+      "*, leads(*), staff:assigned_to(id,name,email), inquiry_tags(tag), line_accounts(channel_access_token), brands(name)",
     )
     .eq("id", body.inquiry_id)
     .single();
@@ -101,39 +107,53 @@ export async function POST(request: NextRequest) {
     inquiry: (updatedInquiry as unknown as InquiryWithLead | null) ?? inquiryWithLead,
   });
 
-  // LINE チャンネルの場合はアポ確認メッセージを自動送信
-  if (inquiryWithLead.channel === "line") {
-    const lineUserId = (
-      inquiryWithLead.leads as { line_user_id: string | null } | null
-    )?.line_user_id;
-    const lineAccount = (inquiry as unknown as { line_accounts?: { channel_access_token?: string | null } | null }).line_accounts;
-    const channelAccessToken =
-      lineAccount?.channel_access_token ?? process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  // PR18: アポ確認メッセージ送信（マルチチャネル）
+  // confirmation_channels が指定された場合のみ送信。後方互換で省略時は元LINEチャンネルのみ自動送信
+  const channels: NotificationChannel[] =
+    body.confirmation_channels && body.confirmation_channels.length > 0
+      ? body.confirmation_channels
+      : inquiryWithLead.channel === "line"
+      ? ["line"]
+      : [];
 
-    if (lineUserId && channelAccessToken) {
-      const scheduledDate = new Date(body.scheduled_at);
-      const dateStr = new Intl.DateTimeFormat("ja-JP", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        weekday: "short",
-      }).format(scheduledDate);
-      const methodLabel =
-        body.preferred_method === "delivery" ? "宅配査定" : "訪問査定";
-      const confirmMsg = `【査定予約確定のご連絡】\n\n査定のご予約を承りました。\n\n▼査定日時\n${dateStr}\n\n▼方法\n${methodLabel}\n\n当日はよろしくお願いいたします。ご不明な点がございましたらお気軽にご連絡ください。`;
+  const sendResults: Awaited<ReturnType<typeof sendMultiChannel>> = [];
+  if (channels.length > 0) {
+    const lead = inquiryWithLead.leads as {
+      display_name: string | null;
+      line_user_id: string | null;
+      email: string | null;
+      phone: string | null;
+    } | null;
+    const lineAccount = (
+      inquiry as unknown as {
+        line_accounts?: { channel_access_token?: string | null } | null;
+      }
+    ).line_accounts;
+    const brand = (
+      inquiry as unknown as { brands?: { name?: string | null } | null }
+    ).brands;
+    const confirmMsg = buildAppointmentConfirmation({
+      customerName: lead?.display_name,
+      brandName: brand?.name,
+      scheduledAt: body.scheduled_at,
+      itemCategory: body.item_category,
+      address: body.address,
+      preferredMethod: body.preferred_method,
+    });
 
-      try {
-        const client = new line.messagingApi.MessagingApiClient({
-          channelAccessToken,
-        });
-        await client.pushMessage({
-          to: lineUserId,
-          messages: [{ type: "text", text: confirmMsg }],
-        });
-      } catch (lineError) {
-        console.error("LINE appointment confirmation failed:", lineError);
+    const results = await sendMultiChannel(confirmMsg, channels, {
+      lineUserId: lead?.line_user_id ?? null,
+      lineChannelAccessToken: lineAccount?.channel_access_token ?? null,
+      email: lead?.email ?? null,
+      phone: lead?.phone ?? null,
+      emailFrom: brand?.name ? `${brand.name} <noreply@makxas.com>` : undefined,
+      emailSubject: "ご予約のご確認",
+    });
+    sendResults.push(...results);
+    // 失敗時のログ
+    for (const r of results) {
+      if (!r.ok) {
+        console.error(`Confirmation send failed (${r.channel}):`, r.error, r.detail);
       }
     }
   }
@@ -141,5 +161,6 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     appointment: appointment as Appointment,
     inquiry: updatedInquiry as unknown as InquiryWithLead,
+    confirmationResults: sendResults,
   });
 }
