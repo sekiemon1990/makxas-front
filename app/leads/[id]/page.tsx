@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { LeadContactsPanel } from "@/components/leads/LeadContactsPanel";
 import { LtvPredictionPanel } from "@/components/leads/LtvPredictionPanel";
+import { CrossBrandLtvPanel } from "@/components/leads/CrossBrandLtvPanel";
 
 import { AppShell } from "@/components/app-shell";
 import { ChannelBadge, StatusBadge } from "@/components/badges";
@@ -356,6 +357,9 @@ export default async function LeadDetailPage({
               />
             </div>
           </div>
+
+          {/* PR40: マルチブランド横断LTV */}
+          <CrossBrandLtvPanel leadId={lead.id} />
 
           {/* PR32: LTV予測（AI） */}
           <LtvPredictionPanel leadId={lead.id} />
