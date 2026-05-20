@@ -1537,6 +1537,39 @@ export function RealtimeInbox({
                         </button>
                       </span>
                     ))}
+                    {/* PR22: AI自動タグ付与ボタン */}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!selectedInquiry) return;
+                        const res = await fetch("/api/ai/auto-tag", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ inquiry_id: selectedInquiry.id }),
+                        });
+                        const d = (await res.json()) as { added_tags?: string[]; error?: string };
+                        if (d.added_tags && d.added_tags.length > 0) {
+                          setItems((prev) =>
+                            prev.map((it): InquiryWithLead =>
+                              it.id === selectedInquiry.id
+                                ? ({
+                                    ...it,
+                                    inquiry_tags: [
+                                      ...(it.inquiry_tags ?? []),
+                                      ...d.added_tags!.map((t) => ({ tag: t })),
+                                    ],
+                                  } as InquiryWithLead)
+                                : it,
+                            ),
+                          );
+                        }
+                      }}
+                      className="inline-flex items-center gap-1 rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-xs text-violet-700 hover:bg-violet-100"
+                      title="AIが会話を読んでタグを自動付与します"
+                    >
+                      <Sparkles className="size-2.5" />
+                      AI自動タグ
+                    </button>
                     <div className="relative">
                       <input
                         ref={tagInputRef}
