@@ -315,7 +315,19 @@ export default function AppointmentsPage() {
 
         <div className="flex-1 overflow-y-auto p-8">
           {loading ? (
-            <div className="flex h-40 items-center justify-center text-sm text-zinc-500">読み込み中...</div>
+            // UI/UXレビュー D1: スケルトンUI
+            <div className="space-y-2" aria-label="読み込み中">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white p-4">
+                  <div className="h-10 w-10 animate-pulse rounded-full bg-zinc-100" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-32 animate-pulse rounded bg-zinc-100" />
+                    <div className="h-3 w-48 animate-pulse rounded bg-zinc-100" />
+                  </div>
+                  <div className="h-6 w-16 animate-pulse rounded bg-zinc-100" />
+                </div>
+              ))}
+            </div>
           ) : filteredAppointments.length === 0 ? (
             <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-zinc-300 text-sm text-zinc-500">
               {activeFilterCount > 0 ? "条件に一致するアポイントメントがありません。" : "アポイントメントがまだありません。"}

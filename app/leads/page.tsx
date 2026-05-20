@@ -300,7 +300,35 @@ export default function LeadsPage() {
         {/* テーブル */}
         <div className="mt-6 overflow-hidden rounded-xl border border-zinc-200 bg-white">
           {loading ? (
-            <div className="p-12 text-center text-sm text-zinc-400">読み込み中...</div>
+            // UI/UXレビュー D1: スピナーをスケルトンUIに置き換え
+            <table className="w-full text-sm" aria-label="読み込み中">
+              <thead>
+                <tr className="border-b border-zinc-100 bg-zinc-50 text-left">
+                  <th className="px-4 py-3 font-medium text-zinc-500">顧客名</th>
+                  <th className="px-4 py-3 font-medium text-zinc-500">電話番号</th>
+                  <th className="px-4 py-3 font-medium text-zinc-500">メール</th>
+                  <th className="px-4 py-3 font-medium text-zinc-500">チャネル</th>
+                  <th className="px-4 py-3 font-medium text-zinc-500">反響</th>
+                  <th className="px-4 py-3 font-medium text-zinc-500">アポ</th>
+                  <th className="px-4 py-3 font-medium text-zinc-500">最終接触</th>
+                  <th className="px-4 py-3 font-medium text-zinc-500">登録日</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={i} className="border-b border-zinc-50">
+                    <td className="px-4 py-3"><div className="h-3 w-24 animate-pulse rounded bg-zinc-100" /></td>
+                    <td className="px-4 py-3"><div className="h-3 w-28 animate-pulse rounded bg-zinc-100" /></td>
+                    <td className="px-4 py-3"><div className="h-3 w-36 animate-pulse rounded bg-zinc-100" /></td>
+                    <td className="px-4 py-3"><div className="h-5 w-5 animate-pulse rounded-full bg-zinc-100" /></td>
+                    <td className="px-4 py-3"><div className="h-3 w-6 animate-pulse rounded bg-zinc-100" /></td>
+                    <td className="px-4 py-3"><div className="h-3 w-6 animate-pulse rounded bg-zinc-100" /></td>
+                    <td className="px-4 py-3"><div className="h-3 w-12 animate-pulse rounded bg-zinc-100" /></td>
+                    <td className="px-4 py-3"><div className="h-3 w-20 animate-pulse rounded bg-zinc-100" /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           ) : (
             <table className="w-full text-sm">
               <thead>

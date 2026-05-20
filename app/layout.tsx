@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { KeyboardShortcutsHelp } from "@/components/KeyboardShortcutsHelp";
 
 export const metadata: Metadata = {
   title: "makxas-front",
@@ -25,7 +26,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja" className="h-full antialiased">
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <KeyboardShortcutsHelp />
+      </body>
     </html>
   );
 }
