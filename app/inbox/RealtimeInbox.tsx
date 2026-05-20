@@ -165,6 +165,19 @@ export function RealtimeInbox({
   const [readIds, setReadIds] = useState<Set<string>>(new Set(initialReadIds));
   // PR17: 初期値をサーバーから受け取ってサーバーサイド検索と同期
   const [searchQuery, setSearchQuery] = useState(initialSearch ?? "");
+  // PR25: AI追加買取コーチング
+  type CoachingResult = {
+    lever2_extraction?: number;
+    customer_attribute?: number;
+    high_value_category?: number;
+    customer_respect?: number;
+    overall_score?: number;
+    good_points?: string;
+    improvement_points?: string;
+    lever2_examples_detected?: string[];
+  };
+  const [coachingLoading, setCoachingLoading] = useState(false);
+  const [coachingResult, setCoachingResult] = useState<CoachingResult | null>(null);
   // 500ms 入力停止後にサーバー検索（URLパラメータ q を更新）
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -1391,6 +1404,36 @@ export function RealtimeInbox({
                       <Sparkles className="size-3.5" aria-hidden="true" />
                       AI架電
                     </Button>
+                    {/* PR25: AI追加買取コーチング */}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0 h-8 border-amber-300 text-amber-700 hover:bg-amber-50"
+                      title="MAKXAS思想に基づき、レバー2（追加買取）の切り出しを評価"
+                      onClick={async () => {
+                        if (!selectedInquiry) return;
+                        setCoachingLoading(true);
+                        try {
+                          const res = await fetch("/api/ai/coaching", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ inquiry_id: selectedInquiry.id }),
+                          });
+                          const d = await res.json();
+                          if (!res.ok) {
+                            alert(`コーチング評価失敗: ${d.error}`);
+                          } else {
+                            setCoachingResult(d);
+                          }
+                        } finally {
+                          setCoachingLoading(false);
+                        }
+                      }}
+                      disabled={coachingLoading}
+                    >
+                      <Sparkles className="size-3.5" aria-hidden="true" />
+                      {coachingLoading ? "評価中..." : "コーチング"}
+                    </Button>
                     <Button size="sm" className="shrink-0 h-8" onClick={() => setAppointmentOpen(true)}>
                       <CalendarPlus className="size-3.5" aria-hidden="true" />
                       アポ設定
@@ -1439,6 +1482,77 @@ export function RealtimeInbox({
                       </div>
                     </div>
                   ) : null}
+                </div>
+              ) : null}
+
+              {/* PR25: AI追加買取コーチング結果表示 */}
+              {coachingResult ? (
+                <div className="border-b border-amber-200 bg-amber-50/40">
+                  <div className="px-5 py-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-amber-900">
+                        📊 AI追加買取コーチング評価
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setCoachingResult(null)}
+                        className="text-[10px] text-amber-700 hover:text-amber-900"
+                      >
+                        閉じる
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 text-center text-[10px]">
+                      <div className="rounded bg-white border border-amber-200 px-2 py-1.5">
+                        <p className="text-amber-700">レバー2切出</p>
+                        <p className="text-sm font-bold text-amber-900">{coachingResult.lever2_extraction ?? "-"}</p>
+                      </div>
+                      <div className="rounded bg-white border border-zinc-200 px-2 py-1.5">
+                        <p className="text-zinc-500">属性把握</p>
+                        <p className="text-sm font-bold text-zinc-800">{coachingResult.customer_attribute ?? "-"}</p>
+                      </div>
+                      <div className="rounded bg-white border border-zinc-200 px-2 py-1.5">
+                        <p className="text-zinc-500">高単価誘導</p>
+                        <p className="text-sm font-bold text-zinc-800">{coachingResult.high_value_category ?? "-"}</p>
+                      </div>
+                      <div className="rounded bg-white border border-zinc-200 px-2 py-1.5">
+                        <p className="text-zinc-500">顧客満足</p>
+                        <p className="text-sm font-bold text-zinc-800">{coachingResult.customer_respect ?? "-"}</p>
+                      </div>
+                    </div>
+                    {typeof coachingResult.overall_score === "number" && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="text-[10px] text-zinc-600">総合スコア:</span>
+                        <span className="text-lg font-bold text-amber-700">{coachingResult.overall_score}</span>
+                        <span className="text-[10px] text-zinc-400">/100</span>
+                        <div className="flex-1 h-1.5 rounded-full bg-zinc-200 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-amber-500"
+                            style={{ width: `${coachingResult.overall_score}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {coachingResult.good_points && (
+                      <p className="mt-2 text-[11px] text-emerald-700">
+                        ✓ {coachingResult.good_points}
+                      </p>
+                    )}
+                    {coachingResult.improvement_points && (
+                      <p className="mt-1 text-[11px] text-amber-900">
+                        💡 {coachingResult.improvement_points}
+                      </p>
+                    )}
+                    {coachingResult.lever2_examples_detected && coachingResult.lever2_examples_detected.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-[10px] text-zinc-500 mb-0.5">検出された追加買取の切り出し:</p>
+                        <ul className="space-y-0.5">
+                          {coachingResult.lever2_examples_detected.map((ex, i) => (
+                            <li key={i} className="text-[10px] text-zinc-700">「{ex}」</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : null}
 
