@@ -40,6 +40,7 @@ const navItems = [
   { href: "/settings", label: "設定", mobileLabel: "設定", icon: Settings },
   { href: "/admin", label: "管理", mobileLabel: "管理", icon: ShieldCheck, divider: true as const, exactMatch: true as const },
   { href: "/admin/ai", label: "AI学習・自動化", mobileLabel: "学習", icon: BrainCircuit, indent: true as const },
+  { href: "/admin/ai-quality", label: "AI品質・コスト", mobileLabel: "AI品質", icon: BrainCircuit, indent: true as const },
   { href: "/admin/ai-chats", label: "AI履歴管理", mobileLabel: "履歴", icon: HistoryIcon, indent: true as const, aiHistoryOnly: true as const },
 ];
 

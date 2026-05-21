@@ -6,7 +6,7 @@
  */
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ClipboardCheck, Copy, FileText, X } from "lucide-react";
 
 export function HandoverSummaryButton({ inquiryId }: { inquiryId: string }) {
@@ -39,6 +39,16 @@ export function HandoverSummaryButton({ inquiryId }: { inquiryId: string }) {
       setLoading(false);
     }
   }
+
+  // Escape キーでモーダルを閉じる (PR48-50: UX磨き込み)
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   async function copy() {
     if (!summary) return;
