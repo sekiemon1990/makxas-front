@@ -24,6 +24,7 @@ import {
 import { ChannelBadge, StatusBadge } from "@/components/badges";
 import { PriorityBadge } from "@/components/inquiry/PriorityBadge";
 import { InquiryPriorityRow } from "@/components/inquiry/InquiryPriorityRow";
+import { BatchPriorityButton } from "@/components/inquiry/BatchPriorityButton";
 import { AiSuggestPanel } from "@/components/inbox/AiSuggestPanel";
 import { AppointmentModal } from "@/components/inbox/AppointmentModal";
 import { InquiryItemsPanel, type CustomerProfile } from "@/components/inbox/InquiryItemsPanel";
@@ -992,6 +993,24 @@ export function RealtimeInbox({
               placeholder="件名・顧客名・電話・メールで検索"
               type="search"
               value={searchQuery}
+            />
+            <BatchPriorityButton
+              inquiries={items}
+              onResults={(updates) => {
+                setItems((current) =>
+                  current.map((it) => {
+                    const u = updates.get(it.id);
+                    if (!u || !u.priority) return it;
+                    return {
+                      ...it,
+                      ai_priority: u.priority,
+                      ai_priority_score: u.score ?? null,
+                      ai_priority_reason: u.reason ?? null,
+                      ai_priority_set_at: u.setAt ?? new Date().toISOString(),
+                    };
+                  }),
+                );
+              }}
             />
             {/* UI/UXレビュー C8: フィルター整理 — フィルター本体・自分のみ・通知の3グループに分離、アクティブ時はクリアボタン表示 */}
             {(() => {
