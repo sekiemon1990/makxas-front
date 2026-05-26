@@ -1,12 +1,9 @@
 "use client";
 
-import { createBrowserClient } from "@supabase/ssr";
+import { createMakxasBrowserClient } from "@makxas/supabase-next";
 
 import type { Database } from "@/types/database";
 
 export function createClient() {
-  return createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
+  return createMakxasBrowserClient<Database>();
 }
