@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse, type NextRequest } from "next/server";
 import { logAiUsage } from "@/lib/ai/usage";
 import { requireApiAuth } from "@/lib/auth/requireApiAuth";
+import { notifyChatwork } from "@/lib/chatwork";
 import { createServiceClient } from "@/lib/supabase/service";
 
 const ANALYZE_MODEL = "claude-haiku-4-5-20251001";
@@ -15,21 +16,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   followup_question: "追加質問",
   initial_contact: "初回問い合わせ",
 };
-
-async function notifyChatwork(message: string) {
-  const token = process.env.CHATWORK_API_TOKEN;
-  const roomId = process.env.CHATWORK_ROOM_ID;
-  if (!token || !roomId) return;
-  try {
-    await fetch(`https://api.chatwork.com/v2/rooms/${roomId}/messages`, {
-      method: "POST",
-      headers: { "X-ChatWorkToken": token, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ body: message }),
-    });
-  } catch (e) {
-    console.error("[ai/learning] Chatwork notify failed:", e);
-  }
-}
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
