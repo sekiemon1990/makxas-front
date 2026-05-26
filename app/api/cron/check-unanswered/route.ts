@@ -1,3 +1,4 @@
+import { sendChatworkMessageOrSkip } from "@makxas/chatwork-client";
 import { NextResponse } from "next/server";
 
 import { createServiceClient } from "@/lib/supabase/service";
@@ -12,9 +13,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const chatworkToken = process.env.CHATWORK_API_TOKEN;
-  const chatworkRoomId = process.env.CHATWORK_ROOM_ID;
-  if (!chatworkToken || !chatworkRoomId) {
+  if (!process.env.CHATWORK_API_TOKEN || !process.env.CHATWORK_ROOM_ID) {
     return NextResponse.json(
       { error: "Chatwork env vars not set" },
       { status: 500 },
@@ -79,22 +78,14 @@ export async function GET(request: Request) {
 
   const message = `[info][title]⚠️ 未返信アラート（${unanswered.length}件）[/title]${UNANSWERED_THRESHOLD_MINUTES}分以上返信されていない反響があります。\n\n${lines.join("\n")}\n\nhttps://makxas-front.vercel.app/inbox[/info]`;
 
-  const res = await fetch(
-    `https://api.chatwork.com/v2/rooms/${chatworkRoomId}/messages`,
-    {
-      method: "POST",
-      headers: {
-        "X-ChatWorkToken": chatworkToken,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({ body: message }),
-    },
-  );
+  const result = await sendChatworkMessageOrSkip(message);
 
-  if (!res.ok) {
-    const text = await res.text();
-    console.error("Chatwork notify failed", text);
-    return NextResponse.json({ error: "Chatwork failed", detail: text }, { status: 500 });
+  if (!result.ok) {
+    console.error("Chatwork notify failed", result.error);
+    return NextResponse.json(
+      { error: "Chatwork failed", detail: result.error },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json({ notified: unanswered.length });

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { notifyChatwork } from "@/lib/chatwork";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export const runtime = "nodejs";
@@ -10,9 +11,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const chatworkToken = process.env.CHATWORK_API_TOKEN;
-  const chatworkRoomId = process.env.CHATWORK_ROOM_ID;
-  if (!chatworkToken || !chatworkRoomId) {
+  if (!process.env.CHATWORK_API_TOKEN || !process.env.CHATWORK_ROOM_ID) {
     return NextResponse.json({ error: "Chatwork env vars not set" }, { status: 500 });
   }
 
@@ -41,17 +40,7 @@ export async function GET(request: NextRequest) {
     const noteText = reminder.note ? `\nメモ: ${reminder.note}` : "";
     const message = `【フォローアップリマインダー】\n@${staffName} さん、以下の反響のフォローアップ時間です。\n\n反響: ${subject}${noteText}\n確認: ${appUrl}/inbox?id=${reminder.inquiry_id}`;
 
-    await fetch(
-      `https://api.chatwork.com/v2/rooms/${chatworkRoomId}/messages`,
-      {
-        method: "POST",
-        headers: {
-          "X-ChatWorkToken": chatworkToken,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({ body: message }),
-      },
-    ).catch(() => {});
+    await notifyChatwork(message);
   }
 
   // 通知済みフラグを立てる

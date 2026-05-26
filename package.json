@@ -15,6 +15,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
     "@line/bot-sdk": "^11.0.0",
+    "@makxas/chatwork-client": "file:vendor/makxas-chatwork-client-0.1.0.tgz",
     "@sentry/nextjs": "^10.53.1",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.105.3",
