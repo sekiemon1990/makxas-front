@@ -31,8 +31,11 @@ function jpy(usd: number): string {
 
 export default async function AiQualityDashboard() {
   const supabase = createServiceClient();
-  const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  const since7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  // Per-request server dashboard window.
+  // eslint-disable-next-line react-hooks/purity
+  const nowMs = Date.now();
+  const since30 = new Date(nowMs - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const since7 = new Date(nowMs - 7 * 24 * 60 * 60 * 1000).toISOString();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: rows30 } = await (supabase as any)

@@ -38,6 +38,8 @@ function HelpPageInner() {
   useEffect(() => {
     const param = searchParams?.get("chapter");
     if (param && HELP_CHAPTERS.some((c) => c.id === param)) {
+      // Sync the shareable chapter query param into local selection state.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedId(param);
     }
   }, [searchParams]);

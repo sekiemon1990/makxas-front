@@ -39,6 +39,8 @@ export function CrossBrandLtvPanel({ leadId }: { leadId: string }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Reset loading before fetching the cross-brand summary for this lead.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     fetch(`/api/leads/${leadId}/cross-brand-ltv`)
       .then((r) => r.json())

@@ -534,6 +534,8 @@ export function RealtimeInbox({
 
     // 自動実行
     autoAiTriggeredRef.current = selectedInquiry.id;
+    // Show loading immediately while the side-effect fetch is in flight.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAiLoading(true);
     fetch("/api/ai/suggest", {
       method: "POST",
@@ -579,7 +581,6 @@ export function RealtimeInbox({
     if (!selectedInquiry?.lead_id) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setRelatedInquiries([]);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDuplicateLeads([]);
       return;
     }
