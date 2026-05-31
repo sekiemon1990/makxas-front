@@ -62,6 +62,8 @@ export function OnboardingTutorial() {
     if (typeof window === "undefined") return;
     try {
       const seen = window.localStorage.getItem(STORAGE_KEY);
+      // LocalStorage is only available after mount; open the first-run modal then.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (!seen) setOpen(true);
     } catch {
       // ignore

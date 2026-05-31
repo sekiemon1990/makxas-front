@@ -77,6 +77,8 @@ export default function LeadsPage() {
   const nowMs = useMemo(() => Date.now(), []);
 
   useEffect(() => {
+    // Reset local request state before starting the list fetch for this reload.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setError(null);
     setLoading(true);
     fetch("/api/leads/list")

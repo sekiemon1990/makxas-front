@@ -4,7 +4,7 @@
  * 反響の AI 自動優先度バッジ。
  * inquiries.ai_priority (high/medium/low) を色分けで表示。
  */
-import { ChevronsUp, Equal, ChevronsDown } from "lucide-react";
+import { ChevronsUp, Equal, ChevronsDown, type LucideIcon } from "lucide-react";
 
 type Priority = "high" | "medium" | "low";
 
@@ -20,16 +20,11 @@ const TONE: Record<Priority, string> = {
   low: "text-zinc-500 bg-zinc-50 border-zinc-200",
 };
 
-function icon(p: Priority) {
-  switch (p) {
-    case "high":
-      return ChevronsUp;
-    case "medium":
-      return Equal;
-    case "low":
-      return ChevronsDown;
-  }
-}
+const ICON: Record<Priority, LucideIcon> = {
+  high: ChevronsUp,
+  medium: Equal,
+  low: ChevronsDown,
+};
 
 export function PriorityBadge({
   priority,
@@ -40,7 +35,7 @@ export function PriorityBadge({
   score?: number | null;
   compact?: boolean;
 }) {
-  const Icon = icon(priority);
+  const Icon = ICON[priority];
   return (
     <span
       className={`inline-flex items-center gap-0.5 ${compact ? "text-[10px] px-1.5 py-0.5" : "text-xs px-2 py-0.5"} font-semibold rounded-full border ${TONE[priority]}`}

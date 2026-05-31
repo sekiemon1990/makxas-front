@@ -61,6 +61,8 @@ export function AuditLogPanel({ inquiryId }: { inquiryId: string }) {
 
   useEffect(() => {
     if (!open || logs !== null) return;
+    // Mark the lazy audit-log fetch as loading for this panel open.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     fetch(`/api/inquiries/${inquiryId}/audit-log`)
       .then((r) => r.json())
@@ -73,6 +75,7 @@ export function AuditLogPanel({ inquiryId }: { inquiryId: string }) {
 
   // 反響を切り替えたら状態リセット
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLogs(null);
     setOpen(false);
   }, [inquiryId]);
