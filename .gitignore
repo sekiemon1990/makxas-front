@@ -44,3 +44,10 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# Claude local session/worktree artifacts
+.claude/sessions/
+.claude/worktrees/
+
+.envrc
+.env*.local
