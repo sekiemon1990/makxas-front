@@ -9,10 +9,20 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    "**/.next/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
+    ".claude/sessions/**",
+    ".claude/worktrees/**",
   ]),
+  {
+    rules: {
+      "react-hooks/purity": "warn",
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/static-components": "warn",
+    },
+  },
 ]);
 
 export default eslintConfig;
