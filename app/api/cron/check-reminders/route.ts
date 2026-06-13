@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { notifyChatwork } from "@/lib/chatwork";
+import { hasChatworkGatewayEnv, notifyChatwork } from "@/lib/chatwork";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export const runtime = "nodejs";
@@ -11,8 +11,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!process.env.CHATWORK_API_TOKEN || !process.env.CHATWORK_ROOM_ID) {
-    return NextResponse.json({ error: "Chatwork env vars not set" }, { status: 500 });
+  if (!hasChatworkGatewayEnv()) {
+    return NextResponse.json({ error: "Gateway comms env vars not set" }, { status: 500 });
   }
 
   const supabase = createServiceClient();
