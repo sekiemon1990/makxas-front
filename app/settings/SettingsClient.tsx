@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, Plus, Trash2 } from "lucide-react";
 
+import { AllowlistManager } from "@/components/settings/AllowlistManager";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -207,7 +208,10 @@ export function SettingsClient({
             <ComparisonAccountsList accounts={comparisonAccounts} />
           ) : null}
           {activeTab === "staff" ? (
-            <StaffAccessList access={staffBrandAccess} staff={staff} />
+            <div className="space-y-6">
+              <StaffAccessList access={staffBrandAccess} staff={staff} />
+              <AllowlistManager />
+            </div>
           ) : null}
           {activeTab === "templates" ? (
             <TemplatesList

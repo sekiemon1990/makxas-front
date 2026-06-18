@@ -62,11 +62,35 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (user && pathname === "/login") {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/inbox";
-    redirectUrl.search = "";
-    return NextResponse.redirect(redirectUrl);
+  // 認証ゲート: ログイン済みでも「有効な staff」でなければアクセスさせない。
+  // 許可ドメイン外/許可リスト外のメールは callback で staff 化されないため、
+  // ここで弾かれる。無効化(is_active=false)された staff も同様。
+  if (user && (!isPublic || pathname === "/login")) {
+    const { data: staffRow } = await supabase
+      .from("staff")
+      .select("is_active")
+      .eq("auth_id", user.id)
+      .maybeSingle();
+
+    const isActiveStaff = staffRow?.is_active === true;
+
+    if (!isActiveStaff) {
+      await supabase.auth.signOut();
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = "/login";
+      redirectUrl.search = "?error=unauthorized";
+      const res = NextResponse.redirect(redirectUrl);
+      // signOut が response に書いた Cookie 削除をリダイレクトへ引き継ぐ。
+      response.cookies.getAll().forEach((cookie) => res.cookies.set(cookie));
+      return res;
+    }
+
+    if (pathname === "/login") {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = "/inbox";
+      redirectUrl.search = "";
+      return NextResponse.redirect(redirectUrl);
+    }
   }
 
   return response;
