@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "repo": "makxas-front",
+  "owner": "社長室",
+  "last_reviewed_on": "2026-06-18",
+  "items": [
+    {
+      "name": "AI返信サジェスト",
+      "description": "LINE、フォーム、メールなどの反響に対して、会話履歴を踏まえた返信案をスタッフへ提示する。",
+      "kind": "product_feature",
+      "where_used": [
+        "統合インボックス",
+        "/api/ai/suggest",
+        "LINE / Webフォーム / メール反響"
+      ],
+      "data_sensitivity": "pii",
+      "monthly_cost": "OpenAI GPT-4o-mini従量課金。AGENTS.mdでは月500件で少額想定。",
+      "owner": "社長室",
+      "entrypoints": [
+        "lib/ai/suggest-reply.ts",
+        "app/api/ai/suggest/route.ts",
+        "supabase/migrations/004_ai_suggest.sql"
+      ],
+      "dependencies": [
+        "OpenAI API",
+        "Supabase",
+        "LINE Messaging API",
+        "反響データ"
+      ],
+      "kill_switch": "AI suggest APIの環境変数を未設定にする、または返信サジェストUIをOFFにする",
+      "status": "live",
+      "runbook": "AGENTS.md",
+      "risk_notes": "顧客接点あり。AI案はスタッフ確認後の送信に限定し、本人名義・外部送信の承認境界を維持する。"
+    },
+    {
+      "name": "AI学習・フィードバック",
+      "description": "返信案や顧客対応の結果を記録し、改善・分析に使う。",
+      "kind": "automation",
+      "where_used": ["/admin/ai", "/api/ai/feedback", "/api/cron/ai-learning"],
+      "data_sensitivity": "pii",
+      "monthly_cost": "既存OpenAI API / Supabase利用内。追加固定費なし。",
+      "owner": "社長室",
+      "entrypoints": [
+        "app/api/ai/feedback/route.ts",
+        "app/api/cron/ai-learning/route.ts",
+        "lib/supabase/aiChatReviews.ts"
+      ],
+      "dependencies": ["Supabase", "OpenAI API", "AI feedback tables"],
+      "kill_switch": "ai-learning cronを停止し、AI feedback APIの環境変数を未設定にする",
+      "status": "live",
+      "runbook": "AGENTS.md",
+      "risk_notes": "改善用途の保存データは必要最小限にし、顧客PIIの外部送出を増やさない。"
+    },
+    {
+      "name": "反響内容の品目抽出",
+      "description": "問い合わせ文から買取品目や要点を抽出し、対応優先度と引き継ぎを支援する。",
+      "kind": "product_feature",
+      "where_used": [
+        "統合インボックス",
+        "/api/ai/extract-items",
+        "/api/inquiry-items"
+      ],
+      "data_sensitivity": "pii",
+      "monthly_cost": "OpenAI API従量課金内。利用量は反響件数に連動。",
+      "owner": "社長室",
+      "entrypoints": [
+        "app/api/ai/extract-items/route.ts",
+        "app/api/inquiry-items/route.ts",
+        "supabase/migrations/014_inquiry_items.sql"
+      ],
+      "dependencies": ["OpenAI API", "Supabase", "inquiries", "messages"],
+      "kill_switch": "品目抽出APIの環境変数を未設定にする、またはUI導線を非表示にする",
+      "status": "live",
+      "runbook": "AGENTS.md",
+      "risk_notes": "抽出結果はスタッフ確認用であり、顧客への自動送信や価格確定には使わない。"
+    },
+    {
+      "name": "Google Calendar連携",
+      "description": "アポ・予定の同期を行い、反響対応から訪問査定までの抜け漏れを減らす。",
+      "kind": "automation",
+      "where_used": [
+        "アポ管理",
+        "/api/calendar/sync",
+        "/api/cron/calendar-sync"
+      ],
+      "data_sensitivity": "pii",
+      "monthly_cost": "Google APIは既存Workspace契約内。アプリ側追加固定費なし。",
+      "owner": "社長室",
+      "entrypoints": [
+        "app/api/calendar/sync/route.ts",
+        "app/api/cron/calendar-sync/route.ts",
+        "app/api/calendar/events/route.ts"
+      ],
+      "dependencies": ["Google Calendar API", "Supabase", "appointments"],
+      "kill_switch": "calendar-sync cronを停止し、Google Calendar OAuth設定を未設定にする",
+      "status": "live",
+      "runbook": "AGENTS.md",
+      "risk_notes": "顧客予定を扱うため、通知・招待・更新の副作用を確認してから本番writeを行う。"
+    }
+  ]
+}
