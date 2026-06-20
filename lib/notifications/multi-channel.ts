@@ -14,7 +14,18 @@ import * as line from "@line/bot-sdk";
 
 export type NotificationChannel = "line" | "email" | "sms";
 
+export const DELIVERY_TARGET_TENANT_MISMATCH_ERROR =
+  "lead_contact_delivery_target_tenant_mismatch";
+
 export type RecipientInfo = {
+  /** Current tenant executing the notification. */
+  tenantId?: string | null;
+  /** Tenant owner of the lead row, when known. */
+  leadTenantId?: string | null;
+  /** Tenant owner of the selected lead_contacts row, when known. */
+  contactOwnerTenantId?: string | null;
+  /** Explicit Gateway-style delivery target owner tenant id. */
+  deliveryTargetOwnerTenantId?: string | null;
   /** LINE userId (Uxxxx...) */
   lineUserId?: string | null;
   /** LINE Channel Access Token（テナント別/フォールバック .env LINE_CHANNEL_ACCESS_TOKEN） */
@@ -35,6 +46,37 @@ export type SendResult = {
   error?: string;
   detail?: string;
 };
+
+export function resolveRecipientOwnerTenantId(
+  recipient: Pick<
+    RecipientInfo,
+    | "tenantId"
+    | "leadTenantId"
+    | "contactOwnerTenantId"
+    | "deliveryTargetOwnerTenantId"
+  >,
+): string | null {
+  return (
+    cleanString(recipient.deliveryTargetOwnerTenantId) ??
+    cleanString(recipient.contactOwnerTenantId) ??
+    cleanString(recipient.leadTenantId) ??
+    cleanString(recipient.tenantId)
+  );
+}
+
+export function hasDeliveryTargetTenantMismatch(
+  recipient: Pick<
+    RecipientInfo,
+    | "tenantId"
+    | "leadTenantId"
+    | "contactOwnerTenantId"
+    | "deliveryTargetOwnerTenantId"
+  >,
+): boolean {
+  const tenantId = cleanString(recipient.tenantId);
+  const ownerTenantId = resolveRecipientOwnerTenantId(recipient);
+  return Boolean(tenantId && ownerTenantId && tenantId !== ownerTenantId);
+}
 
 /**
  * 日本の電話番号を E.164（+81）形式に正規化。
@@ -179,6 +221,14 @@ export async function sendMultiChannel(
   channels: NotificationChannel[],
   recipient: RecipientInfo,
 ): Promise<SendResult[]> {
+  if (hasDeliveryTargetTenantMismatch(recipient)) {
+    return channels.map((channel) => ({
+      channel,
+      ok: false,
+      error: DELIVERY_TARGET_TENANT_MISMATCH_ERROR,
+    }));
+  }
+
   const tasks: Promise<SendResult>[] = [];
   for (const ch of channels) {
     if (ch === "line") tasks.push(sendLine(message, recipient));
@@ -186,6 +236,11 @@ export async function sendMultiChannel(
     else if (ch === "sms") tasks.push(sendSms(message, recipient));
   }
   return Promise.all(tasks);
+}
+
+function cleanString(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
 }
 
 /**
