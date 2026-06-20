@@ -8,6 +8,11 @@ import { createClient } from "@/lib/supabase/server";
 // パスワードは /auth/reset-password 導線で既存行に付与する。
 export async function POST(request: Request) {
   const requestUrl = new URL(request.url);
+  // CSRF 緩和（独立レビュー S2-2）: 別オリジンからの強制 POST(login CSRF)を弾く
+  const origin = request.headers.get("origin");
+  if (origin && new URL(origin).origin !== requestUrl.origin) {
+    return NextResponse.redirect(new URL("/login?error=invalid_credentials", requestUrl), { status: 303 });
+  }
   const form = await request.formData();
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   const password = String(form.get("password") ?? "");

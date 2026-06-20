@@ -14,6 +14,7 @@ const PUBLIC_PREFIXES = [
   "/api/auth/google",
   "/api/auth/password", // ADR-0007: ID・パスワード認証
   "/api/auth/reset", // ADR-0007: パスワード設定/再設定の要求
+  "/auth/reset-callback", // ADR-0007: パスワードリセット専用コールバック
   "/auth/reset-password", // ADR-0007: パスワード設定/再設定の画面
   "/api/webhooks",
   "/api/cron",
