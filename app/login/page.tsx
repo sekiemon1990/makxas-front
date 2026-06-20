@@ -22,9 +22,11 @@ const ERROR_MESSAGES: Record<string, string> = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; notice?: string }>;
+  searchParams: Promise<{ error?: string; notice?: string; next?: string }>;
 }) {
-  const { error, notice } = await searchParams;
+  const { error, notice, next } = await searchParams;
+  // 直リンク復帰先（ADR-0023）。値の検証は遷移を行う各 route 側で safeNextPath により実施。
+  const nextValue = next ?? "";
 
   return (
     <AppShell>
@@ -39,6 +41,7 @@ export default async function LoginPage({
           <CardContent className="space-y-4">
             {/* 第1経路: Google 認証 */}
             <form action="/api/auth/google" method="post">
+              <input type="hidden" name="next" value={nextValue} />
               <Button className="w-full" size="lg" type="submit" variant="outline">
                 <GoogleIcon />
                 Googleでログイン
@@ -53,6 +56,7 @@ export default async function LoginPage({
 
             {/* 第2経路: メールアドレス + パスワード（ADR-0007 / 第21条） */}
             <form action="/api/auth/password" method="post" className="space-y-3">
+              <input type="hidden" name="next" value={nextValue} />
               <Input
                 type="email"
                 name="email"

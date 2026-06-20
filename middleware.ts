@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { safeNextPath } from "@/lib/safe-next";
 import type { Database } from "@/types/database";
 
 const PUBLIC_PREFIXES = [
@@ -73,16 +74,20 @@ export async function middleware(request: NextRequest) {
   );
 
   if (!user && !isPublic) {
+    // 直リンク到達性(ADR-0023): 元のパス(+クエリ)を next に保持し、ログイン後に復帰させる
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
-    redirectUrl.searchParams.set("next", pathname);
+    redirectUrl.search = "";
+    redirectUrl.searchParams.set("next", pathname + request.nextUrl.search);
     return NextResponse.redirect(redirectUrl);
   }
 
   if (user && pathname === "/login") {
+    // ログイン済みで /login に来た場合、next 指定があればその画面へ（open-redirect ガード済み）
+    const dest = safeNextPath(request.nextUrl.searchParams.get("next"));
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/inbox";
-    redirectUrl.search = "";
+    redirectUrl.pathname = dest.split("?")[0];
+    redirectUrl.search = dest.includes("?") ? `?${dest.split("?").slice(1).join("?")}` : "";
     return NextResponse.redirect(redirectUrl);
   }
 

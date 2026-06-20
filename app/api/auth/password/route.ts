@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { safeNextPath } from "@/lib/safe-next";
 import { createClient } from "@/lib/supabase/server";
 
 // ID・パスワード認証（ADR-0007 / AI憲法 第21条「認証経路の冗長性」）。
@@ -16,6 +17,8 @@ export async function POST(request: Request) {
   const form = await request.formData();
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   const password = String(form.get("password") ?? "");
+  // 直リンク復帰先(ADR-0023・open-redirect ガード済み)
+  const next = safeNextPath(form.get("next") as string | null);
 
   if (!email || !password) {
     return NextResponse.redirect(
@@ -35,5 +38,5 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.redirect(new URL("/inbox", requestUrl), { status: 303 });
+  return NextResponse.redirect(new URL(next, requestUrl), { status: 303 });
 }

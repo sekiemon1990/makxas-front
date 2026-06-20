@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 
+import { safeNextPath } from "@/lib/safe-next";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
+  // 直リンク復帰先(ADR-0023・open-redirect ガード済み)
+  const next = safeNextPath(requestUrl.searchParams.get("next"));
 
   if (!code) {
     return NextResponse.redirect(new URL("/login?error=missing_code", requestUrl));
@@ -41,5 +44,5 @@ export async function GET(request: Request) {
     );
   }
 
-  return NextResponse.redirect(new URL("/inbox", requestUrl));
+  return NextResponse.redirect(new URL(next, requestUrl));
 }
