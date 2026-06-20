@@ -5,6 +5,12 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
+  // ADR-0007: パスワードリセット(recovery)時は next=/auth/reset-password/update へ。既定は /inbox。
+  const nextParam = requestUrl.searchParams.get("next");
+  const safeNext =
+    nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
+      ? nextParam
+      : "/inbox";
 
   if (!code) {
     return NextResponse.redirect(new URL("/login?error=missing_code", requestUrl));
@@ -41,5 +47,5 @@ export async function GET(request: Request) {
     );
   }
 
-  return NextResponse.redirect(new URL("/inbox", requestUrl));
+  return NextResponse.redirect(new URL(safeNext, requestUrl));
 }
