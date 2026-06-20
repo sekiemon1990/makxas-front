@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import {
@@ -7,8 +9,23 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
-export default function LoginPage() {
+const ERROR_MESSAGES: Record<string, string> = {
+  invalid_credentials: "メールアドレスまたはパスワードが正しくありません。",
+  missing_credentials: "メールアドレスとパスワードを入力してください。",
+  oauth: "Googleログインを開始できませんでした。",
+  callback: "ログイン処理に失敗しました。もう一度お試しください。",
+  missing_code: "ログイン処理に失敗しました。もう一度お試しください。",
+};
+
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; notice?: string }>;
+}) {
+  const { error, notice } = await searchParams;
+
   return (
     <AppShell>
       <div className="flex h-screen items-center justify-center bg-[linear-gradient(180deg,#fafafa_0%,#f4f4f5_100%)] p-8">
@@ -19,13 +36,58 @@ export default function LoginPage() {
               反響対応を始めるにはログインしてください。
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            {/* 第1経路: Google 認証 */}
             <form action="/api/auth/google" method="post">
-              <Button className="w-full" size="lg" type="submit">
+              <Button className="w-full" size="lg" type="submit" variant="outline">
                 <GoogleIcon />
                 Googleでログイン
               </Button>
             </form>
+
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-zinc-200" />
+              <span className="text-xs text-zinc-400">または</span>
+              <div className="h-px flex-1 bg-zinc-200" />
+            </div>
+
+            {/* 第2経路: メールアドレス + パスワード（ADR-0007 / 第21条） */}
+            <form action="/api/auth/password" method="post" className="space-y-3">
+              <Input
+                type="email"
+                name="email"
+                required
+                placeholder="メールアドレス"
+                autoComplete="email"
+              />
+              <Input
+                type="password"
+                name="password"
+                required
+                placeholder="パスワード"
+                autoComplete="current-password"
+              />
+              <Button className="w-full" type="submit">
+                メールアドレスでログイン
+              </Button>
+            </form>
+
+            <div className="text-center text-xs">
+              <Link href="/auth/reset-password" className="text-zinc-500 underline">
+                パスワードを設定 / 忘れた方
+              </Link>
+            </div>
+
+            {notice === "reset_sent" && (
+              <p className="rounded-md bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                パスワード設定用のメールを送信しました（登録済みのアドレスの場合）。
+              </p>
+            )}
+            {error && (
+              <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
+                {ERROR_MESSAGES[error] ?? "ログイン処理に失敗しました。もう一度お試しください。"}
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
