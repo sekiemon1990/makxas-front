@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { logAiUsage } from "@/lib/ai/usage";
+import { buildAiEvent, buildUsageEnvelope } from "@/lib/ai/event";
 import { createServiceClient } from "@/lib/supabase/service";
 import { buildHelpDocsContext } from "@/lib/help/manual";
 import { composeSystemPrompt } from "@makxas/ai-kit";
@@ -177,6 +178,8 @@ export async function POST(request: NextRequest) {
       : []),
   ];
 
+  const conversationId = crypto.randomUUID();
+
   try {
     const anthropic = new Anthropic({ apiKey });
     let messages: Anthropic.MessageParam[] = body.messages.map((m) => ({
@@ -207,13 +210,19 @@ export async function POST(request: NextRequest) {
         }),
       );
 
-      // コスト追跡: tool_use ループの各 iteration を記録
+      // コスト追跡: tool_use ループの各 iteration を記録（ADR-0029 AiEventContract 埋め込み）
+      const usageEnvelope = buildUsageEnvelope(response.usage, MODEL);
+      const aiEvent = buildAiEvent({
+        conversationId,
+        usage: usageEnvelope,
+        action: response.stop_reason === "end_turn" ? "executed" : "pending",
+      });
       await logAiUsage({
         category: "chat",
         model: MODEL,
         usage: response.usage,
         endpoint: "/api/ai/chat",
-        meta: { iteration: i + 1, stop_reason: response.stop_reason },
+        meta: { iteration: i + 1, stop_reason: response.stop_reason, ai_event: aiEvent },
       });
 
       if (response.stop_reason === "end_turn") {
