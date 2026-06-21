@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { logAiUsage } from "@/lib/ai/usage";
 import { createServiceClient } from "@/lib/supabase/service";
 import { buildHelpDocsContext } from "@/lib/help/manual";
+import { composeSystemPrompt } from "@makxas/ai-kit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -144,7 +145,7 @@ export async function POST(request: NextRequest) {
 
   // 静的なシステムプロンプト (リクエスト間で同一 → Anthropic prompt caching 対象)
   // Sonnet 4.6 の最小キャッシュ要件 2048 tokens を満たす想定。
-  const staticSystemPrompt = [
+  const staticSystemPrompt = composeSystemPrompt([
     "あなたは買取マクサスのインサイドセールスチームをサポートするAIアシスタントです。",
     "買取マクサス・銀座リパール・ブックリバー・カグウルなど複数の買取ブランドを運営する会社の、",
     "LINE・Webフォーム・メール・電話・比較サイトからの反響を管理し、アポイントメント（査定予約）取得を支援するシステムです。",
@@ -154,28 +155,7 @@ export async function POST(request: NextRequest) {
     "- search_data ツールで顧客・反響を検索",
     "- 返信案の作成、会話要約、次のアクション提案",
     "- 常に日本語で回答する",
-    "",
-    "【追加買取（レバー2）の2軸フレームワーク — 最重要】",
-    "追加買取は最重要の営業行動です。返信案・声掛け文・提案を作る際は必ず以下の順序で考えてください。",
-    "",
-    "1. 顧客属性を読む（年齢・収入/資産・売却動機の3要素の掛け算）",
-    "   - 売却動機の強さ: 遺品整理（強）> 引越し > 片付け > 買い換え（弱）",
-    "   - 顧客単価目安 = 年齢が高い × 収入/資産が高い × 売却動機が強い",
-    "",
-    "2. ニーズ（なぜ売りたいか）で提案の切り口・言葉を決める",
-    "   - 遺品整理 → 丁寧に寄り添う。急かさず、感情に配慮しながら「お家にある貴金属・ブランド品」を自然に聞く",
-    "   - 引越し → まとめて手放したい心理。効率重視で「スマホ・PC・ブランド品も一緒にどうですか」",
-    "   - 片付け → 時間をかけて整理中。次回以降の提案余地を作る関係構築を重視",
-    "   - 買い換え → 入口商品に集中しつつ、古い機器や周辺アクセサリーも確認",
-    "",
-    "3. 属性×ニーズで絞った商材の中で高単価から狙う（中古¥5,000未満は対象外）",
-    "   - 中高年・高所得・動機強 → 貴金属、ブランドバッグ、時計、骨董品を優先",
-    "   - 若年層・一般所得 → スマートフォン、PC・タブレット、ゲーム機を優先",
-    "   - 全年代共通 → カメラ、楽器、使っていない電子機器",
-    "",
-    "4. 返信文に追加買取のヒントを自然な形で含める（押し売りは禁止）",
-    "   - 顧客が後悔しない取引を最優先にしながら、声掛けの機会を作る",
-  ].join("\n") + buildHelpDocsContext();
+  ].join("\n")) + buildHelpDocsContext();
 
   // 動的部分 (リクエスト毎に変動 → キャッシュ対象外)
   const dynamicSystemParts: string[] = [];
