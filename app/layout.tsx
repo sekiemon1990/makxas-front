@@ -3,6 +3,8 @@ import "./globals.css";
 import { KeyboardShortcutsHelp } from "@/components/KeyboardShortcutsHelp";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
+import { FrontCopilotWidget } from "@/components/shell/FrontCopilotWidget";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "makxas-front",
@@ -21,11 +23,16 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   // UI/UXレビュー D4: ダークモード対応 — next-themes + suppressHydrationWarning
   return (
     <html lang="ja" className="h-full antialiased" suppressHydrationWarning>
@@ -34,6 +41,7 @@ export default function RootLayout({
           {children}
           <KeyboardShortcutsHelp />
           <PwaInstallPrompt />
+          {user && <FrontCopilotWidget />}
         </ThemeProvider>
       </body>
     </html>
