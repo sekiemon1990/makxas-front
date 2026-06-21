@@ -8,7 +8,22 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-export default function LoginPage() {
+const ERROR_MESSAGES: Record<string, string> = {
+  unauthorized:
+    "このアカウントはログインを許可されていません。makxas のアカウントでログインするか、管理者に利用申請してください。",
+  oauth: "ログイン処理でエラーが発生しました。もう一度お試しください。",
+  callback: "ログイン処理でエラーが発生しました。もう一度お試しください。",
+  missing_code: "ログイン処理が中断されました。もう一度お試しください。",
+};
+
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
+  const errorMessage = error ? ERROR_MESSAGES[error] : undefined;
+
   return (
     <AppShell>
       <div className="flex h-screen items-center justify-center bg-[linear-gradient(180deg,#fafafa_0%,#f4f4f5_100%)] p-8">
@@ -20,6 +35,11 @@ export default function LoginPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {errorMessage ? (
+              <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {errorMessage}
+              </div>
+            ) : null}
             <form action="/api/auth/google" method="post">
               <Button className="w-full" size="lg" type="submit">
                 <GoogleIcon />
