@@ -262,3 +262,35 @@ Supabase Pro昇格の判断基準: DB容量400MB超 / 同時接続上限頻発 /
 4. 顧客満足度を犠牲にしない（押し売り禁止・顧客が後悔しない取引のみ推奨）
 
 詳細: `~/.claude/MAKXAS_PHILOSOPHY.md`（ローカル）または `MAKXAS_PHILOSOPHY.md`（リポジトリ内）
+
+---
+
+## @makxas/ai-kit（内部 AI パッケージ）
+
+AI 機能（Claude API 呼び出し・システムプロンプト構築）に使う内部パッケージ。
+Phase 0b より `file:vendor/makxas-ai-kit-0.0.1.tgz` として `vendor/` に同梱済み。
+
+- `composeSystemPrompt(opts?)` — 営業思想（`SALES_DOCTRINE_CORE`）込みのシステムプロンプトを生成
+- `SALES_DOCTRINE_CORE` — 全 AI 機能共通の追加買取・営業思想テキスト
+- `additionalContent` オプションでタスク固有の指示を追記可能
+
+### AI 機能実装の注意
+- AI エンドポイントは `@anthropic-ai/sdk` を直接使うが、システムプロンプトは必ず `composeSystemPrompt()` 経由で構築する
+- `cache_control: { type: "ephemeral" }` は **必ず保持**（Anthropic prompt caching のコスト削減のため絶対削らない）
+- Anthropic API コールはサーバーサイド（Route Handler）のみ（既存規約どおり）
+
+### パッケージ更新手順
+1. `~/repos/makxas-ai-kit` で変更
+2. `npm pack` → `makxas-ai-kit-X.X.X.tgz` を生成
+3. tgz を `vendor/` にコピー
+4. `package.json` の `@makxas/ai-kit` バージョン文字列を更新
+5. `npm install` → コミット（tgz ファイルも含む）
+
+---
+
+## 全社横断ルール反映（ADR）
+
+横断決定の正本は `makxas-ai-native/decisions/`。本 repo に関係する確定事項:
+
+- **ADR-0029（全ツール共通 埋め込みAIアシスタント基盤のサービス境界）**: 1. **対話オーケストレータと埋め込みアシスタント基盤を分離する。** makxas-agent の `chatwork-webhook`（対話オーケストレータ・約4,649行のモノリス）には**同居させない**。 2. **集約サーバは当面作らない。** 共有ライブラリ（`makxas-ai-kit`）＋ 統制規約で実現する（ハイブリッド）。詳細: `makxas-ai-native/decisions/ADR-0029-copilot-assistant-platform-boundary.md`。
+- **ADR-0029 RLS 対応**: `ai_chats` テーブルの RLS ポリシーは `auth.uid() = user_id` で行ロック。AI チャット履歴の参照・書き込みは必ずログイン済みユーザーのスコープ内に限定する。
