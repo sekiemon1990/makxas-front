@@ -7,13 +7,12 @@
  * 指定スタッフの過去返信履歴を「文体サンプル」として参照し、本人らしい
  * 文体で返信案を生成する。文体・口癖・絵文字の使い方を継承。
  *
- * MAKXAS思想：パーソナライズで「らしさ」を保ちつつレバー2の切り出しは
- * 必ず含める。
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { logAiUsage } from "@/lib/ai/usage";
+import { SALES_DOCTRINE_CORE } from "@makxas/ai-kit";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = "claude-haiku-4-5-20251001" as const;
@@ -89,7 +88,7 @@ export async function POST(request: NextRequest) {
       ? samples.map((s, i) => `--- 例${i + 1} ---\n${s}`).join("\n")
       : "（過去サンプルなし。一般的な丁寧体で生成）";
 
-  const systemPrompt = `あなたは買取マクサスの営業支援AIです。
+  const systemPrompt = `${SALES_DOCTRINE_CORE}\n\nあなたは買取マクサスの営業支援AIです。
 スタッフ「${staff.name ?? "本人"}」の文体を完全に模倣した返信案を作成してください。
 
 ## 文体サンプル（このスタッフの過去返信）
@@ -98,7 +97,6 @@ ${styleBlock}
 ## ルール
 - 上記サンプルの語尾・絵文字・敬語レベル・改行スタイルを忠実に再現
 - 内容は会話の文脈に沿わせる
-- MAKXAS思想：可能なら自然な形でレバー2（追加買取）の声掛けも織り込む
 - 押し売り厳禁
 - 返信文のみを出力（説明・JSON 不要）`;
 
