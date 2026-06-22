@@ -1,6 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import {
+  canWriteWithRole,
+  isApiWriteGuardTarget,
+} from "@/lib/auth/apiWritePolicy";
 import { safeNextPath } from "@/lib/safe-next";
 import type { Database } from "@/types/database";
 
@@ -80,6 +84,31 @@ export async function middleware(request: NextRequest) {
     redirectUrl.search = "";
     redirectUrl.searchParams.set("next", pathname + request.nextUrl.search);
     return NextResponse.redirect(redirectUrl);
+  }
+
+  if (
+    user &&
+    isApiWriteGuardTarget({
+      pathname,
+      method: request.method,
+      skipsMiddlewareAuth: isPublic,
+    })
+  ) {
+    const { data: staff, error: staffError } = await supabase
+      .from("staff")
+      .select("role, is_active")
+      .eq("auth_id", user.id)
+      .maybeSingle();
+
+    if (staffError || !staff?.is_active || !canWriteWithRole(staff.role)) {
+      return NextResponse.json(
+        {
+          error: "read_only_write_denied",
+          message: "読み取り専用アカウントでは変更操作はできません。",
+        },
+        { status: 403 },
+      );
+    }
   }
 
   if (user && pathname === "/login") {
