@@ -15,6 +15,7 @@ const PUBLIC_PREFIXES = [
   "/appointment", // PR37: 顧客向けアポ照会（トークン認証で別途保護）
   "/survey", // PR42: 顧客向けアンケート（トークン認証で別途保護）
   "/api/public", // PR37: 顧客向け公開API
+  "/api/health",
   "/auth/callback",
   "/api/auth/google",
   "/api/auth/password", // ADR-0007: ID・パスワード認証
