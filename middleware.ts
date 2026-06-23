@@ -16,6 +16,7 @@ const PUBLIC_PREFIXES = [
   "/survey", // PR42: 顧客向けアンケート（トークン認証で別途保護）
   "/api/public", // PR37: 顧客向け公開API
   "/api/health",
+  "/api/support/aggregate", // Bearer token guarded aggregate-only CS read contract
   "/auth/callback",
   "/api/auth/google",
   "/api/auth/password", // ADR-0007: ID・パスワード認証
