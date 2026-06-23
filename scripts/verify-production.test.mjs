@@ -4,6 +4,7 @@ import {
   classifyHealth,
   classifyLoginPage,
   classifyLoginRedirect,
+  classifySupportAggregateRead,
   normalizeBaseUrl,
 } from "./verify-production.mjs";
 
@@ -53,4 +54,54 @@ test("classifyLoginPage accepts a Japanese Next.js app shell", () => {
     }).ok,
     true,
   );
+});
+
+test("classifySupportAggregateRead accepts fail-closed unauthenticated checks without a token", () => {
+  const result = classifySupportAggregateRead({
+    status: 401,
+    body: {
+      ok: false,
+      service: "makxas-front",
+      domain: "support_aggregate",
+      error: "unauthorized",
+      db: "not_touched",
+      external_sends: 0,
+    },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.reason, "fail_closed_unauthorized");
+});
+
+test("classifySupportAggregateRead requires aggregate-only payloads when token is configured", () => {
+  const ok = classifySupportAggregateRead({
+    status: 200,
+    body: {
+      ok: true,
+      service: "makxas-front",
+      domain: "support_aggregate",
+      status: "read_only",
+      privacy: {
+        pii_returned: false,
+        free_text_returned: false,
+        aggregate_only: true,
+      },
+      metrics: { inquiries_total: 10 },
+      evidence: { query_mode: "read_only" },
+    },
+  }, { withToken: true });
+  assert.equal(ok.ok, true);
+
+  const unsafe = classifySupportAggregateRead({
+    status: 200,
+    body: {
+      service: "makxas-front",
+      domain: "support_aggregate",
+      status: "read_only",
+      privacy: { pii_returned: false, free_text_returned: false, aggregate_only: true },
+      metrics: { phone: "090-xxxx" },
+      evidence: { query_mode: "read_only" },
+    },
+  }, { withToken: true });
+  assert.equal(unsafe.ok, false);
+  assert.deepEqual(unsafe.unsafe_keys, ["metrics.phone"]);
 });
