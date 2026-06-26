@@ -97,24 +97,26 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // メール送信（Resend）
-    if (!channelSent && lead?.email && process.env.RESEND_API_KEY) {
+    // メール送信（Gateway 経由）
+    if (!channelSent && lead?.email && process.env.GATEWAY_BASE_URL) {
       try {
-        const resp = await fetch("https://api.resend.com/emails", {
+        const gatewayToken = process.env.GATEWAY_SHARED_TOKEN ?? '';
+        const fromEmail = process.env.RESEND_FROM_EMAIL ?? "noreply@makxas.com";
+        const resp = await fetch(`${process.env.GATEWAY_BASE_URL}/v1/email/send`, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+            Authorization: `Bearer ${gatewayToken}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: process.env.RESEND_FROM_EMAIL ?? "noreply@makxas.com",
+            from: fromEmail,
             to: lead.email,
             subject: "【査定前日のご確認】明日の査定について",
             text: reminderMsg,
           }),
         });
         if (resp.ok) channelSent = true;
-        else console.error("appointment-reminder: Resend error", await resp.text());
+        else console.error("appointment-reminder: Gateway email error", await resp.text());
       } catch (e) {
         console.error("appointment-reminder: Email send failed", e);
       }

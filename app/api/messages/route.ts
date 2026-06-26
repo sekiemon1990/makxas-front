@@ -1,6 +1,5 @@
 import * as line from "@line/bot-sdk";
 import { NextResponse, type NextRequest } from "next/server";
-import { Resend } from "resend";
 
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -143,7 +142,7 @@ export async function POST(request: NextRequest) {
       inquiry.leads as { email: string | null } | null
     )?.email;
 
-    if (leadEmail && process.env.RESEND_API_KEY) {
+    if (leadEmail && process.env.GATEWAY_BASE_URL) {
       try {
         // 返信用メールアカウントを取得（brand_id or store_id でマッチ、purpose=reply）
         const { data: replyAccount } = await supabase
@@ -166,23 +165,32 @@ export async function POST(request: NextRequest) {
         const fromName = replyAccount?.display_name ?? "買取マクサス";
         const emailSubject = body.subject?.trim() || inquiry.subject || "お問い合わせへのご返信";
 
-        const resend = new Resend(process.env.RESEND_API_KEY);
-        const { data: resendData, error: resendError } = await resend.emails.send({
-          from: `${fromName} <${fromEmail}>`,
-          to: [leadEmail],
-          subject: emailSubject,
-          text: body.body.trim(),
+        const gatewayToken = process.env.GATEWAY_SHARED_TOKEN ?? '';
+        const resp = await fetch(`${process.env.GATEWAY_BASE_URL}/v1/email/send`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${gatewayToken}`,
+          },
+          body: JSON.stringify({
+            from: `${fromName} <${fromEmail}>`,
+            to: [leadEmail],
+            subject: emailSubject,
+            text: body.body.trim(),
+          }),
         });
 
-        if (resendError) {
-          console.error("Resend email failed:", resendError);
-        } else if (resendData?.id) {
-          // email_msg_id を更新
-          await supabase
-            .from("messages")
-            .update({ email_msg_id: resendData.id })
-            .eq("id", message.id);
-          message.email_msg_id = resendData.id;
+        if (resp.ok) {
+          const data = (await resp.json()) as { id?: string };
+          if (data.id) {
+            await supabase
+              .from("messages")
+              .update({ email_msg_id: data.id })
+              .eq("id", message.id);
+            message.email_msg_id = data.id;
+          }
+        } else {
+          console.error("Gateway email send failed:", await resp.text());
         }
       } catch (emailError) {
         console.error("Email send error:", emailError);
