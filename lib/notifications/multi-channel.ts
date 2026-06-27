@@ -4,9 +4,9 @@
  * アポ確認メッセージなど、リードへの能動通知を LINE / Email / SMS の
  * いずれか or 複数チャネルで送信する共通モジュール。
  *
- * - LINE: @line/bot-sdk の pushMessage
- * - Email: Resend
- * - SMS: Twilio REST API（Messages リソース）
+ * - LINE: @line/bot-sdk の pushMessage（ADR-0073: Gateway 移行予定・sanctioned_direct）
+ * - Email: makxas-integrations-gateway /v1/comms/send/resend_transactional（ADR-0073 Phase 2 完了）
+ * - SMS: Twilio REST API（ADR-0073: Gateway 移行予定・sanctioned_direct）
  *
  * 失敗したチャネルは記録するが、他チャネルの送信は止めない（並列実行）。
  */
@@ -129,29 +129,31 @@ async function sendEmail(
   if (!recipient.email) {
     return { channel: "email", ok: false, error: "メールアドレス未登録" };
   }
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    return { channel: "email", ok: false, error: "RESEND_API_KEY 未設定" };
+  const gatewayBase = process.env.MAKXAS_INTEGRATIONS_GATEWAY_URL?.trim().replace(/\/+$/, "");
+  const gatewayToken =
+    process.env.MAKXAS_COMMS_GATEWAY_TOKEN ??
+    process.env.MAKXAS_GATEWAY_API_KEY_MAKXAS_FRONT ??
+    process.env.MAKXAS_INTEGRATIONS_GATEWAY_TOKEN;
+  if (!gatewayBase || !gatewayToken) {
+    return { channel: "email", ok: false, error: "Gateway env 未設定 (MAKXAS_INTEGRATIONS_GATEWAY_URL / token)" };
   }
   const from = recipient.emailFrom ?? "買取マクサス <noreply@makxas.com>";
   const subject = recipient.emailSubject ?? "ご予約のご確認";
   try {
-    const res = await fetch("https://api.resend.com/emails", {
+    const res = await fetch(`${gatewayBase}/v1/comms/send/resend_transactional`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+        authorization: `Bearer ${gatewayToken}`,
+        "content-type": "application/json",
       },
       body: JSON.stringify({
-        from,
-        to: [recipient.email],
-        subject,
-        text: message,
+        recipient: { kind: "email_address", id: recipient.email },
+        message: { from, subject, text: message },
       }),
     });
     if (!res.ok) {
       const detail = await res.text();
-      return { channel: "email", ok: false, error: `Resend ${res.status}`, detail };
+      return { channel: "email", ok: false, error: `Gateway comms ${res.status}`, detail };
     }
     return { channel: "email", ok: true };
   } catch (e) {
