@@ -1,0 +1,57 @@
+name: 本番UI自動目視 E2E（ADR-0066）
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        required: false
+        description: "テスト対象URL（省略時は vars.E2E_BASE_URL）"
+  schedule:
+    - cron: "0 22 * * *"
+concurrency:
+  group: e2e-prod
+  cancel-in-progress: true
+jobs:
+  e2e:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'deployment_status' &&
+       github.event.deployment_status.state == 'success' &&
+       (github.event.deployment.environment == 'Production' ||
+        github.event.deployment.environment == 'production'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: E2E 実行
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ inputs.base_url || vars.E2E_BASE_URL || github.event.deployment_status.environment_url || 'https://makxas-front.vercel.app' }}
+          E2E_BYPASS_TOKEN: ${{ secrets.E2E_BYPASS_TOKEN }}
+        run: npx playwright test tests/e2e/smoke.spec.ts --reporter=list
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-artifacts-${{ github.run_number }}
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 14
+      - name: Chatwork 失敗通知
+        if: failure()
+        env:
+          GATEWAY_URL: ${{ secrets.MAKXAS_AGENT_FUNCTIONS_BASE_URL }}
+          BOT_TOKEN: ${{ secrets.CHATWORK_BOT_SEND_TOKEN }}
+          ROOM_ID: ${{ secrets.CHATWORK_OPS_ROOM_ID }}
+        run: |
+          if [ -z "$GATEWAY_URL" ] || [ -z "$BOT_TOKEN" ] || [ -z "$ROOM_ID" ]; then exit 0; fi
+          curl -sf -X POST "$GATEWAY_URL/chatwork-webhook/bot-send" \
+            -H "Authorization: Bearer $BOT_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"room_id\": $ROOM_ID, \"message\": \"[info][title]🔴 makxas-front 本番E2E失敗[/title]${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}[/info]\", \"dry_run\": false}"
