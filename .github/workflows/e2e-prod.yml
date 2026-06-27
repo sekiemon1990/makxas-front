@@ -29,7 +29,7 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium webkit
       - name: E2E 実行
         env:
           PLAYWRIGHT_BASE_URL: ${{ inputs.base_url || vars.E2E_BASE_URL || github.event.deployment_status.environment_url || 'https://makxas-front.vercel.app' }}
