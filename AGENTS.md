@@ -127,6 +127,12 @@ Supabase Pro昇格の判断基準: DB容量400MB超 / 同時接続上限頻発 /
 - `call_sessions`: 電話セッション（Phase 2〜）
 - `email_accounts`: メールアカウント設定（Phase 2〜）
 
+## Company Memory Phase2+ 出力境界（ADR-0074）
+
+- Company Memory に渡せる反響/会話由来データは、正本を本 repo 側に残した `redacted summary` の derived record のみ。raw chat / raw message / 顧客PII / LINE ID / secret は記憶層へ送らない。
+- 記憶層へ渡す前に `lib/company-memory/redacted-summary-contract.ts` の contract を通し、`redaction_contract=adr0074-redacted-summary-v1`、`deletion_contract=source-pointer-delete-or-expire`、`source_pointer_contract=canonical-pointer-only`、`phase2_go=conditional-redacted-summary` を必須にする。
+- 正本削除・保持期限切れ時は source pointer で逆引きできる derived record を削除または expire できることを維持する。未実装の exporter は pointer-only / fail-closed。
+
 ## マクサスコア連携
 
 ### API 接続情報（2026-05 確認済み）
