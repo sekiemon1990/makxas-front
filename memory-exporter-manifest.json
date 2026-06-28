@@ -1,0 +1,26 @@
+{
+  "schema": "makxas.company_memory.source_exporter_manifest.v1",
+  "repo": "makxas-front",
+  "phase": "phase2",
+  "status": "dry_run_ready",
+  "summary": "Inbound lead and chat memory export is allowed only as redacted derived summaries with canonical source pointers.",
+  "dry_run_command": "npm run memory:exporter:dry-run",
+  "real_data_read": false,
+  "production_write": false,
+  "external_send": false,
+  "raw_payload_allowed": false,
+  "pii_allowed": false,
+  "allowed_kinds": ["conversation"],
+  "allowed_input_modes": ["redacted-summary"],
+  "contracts": {
+    "redaction_contract": "adr0074-redacted-summary-v1",
+    "deletion_contract": "source-pointer-delete-or-expire",
+    "source_pointer_contract": "canonical-pointer-only"
+  },
+  "source_events": {
+    "gateway_path": "/v1/company-memory/source-events",
+    "events": ["source_deleted", "source_expired", "source_retracted"],
+    "default_execute": false
+  },
+  "live_go_required": true
+}

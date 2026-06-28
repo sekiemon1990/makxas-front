@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "memory:exporter:dry-run": "vitest run lib/company-memory/*.test.ts",
     "verify:production": "node scripts/verify-production.mjs",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
