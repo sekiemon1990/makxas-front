@@ -1,0 +1,14 @@
+{
+  "schema": "makxas.visual_evidence.repo_rollout.v1",
+  "repo": "makxas-front",
+  "kind": "ui_e2e_sensitive",
+  "rollout_status": "done",
+  "ui_e2e": true,
+  "sensitive": true,
+  "blocked_sensitive_required": true,
+  "upload_raw_artifacts": false,
+  "primary_route": "/auth/login",
+  "e2e_workflow": ".github/workflows/e2e-prod.yml",
+  "alternative_verification": "Customer lead/PII UI uses blocked_sensitive manifest only. Raw screenshots, trace, video, and Playwright HTML report are not uploaded.",
+  "db_impact": "no_db_impact"
+}

@@ -29,22 +29,54 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium webkit
+      - run: npx playwright install --with-deps chromium
       - name: E2E 実行
+        id: e2e
         env:
+          E2E_BASE_URL: ${{ inputs.base_url || vars.E2E_BASE_URL || github.event.deployment_status.environment_url || 'https://makxas-front.vercel.app' }}
           PLAYWRIGHT_BASE_URL: ${{ inputs.base_url || vars.E2E_BASE_URL || github.event.deployment_status.environment_url || 'https://makxas-front.vercel.app' }}
           E2E_BYPASS_TOKEN: ${{ secrets.E2E_BYPASS_TOKEN }}
-        run: npx playwright test tests/e2e/smoke.spec.ts --reporter=list
-      - if: failure()
+        run: |
+          set +e
+          npx playwright test tests/e2e/smoke.spec.ts --reporter=list
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Visual Evidence manifest 生成
+        id: visual_evidence
+        if: always()
+        run: |
+          node scripts/visual-evidence-manifest.mjs \
+            --out test-results/visual-evidence-manifest.json \
+            --source github_artifact \
+            --kind trace \
+            --route /auth/login \
+            --viewport desktop \
+            --evidence-root test-results \
+            --retention-days 14 \
+            --contains-pii true \
+            --ui blocked_sensitive \
+            --function "${{ steps.e2e.outputs.exit_code == '0' && 'ok' || 'failed' }}" \
+            --db no_db_impact \
+            --ocr-summary "makxas-front blocked_sensitive production smoke. Raw screenshots, trace, video, and HTML report are not uploaded."
+      - name: sensitive raw artifact cleanup
+        if: always()
+        run: |
+          mkdir -p .visual-evidence-sensitive
+          cp test-results/visual-evidence-manifest.json .visual-evidence-sensitive/visual-evidence-manifest.json
+          rm -rf test-results playwright-report
+          mkdir -p test-results
+          cp .visual-evidence-sensitive/visual-evidence-manifest.json test-results/visual-evidence-manifest.json
+      - name: Upload blocked_sensitive Visual Evidence manifest
+        if: always() && steps.visual_evidence.outcome == 'success' && steps.visual_evidence.outputs.contains_sensitive == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-artifacts-${{ github.run_number }}
+          name: visual-evidence-manifest-${{ github.run_number }}
           path: |
-            test-results/
-            playwright-report/
+            test-results/visual-evidence-manifest.json
           retention-days: 14
       - name: Chatwork 失敗通知
-        if: failure()
+        if: always() && steps.e2e.outputs.exit_code != '' && steps.e2e.outputs.exit_code != '0'
         env:
           GATEWAY_URL: ${{ secrets.MAKXAS_AGENT_FUNCTIONS_BASE_URL }}
           BOT_TOKEN: ${{ secrets.CHATWORK_BOT_SEND_TOKEN }}
@@ -55,3 +87,8 @@ jobs:
             -H "Authorization: Bearer $BOT_TOKEN" \
             -H "Content-Type: application/json" \
             -d "{\"room_id\": $ROOM_ID, \"message\": \"[info][title]🔴 makxas-front 本番E2E失敗[/title]${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}[/info]\", \"dry_run\": false}"
+      - name: E2E 結果反映
+        if: always() && steps.e2e.outputs.exit_code != '0'
+        run: |
+          code="${{ steps.e2e.outputs.exit_code }}"
+          exit "${code:-1}"
